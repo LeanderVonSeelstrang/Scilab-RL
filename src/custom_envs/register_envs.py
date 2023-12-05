@@ -122,6 +122,9 @@ def register_custom_envs():
     register(id='Reach1DOF-v0',
              entry_point='custom_envs.reach1dof.reach1dof_env:Reach1DOFEnv',
              max_episode_steps=50)
+    register(id="MoonlanderWorld-v0",
+             entry_point="custom_envs.moonlander.moonlander_env:MoonlanderWorldEnv",
+             max_episode_steps=500)
 
     for n_objects in range(3):
         register(id=f'Hook-o{n_objects}-v1',

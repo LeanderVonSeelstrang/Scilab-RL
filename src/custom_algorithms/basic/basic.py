@@ -53,7 +53,8 @@ class BASIC:
 
         # Networks
         n_obs = self.observation_space.shape[0]
-        n_actions = self.action_space.shape[0]
+        # n_actions = self.action_space.shape[0]
+        n_actions = self.action_space.n
         self.actor = create_nn(net_arch, n_obs, n_actions)
         self.a_opt = th.optim.Adam(self.actor.parameters(), lr=learning_rate)
         self.critic = create_nn(net_arch, n_obs + n_actions, 1)
@@ -75,7 +76,8 @@ class BASIC:
         if self.num_timesteps == 0:
             callback.on_rollout_start()
         while self.num_timesteps < total_timesteps:
-            action = self._get_action(self._last_obs, deterministic=False)
+            # action = self._get_action(self._last_obs, deterministic=False)
+            action = self._get_action(self._last_obs, deterministic=True)
             obs, rewards, done, info = self.env.step(action)
             obs = obs.astype('double')
             q = self.target(
@@ -153,7 +155,8 @@ class BASIC:
         """
         obs = th.tensor(obs.flatten()).double()
         with th.no_grad():
-            action = self.actor(obs).detach().numpy()
+            # action = self.actor(obs).detach().numpy()
+            action = th.distributions.Categorical(logits=self.actor(obs)).sample().detach().numpy()
         if not deterministic:
             action += self.noise_factor * (np.random.normal(size=len(action)) - 0.5)
         action = np.clip(action, -1, 1)
