@@ -3,7 +3,7 @@ world:
   x_width: 40
   y_height: 500
   # Difficulty (empty, easy, middle, hard) scaling the number of objects and drifts
-  difficulty: easy
+  difficulty: hard
   drift:
     # Length of a drift range
     length: 15
@@ -19,7 +19,7 @@ world:
     drift_at_whole_level: empty
   objects:
     # obstacle (avoiding task) or coin (collecting task)
-    type: obstacle
+    type: coin
     # When set to true, objects will be more likely to be placed in the middle of the level
     # instead of being uniformly distributed.
     normalized_placement: True

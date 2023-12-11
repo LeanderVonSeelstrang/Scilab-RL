@@ -2,13 +2,12 @@
 All custom environments must be registered here, otherwise they won't be found.
 """
 from gymnasium.envs.registration import register
-import highway_env
 from metaworld.envs import ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
 from utils.custom_wrappers import MakeDictObs
+
 RESET = R = "r"  # Initial Reset position of the agent
 GOAL = G = "g"
 COMBINED = C = "c"  # These cells can be selected as goal or reset locations
-
 
 OPEN = [
     [1, 1, 1, 1, 1, 1, 1],
@@ -53,6 +52,7 @@ def _merge(a, b):
     a.update(b)
     return a
 
+
 def register_custom_envs():
     for n_objects in range(5):
         for gripper_goal in ['gripper_none', 'gripper_random', 'gripper_above']:
@@ -61,8 +61,9 @@ def register_custom_envs():
             distance_threshold = 0.05  # was originally 0.05
             register(id=f'Blocks-o{n_objects}-{gripper_goal}-v1',
                      entry_point='custom_envs.blocks.blocks_env:BlocksEnv',
-                     kwargs={'n_objects': n_objects, 'gripper_goal': gripper_goal, 'distance_threshold': distance_threshold},
-                     max_episode_steps=max(50, 50*n_objects))
+                     kwargs={'n_objects': n_objects, 'gripper_goal': gripper_goal,
+                             'distance_threshold': distance_threshold},
+                     max_episode_steps=max(50, 50 * n_objects))
 
     for reward_type in ["sparse", "dense"]:
         suffix = "Dense" if reward_type == "dense" else ""
@@ -71,34 +72,34 @@ def register_custom_envs():
         }
 
         register(id=f'AntGymnasiumMod{suffix}-dt15-openDGR-v0',
-            entry_point='custom_envs.ant.ant_env:AntGymMod',
-            kwargs = _merge(
-                {
-                    "continuing_task": False,  # No new goal will be generated when a goal is reached
-                    "distance_threshold": 1.5,
-                    "maze_map": OPEN_DIVERSE_GR,
-                },
-                kwargs,
-            ),
-            max_episode_steps = 700,
-            )
+                 entry_point='custom_envs.ant.ant_env:AntGymMod',
+                 kwargs=_merge(
+                     {
+                         "continuing_task": False,  # No new goal will be generated when a goal is reached
+                         "distance_threshold": 1.5,
+                         "maze_map": OPEN_DIVERSE_GR,
+                     },
+                     kwargs,
+                 ),
+                 max_episode_steps=700,
+                 )
         register(id=f'AntGymnasiumMod{suffix}-dt15-openDG-v0',
-             entry_point='custom_envs.ant.ant_env:AntGymMod',
-             kwargs=_merge(
-                 {
-                     "continuing_task": False,  # No new goal will be generated when a goal is reached
-                     "distance_threshold": 1.5,
-                     "maze_map": OPEN_DIVERSE_G,
-                 },
-                 kwargs,
-             ),
-             max_episode_steps=700,
-             )
+                 entry_point='custom_envs.ant.ant_env:AntGymMod',
+                 kwargs=_merge(
+                     {
+                         "continuing_task": False,  # No new goal will be generated when a goal is reached
+                         "distance_threshold": 1.5,
+                         "maze_map": OPEN_DIVERSE_G,
+                     },
+                     kwargs,
+                 ),
+                 max_episode_steps=700,
+                 )
         register(id=f'AntGymnasiumMod{suffix}-dt15-small-openDGR-v0',
                  entry_point='custom_envs.ant.ant_env:AntGymMod',
                  kwargs=_merge(
                      {
-                         "continuing_task": False, # No new goal will be generated when a goal is reached
+                         "continuing_task": False,  # No new goal will be generated when a goal is reached
                          "distance_threshold": 1.5,
                          "maze_map": SMALL_OPEN_DIVERSE_GR,
                      },
@@ -125,6 +126,10 @@ def register_custom_envs():
     register(id="MoonlanderWorld-v0",
              entry_point="custom_envs.moonlander.moonlander_env:MoonlanderWorldEnv",
              max_episode_steps=500)
+    register(id="MetaEnv-v0",
+             entry_point="custom_envs.moonlander.meta_env:MetaEnv",
+             # FIXME
+             max_episode_steps=5000)
 
     for n_objects in range(3):
         register(id=f'Hook-o{n_objects}-v1',
@@ -134,8 +139,8 @@ def register_custom_envs():
 
         register(id=f'ButtonUnlock-o{n_objects}-v1',
                  entry_point='custom_envs.button_unlock.button_unlock_env:ButtonUnlockEnv',
-                 kwargs={'n_buttons': n_objects+1},
-                 max_episode_steps=max(50, 50*n_objects))
+                 kwargs={'n_buttons': n_objects + 1},
+                 max_episode_steps=max(50, 50 * n_objects))
 
     register(
         id='parking-limited-v0',
@@ -154,6 +159,7 @@ def register_metaworld_envs():
             sparse - use the MakeDictObs wrapper and sparse rewards
             dense - use the MakeDictObs wrapper and dense rewards
             """
+
             def make_variable_goal_env(environment_class, environment_type):
                 def variable_goal_env(**kwargs):
                     """
@@ -174,8 +180,11 @@ def register_metaworld_envs():
                 return variable_goal_env
 
             if env_type == "original":
-                register(id=f"MetaW-{env_name[:-len('-goal-observable')]}", entry_point=make_variable_goal_env(env_class, env_type), max_episode_steps=500)
+                register(id=f"MetaW-{env_name[:-len('-goal-observable')]}",
+                         entry_point=make_variable_goal_env(env_class, env_type), max_episode_steps=500)
             elif env_type == "sparse":
-                register(id=f"MetaW-{env_name[:-len('-goal-observable')]}-sparse", entry_point=make_variable_goal_env(env_class, env_type), max_episode_steps=500)
+                register(id=f"MetaW-{env_name[:-len('-goal-observable')]}-sparse",
+                         entry_point=make_variable_goal_env(env_class, env_type), max_episode_steps=500)
             elif env_type == "dense":
-                register(id=f"MetaW-{env_name[:-len('-goal-observable')]}-dense", entry_point=make_variable_goal_env(env_class, env_type), max_episode_steps=500)
+                register(id=f"MetaW-{env_name[:-len('-goal-observable')]}-dense",
+                         entry_point=make_variable_goal_env(env_class, env_type), max_episode_steps=500)
