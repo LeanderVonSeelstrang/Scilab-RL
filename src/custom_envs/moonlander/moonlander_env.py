@@ -1,18 +1,21 @@
-import math
-import random as rnd
-from typing import List, Dict
 import copy
-import cv2
-import numpy as np
 import csv
 import datetime
+import logging
+import math
 import os
+import random as rnd
+from typing import List, Dict
+
+import cv2
+import numpy as np
+import yaml
+from PIL import Image, ImageDraw
 from gymnasium import Env
 from gymnasium import spaces
-import logging
-import yaml
+from hydra.utils import get_original_cwd
 
-import custom_envs.moonlander.helper_functions as hlp
+import src.custom_envs.moonlander.helper_functions as hlp
 
 
 class MoonlanderWorldEnv(Env):
@@ -22,10 +25,10 @@ class MoonlanderWorldEnv(Env):
         Args:
             config_path: Path to a YAML config for the environment
         """
-        # FIXME: This is a hack to allow the environment to be used without root_definition.py
-        self.ROOT_DIR = "/home/annika/coding_projects/Scilab-RL"
-        # FIXME: This is a hack to allow the environment to use the config.yaml file
-        config_path = "/home/annika/coding_projects/Scilab-RL/src/custom_envs/moonlander/standard_config.yaml"
+        self.ROOT_DIR = "."
+        config_path = os.path.join(
+            get_original_cwd(), "src/custom_envs/moonlander/standard_config.yaml"
+        )
 
         if config_path is not None:
             with open(config_path, "r") as file:
@@ -58,7 +61,9 @@ class MoonlanderWorldEnv(Env):
             )
         if config["world"]["objects"]["type"] not in ["obstacle", "coin"]:
             raise ValueError(
-                "object_type must be either 'obstacle' or 'coin' but was {}".format(config["world"]["objects"]["type"])
+                "object_type must be either 'obstacle' or 'coin' but was {}".format(
+                    config["world"]["objects"]["type"]
+                )
             )
 
         if config["world"]["drift"]["drift_at_whole_level"] not in [
@@ -77,7 +82,9 @@ class MoonlanderWorldEnv(Env):
         self.reward_function = config["reward_function"]
         self.already_crashed_objects = []
         if self.reward_function not in ["simple", "gaussian", "pos_neg"]:
-            raise ValueError("Reward function {} not implemented".format(self.reward_function))
+            raise ValueError(
+                "Reward function {} not implemented".format(self.reward_function)
+            )
         if self.reward_function == "pos_neg":
             self.pos_neg_reward_info_dict_per_step = {}
 
@@ -100,6 +107,7 @@ class MoonlanderWorldEnv(Env):
 
         self.current_time = str(datetime.datetime.now())
         self.episode_counter = 0
+        self.step_counter = 0
 
         # DYNAMIC VARIABLES
         logging.info("initialisation" + self.current_time + str(self.episode_counter))
@@ -151,10 +159,14 @@ class MoonlanderWorldEnv(Env):
             self.drift_ranges_with_drift_number = []
         elif drift_at_whole_level == "left":
             # start, stop, intensity, visibility, fake
-            self.drift_ranges_with_drift_number = [[1, world_config["y_height"], 1, False, False]]
+            self.drift_ranges_with_drift_number = [
+                [1, world_config["y_height"], 1, False, False]
+            ]
         elif drift_at_whole_level == "right":
             # start, stop, intensity, visibility, fake
-            self.drift_ranges_with_drift_number = [[1, world_config["y_height"], -1, False, False]]
+            self.drift_ranges_with_drift_number = [
+                [1, world_config["y_height"], -1, False, False]
+            ]
 
         logging.info("object_range_list" + str(object_range_list))
         logging.info("free ranges" + str(list_of_free_ranges))
@@ -207,28 +219,34 @@ class MoonlanderWorldEnv(Env):
         # INITIAL STATE
         self.observation_space = spaces.Box(
             low=-10,
-            high=5,
+            high=3,
             shape=(self.following_observations_size * (world_config["x_width"] + 2),),
             dtype=np.int64,
         )
 
         self.information_for_each_step = [[self.state, "Nan", "Nan"]]
         # save all x and y positions of the agent + action
-        self.positions_and_action = [[int(self.x_position_of_agent), int(self.y_position_of_agent), 1]]
+        self.positions_and_action = [
+            [int(self.x_position_of_agent), int(self.y_position_of_agent), 1]
+        ]
 
         ### LOGGING
         if verbose_level > 0:
             os.mkdir(self.ROOT_DIR + "/logs/" + self.current_time)
 
             ### OBJECTS
-            self.filepath_for_object_list = self.ROOT_DIR + "/logs/" + self.current_time + "/object_list.csv"
+            self.filepath_for_object_list = (
+                self.ROOT_DIR + "/logs/" + self.current_time + "/object_list.csv"
+            )
             # write the objects list of each episode to file
             with open(self.filepath_for_object_list, "a") as file:
                 writer = csv.writer(file)
                 writer.writerow([self.episode_counter, self.object_dict_list])
 
             ### WALLS
-            self.filepath_for_walls_dict = self.ROOT_DIR + "/logs/" + self.current_time + "/walls_dict.csv"
+            self.filepath_for_walls_dict = (
+                self.ROOT_DIR + "/logs/" + self.current_time + "/walls_dict.csv"
+            )
             # write the walls definition to file --> same for every episode
             if not os.path.exists(self.filepath_for_walls_dict):
                 with open(self.filepath_for_walls_dict, "w") as file:
@@ -236,18 +254,34 @@ class MoonlanderWorldEnv(Env):
                     writer.writerow([self.walls_dict])
 
             ### DRIFT
-            self.filepath_for_drift_ranges_list = self.ROOT_DIR + "/logs/" + self.current_time + "/drift_ranges.csv"
+            self.filepath_for_drift_ranges_list = (
+                self.ROOT_DIR + "/logs/" + self.current_time + "/drift_ranges.csv"
+            )
             # write the drift ranges of each episode to file
             with open(self.filepath_for_drift_ranges_list, "a") as file:
                 writer = csv.writer(file)
-                writer.writerow([self.episode_counter, self.drift_ranges_with_drift_number])
+                writer.writerow(
+                    [self.episode_counter, self.drift_ranges_with_drift_number]
+                )
 
             ### LOGGING EVERY EPISODE
             if verbose_level == 2:
-                self.filepath = self.ROOT_DIR + "/logs/" + self.current_time + "/" + str(self.episode_counter) + ".csv"
+                self.filepath = (
+                    self.ROOT_DIR
+                    + "/logs/"
+                    + self.current_time
+                    + "/"
+                    + str(self.episode_counter)
+                    + ".csv"
+                )
 
                 self.filepath_for_vis = (
-                    self.ROOT_DIR + "/logs/" + self.current_time + "/" + str(self.episode_counter) + "_vis.csv"
+                    self.ROOT_DIR
+                    + "/logs/"
+                    + self.current_time
+                    + "/"
+                    + str(self.episode_counter)
+                    + "_vis.csv"
                 )
 
                 # write the initial state to file
@@ -259,7 +293,9 @@ class MoonlanderWorldEnv(Env):
                 # write initial state to file
                 with open(self.filepath_for_vis, "a") as file:
                     writer = csv.writer(file)
-                    writer.writerow(["x_position_of_agent", "y_position_of_agent", "action"])
+                    writer.writerow(
+                        ["x_position_of_agent", "y_position_of_agent", "action"]
+                    )
                     writer.writerow(self.positions_and_action[0])
 
     def is_done(self) -> bool:
@@ -271,7 +307,8 @@ class MoonlanderWorldEnv(Env):
         """
         return (
             self.crashed
-            or self.y_position_of_agent + self.config["agent"]["observation_height"] == self.config["world"]["y_height"]
+            or self.y_position_of_agent + self.config["agent"]["observation_height"]
+            == self.config["world"]["y_height"]
         )
 
     def apply_action(self, action: int, step_width: int) -> None:
@@ -301,14 +338,20 @@ class MoonlanderWorldEnv(Env):
         # Pick out the first drift range that contains the current y position, and take its drift direction value
         (_, _, drift, _, is_drift_fake) = next(
             filter(
-                lambda drift_range: drift_range[0] <= self.y_position_of_agent <= drift_range[1],
+                lambda drift_range: drift_range[0]
+                <= self.y_position_of_agent
+                <= drift_range[1],
                 self.drift_ranges_with_drift_number,
             ),
             [0, 0, 0, True, False],
         )
 
         # Only apply drift of intensity n at every nth step
-        if not is_drift_fake and drift != 0 and self.y_position_of_agent % abs(drift) == 0:
+        if (
+            not is_drift_fake
+            and drift != 0
+            and self.y_position_of_agent % abs(drift) == 0
+        ):
             # Keep the direction (sign) but only move one step in the specified direction.
             # The magnitude indicates the intensity of the drift, but we don't have to
             # consider that here as the drift dict already leaves rows without drift if
@@ -324,8 +367,13 @@ class MoonlanderWorldEnv(Env):
         # a strong drift occurs and the agent simultaneously takes a step.
         if self.x_position_of_agent < self.config["agent"]["size"] - 1:
             self.x_position_of_agent = self.config["agent"]["size"] - 1
-        elif self.x_position_of_agent > self.config["world"]["x_width"] + 2 - self.config["agent"]["size"]:
-            self.x_position_of_agent = self.config["world"]["x_width"] + 2 - self.config["agent"]["size"]
+        elif (
+            self.x_position_of_agent
+            > self.config["world"]["x_width"] + 2 - self.config["agent"]["size"]
+        ):
+            self.x_position_of_agent = (
+                self.config["world"]["x_width"] + 2 - self.config["agent"]["size"]
+            )
 
     def update_observation(self) -> None:
         """
@@ -358,14 +406,21 @@ class MoonlanderWorldEnv(Env):
         if not self.no_crashes:
             if self.config["world"]["objects"]["type"] == "obstacle":
                 # agent is in obstacle or wall = crash
-                if self.has_agent_collided_with_wall() or len(self.find_intersections(self.object_dict_list)) > 0:
+                if (
+                    self.has_agent_collided_with_wall()
+                    or len(self.find_intersections(self.object_dict_list)) > 0
+                ):
                     self.crashed = True
                     if self.reward_function == "simple":
                         return -100
                     elif self.reward_function == "gaussian":
                         return -1000
                     elif self.reward_function == "pos_neg":
-                        raise ValueError("Reward function {} can not be used with crashes".format(self.reward_function))
+                        raise ValueError(
+                            "Reward function {} can not be used with crashes".format(
+                                self.reward_function
+                            )
+                        )
 
             else:
                 # agent is in wall = crash
@@ -376,16 +431,26 @@ class MoonlanderWorldEnv(Env):
                     elif self.reward_function == "gaussian":
                         return -1000
                     elif self.reward_function == "pos_neg":
-                        raise ValueError("Reward function {} can not be used with crashes".format(self.reward_function))
+                        raise ValueError(
+                            "Reward function {} can not be used with crashes".format(
+                                self.reward_function
+                            )
+                        )
                     else:
-                        raise ValueError("Reward function {} not implemented".format(self.reward_function))
+                        raise ValueError(
+                            "Reward function {} not implemented".format(
+                                self.reward_function
+                            )
+                        )
 
         if self.reward_function == "simple":
             relevant_shortened_state = list()
             for row in self.state[0 : 2 * self.config["agent"]["size"]]:
                 relevant_shortened_state.append(
                     row[
-                        max(self.x_position_of_agent - self.config["agent"]["size"], 0) : min(
+                        max(
+                            self.x_position_of_agent - self.config["agent"]["size"], 0
+                        ) : min(
                             self.x_position_of_agent + self.config["agent"]["size"] + 1,
                             self.state.shape[1],
                         )
@@ -427,7 +492,9 @@ class MoonlanderWorldEnv(Env):
 
                         x_positions_of_agent = []
                         for index in range_of_agent:
-                            x_positions_of_agent.append(self.x_position_of_agent + index)
+                            x_positions_of_agent.append(
+                                self.x_position_of_agent + index
+                            )
 
                         range_of_coin = range(
                             -(math.floor(coin["size"] / 2)),
@@ -463,10 +530,14 @@ class MoonlanderWorldEnv(Env):
             for i in range(2 * self.config["agent"]["size"] - 1):
                 # columns
                 if len(range_of_agent) == 0:
-                    values_of_agent_position.append(blurred_state[i][self.x_position_of_agent])
+                    values_of_agent_position.append(
+                        blurred_state[i][self.x_position_of_agent]
+                    )
                 else:
                     for j in range_of_agent:
-                        values_of_agent_position.append(blurred_state[i][self.x_position_of_agent - j])
+                        values_of_agent_position.append(
+                            blurred_state[i][self.x_position_of_agent - j]
+                        )
 
             # calculate reward
             reward = 0
@@ -491,9 +562,14 @@ class MoonlanderWorldEnv(Env):
             return int(normalized_reward)
             # TODO: test for image state
         elif self.reward_function == "pos_neg":
-            if self.config["world"]["difficulty"] != "easy" and self.config["world"]["difficulty"] != "hard":
+            if (
+                self.config["world"]["difficulty"] != "easy"
+                and self.config["world"]["difficulty"] != "hard"
+            ):
                 raise ValueError(
-                    "Reward function {} can only be used with easy and hard difficulty".format(self.reward_function)
+                    "Reward function {} can only be used with easy and hard difficulty".format(
+                        self.reward_function
+                    )
                 )
             # positive reward because of passing
             reward = 0
@@ -501,7 +577,8 @@ class MoonlanderWorldEnv(Env):
             self.pos_neg_reward_info_dict_per_step["neg"] = [0]
             for object in self.object_dict_list:
                 if (
-                    object["y"] + (2 * self.config["agent"]["size"] - 1) == self.y_position_of_agent
+                    object["y"] + (2 * self.config["agent"]["size"] - 1)
+                    == self.y_position_of_agent
                     and object not in self.already_crashed_objects
                 ):
                     if self.config["world"]["difficulty"] == "easy":
@@ -563,7 +640,9 @@ class MoonlanderWorldEnv(Env):
 
             return reward
         else:
-            raise ValueError("Reward function {} not implemented".format(self.reward_function))
+            raise ValueError(
+                "Reward function {} not implemented".format(self.reward_function)
+            )
 
     def has_agent_collided_with_wall(self) -> bool:
         """
@@ -577,7 +656,8 @@ class MoonlanderWorldEnv(Env):
             wall_index = str(self.y_position_of_agent - (size - 1) + agent_y_index)
             if (
                 self.x_position_of_agent - size < self.walls_dict[wall_index][0]
-                or self.x_position_of_agent + size - 1 > self.walls_dict[wall_index][1] - 1
+                or self.x_position_of_agent + size - 1
+                > self.walls_dict[wall_index][1] - 1
             ):
                 return True
         return False
@@ -618,7 +698,9 @@ class MoonlanderWorldEnv(Env):
         """
         # logging.info("step in env")
         if self.is_done():
-            raise EnvironmentError("no more action steps possible at current position in the environment")
+            raise EnvironmentError(
+                "no more action steps possible at current position in the environment"
+            )
 
         # APPLY ACTION
         self.apply_action(action=action, step_width=step_width)
@@ -645,7 +727,9 @@ class MoonlanderWorldEnv(Env):
                 action,
             ]
         ]
-        self.information_for_each_step = self.information_for_each_step + [[self.state, reward, self.is_done()]]
+        self.information_for_each_step = self.information_for_each_step + [
+            [self.state, reward, self.is_done()]
+        ]
 
         # at the end of the episode, write log files
         if self.config["verbose_level"] == 2 and self.is_done():
@@ -663,14 +747,37 @@ class MoonlanderWorldEnv(Env):
                 for step in self.positions_and_action[1:]:
                     writer.writerow(step)
 
+        self.step_counter += 1
         # return step information
         return self.state.flatten(), reward, self.is_done(), truncated, info
 
     def render(self, mode="human"):
-        """
-        not implemented!
-        """
-        raise NotImplementedError("visualisation is not implemented by now")
+        # read ascii text from numpy array
+        ascii_text = str(self.state)
+
+        # Create a new Image
+        # make sure the dimensions (W and H) are big enough for the ascii art
+        W, H = (3000, 3000)
+        im = Image.new("RGBA", (W, H), "white")
+
+        # Draw text to image
+        draw = ImageDraw.Draw(im)
+        _, _, w, h = draw.textbbox((0, 0), ascii_text)
+        # draws the text in the center of the image
+        draw.text(((W - w) / 2, (H - h) / 2), ascii_text, fill="black")
+
+        # Save Image
+        if not os.path.isdir(self.ROOT_DIR + "/rendering/" + str(self.episode_counter)):
+            os.mkdir(self.ROOT_DIR + "/rendering/" + str(self.episode_counter))
+        im.save(
+            self.ROOT_DIR
+            + "/rendering/"
+            + str(self.episode_counter)
+            + "/"
+            + str(self.step_counter)
+            + ".png",
+            "PNG",
+        )
 
     def reset(self, seed=None, options=None):
         """
@@ -678,6 +785,7 @@ class MoonlanderWorldEnv(Env):
         """
         # logging.info("reset " + self.current_time + str(self.episode_counter))
         self.episode_counter += 1
+        self.step_counter = 0
 
         agent_config = self.config["agent"]
         world_config = self.config["world"]
@@ -687,13 +795,19 @@ class MoonlanderWorldEnv(Env):
         # random x position of agent
         size = agent_config["size"]
         if agent_config["initial_x_position"] is None:
-            self.x_position_of_agent = rnd.randint(size, world_config["x_width"] - size + 1)
+            self.x_position_of_agent = rnd.randint(
+                size, world_config["x_width"] - size + 1
+            )
         else:
             self.x_position_of_agent = agent_config["initial_x_position"]
 
         self.y_position_of_agent = size
 
-        (object_range_list, list_of_free_ranges, drift_ranges,) = hlp.create_ranges_of_objects_funnels_and_drifts(
+        (
+            object_range_list,
+            list_of_free_ranges,
+            drift_ranges,
+        ) = hlp.create_ranges_of_objects_funnels_and_drifts(
             world_x_width=world_config["x_width"],
             world_y_height=world_config["y_height"],
             height_padding_areas=agent_config["observation_height"],
@@ -710,10 +824,14 @@ class MoonlanderWorldEnv(Env):
             self.drift_ranges_with_drift_number = []
         elif drift_at_whole_level == "left":
             # start, stop, intensity, visibility, fake
-            self.drift_ranges_with_drift_number = [[1, world_config["y_height"], 1, False, False]]
+            self.drift_ranges_with_drift_number = [
+                [1, world_config["y_height"], 1, False, False]
+            ]
         elif drift_at_whole_level == "right":
             # start, stop, intensity, visibility, fake
-            self.drift_ranges_with_drift_number = [[1, world_config["y_height"], -1, False, False]]
+            self.drift_ranges_with_drift_number = [
+                [1, world_config["y_height"], -1, False, False]
+            ]
 
         if (
             objects_config["type"] == "coin"
@@ -745,7 +863,9 @@ class MoonlanderWorldEnv(Env):
         self.update_observation()
 
         # save all x and y positions of the agent + action
-        self.positions_and_action = [[int(self.x_position_of_agent), int(self.y_position_of_agent), 1]]
+        self.positions_and_action = [
+            [int(self.x_position_of_agent), int(self.y_position_of_agent), 1]
+        ]
         self.information_for_each_step = [[self.state, "Nan", "Nan"]]
 
         if self.config["verbose_level"] > 0:
@@ -757,13 +877,27 @@ class MoonlanderWorldEnv(Env):
             ### DRIFT
             with open(self.filepath_for_drift_ranges_list, "a") as file:
                 writer = csv.writer(file)
-                writer.writerow([self.episode_counter, self.drift_ranges_with_drift_number])
+                writer.writerow(
+                    [self.episode_counter, self.drift_ranges_with_drift_number]
+                )
 
             ### LOGGING EVERY EPISODE
             if self.config["verbose_level"] == 2:
-                self.filepath = self.ROOT_DIR + "/logs/" + self.current_time + "/" + str(self.episode_counter) + ".csv"
+                self.filepath = (
+                    self.ROOT_DIR
+                    + "/logs/"
+                    + self.current_time
+                    + "/"
+                    + str(self.episode_counter)
+                    + ".csv"
+                )
                 self.filepath_for_vis = (
-                    self.ROOT_DIR + "/logs/" + self.current_time + "/" + str(self.episode_counter) + "_vis.csv"
+                    self.ROOT_DIR
+                    + "/logs/"
+                    + self.current_time
+                    + "/"
+                    + str(self.episode_counter)
+                    + "_vis.csv"
                 )
 
         # set placeholder for info

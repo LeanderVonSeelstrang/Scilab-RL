@@ -1,8 +1,8 @@
 import random as rnd
-import scipy.stats
 from typing import List, Dict, Tuple
 
 import numpy as np
+import scipy.stats
 
 
 def create_ranges_of_objects_funnels_and_drifts(
@@ -114,7 +114,9 @@ def create_ranges_of_objects_funnels_and_drifts(
         # we need two times the funnel (2*maximum_needed_range_for_funnel)
         # the remaining is for obstacles (y_height_without_starting_area - 2*maximum_needed_range_for_funnel)
         # we divide this by 2 because we have two phases of obstacles
-        remaining_range_for_objects = int((y_height_without_padding_area - (2 * maximum_needed_range_for_funnel)) / 2)
+        remaining_range_for_objects = int(
+            (y_height_without_padding_area - (2 * maximum_needed_range_for_funnel)) / 2
+        )
 
         ### OBJECTS
         object_range_list = [
@@ -205,7 +207,9 @@ def create_list_of_object_dicts(
         if number_of_objects < 0:
             raise ValueError("The number of objects must be >= 0.")
         if number_of_objects > 0 and object_range_list is None:
-            raise ValueError("If the number of objects is > 0, object_range_list must be specified.")
+            raise ValueError(
+                "If the number of objects is > 0, object_range_list must be specified."
+            )
         number_of_objects = int(number_of_objects / len(object_range_list))
 
     # loop through the list of all ranges where obstacles occur
@@ -299,15 +303,20 @@ def generate_object_field(
     generated_height = range_length - 2 * object_padding
 
     if normalized_object_placement:
-
-        row_probabilities = scipy.stats.binom.pmf(k=np.arange(generated_width), p=0.5, n=generated_width)
+        row_probabilities = scipy.stats.binom.pmf(
+            k=np.arange(generated_width), p=0.5, n=generated_width
+        )
 
         # Divide probabilities by number of rows so the total probability over all rows sums to 1
         # We also multiply by row_probabilities.sum() as the sum for one row doesn't quite equal 1 otherwise
-        row_probabilities = np.divide(row_probabilities, generated_height * row_probabilities.sum())
+        row_probabilities = np.divide(
+            row_probabilities, generated_height * row_probabilities.sum()
+        )
 
         # Repeat the probabilities of one row, for each row
-        probability_table = np.resize(row_probabilities, new_shape=generated_width * generated_height)
+        probability_table = np.resize(
+            row_probabilities, new_shape=generated_width * generated_height
+        )
 
     else:
         if allow_overlapping_objects:
@@ -318,14 +327,15 @@ def generate_object_field(
 
     # Generate obstacles using numpy vectorization
     if allow_overlapping_objects:
-        object_indexes = np.random.choice(a=cell_count, size=number_of_objects, p=probability_table, replace=False)
+        object_indexes = np.random.choice(
+            a=cell_count, size=number_of_objects, p=probability_table, replace=False
+        )
 
     # Generate objects one by one
     else:
         object_indexes = np.zeros(number_of_objects, dtype=np.int32)
 
         for i in range(number_of_objects):
-
             total_weight = probability_table.sum()
             if total_weight == 0:
                 print("Warning: Insufficient space to place all obstacles!")
@@ -339,7 +349,9 @@ def generate_object_field(
 
             # Set probabilities to zero for all cells where another obstacle
             # would collide with this one
-            x, y = np.unravel_index(indices=object_indexes[i], shape=(generated_width, generated_height))
+            x, y = np.unravel_index(
+                indices=object_indexes[i], shape=(generated_width, generated_height)
+            )
 
             # Range of x values that must not get another obstacle to avoid collisions (max exclusive)
             # min/max to avoid going over the array bounds
@@ -352,7 +364,9 @@ def generate_object_field(
             max_invalid_y = min(y + 2 * object_size - 1, generated_height)
 
             # Set the corresponding ranges to 0
-            probability_table[min_invalid_x:max_invalid_x, min_invalid_y:max_invalid_y] = 0
+            probability_table[
+                min_invalid_x:max_invalid_x, min_invalid_y:max_invalid_y
+            ] = 0
 
     # Convert flattened indices back to 2D indices
     x, y = np.unravel_index(
@@ -387,7 +401,6 @@ def create_dict_of_world_walls(
     """
     wall_dict = dict()
     for free_range in list_of_free_ranges:
-
         # the funnel gets smaller and wider in the complete free range
         # the lengths of the funnel indicates one of this cones
         lengths_of_funnel = int((len(range(free_range[0], free_range[1]))) / 2)
@@ -396,7 +409,6 @@ def create_dict_of_world_walls(
         count_same_size = 0
 
         for index in range(free_range[0], free_range[1]):
-
             # x and y value of the wall
             wall_dict[str(index)] = [
                 0 + current_wall_change_number,
@@ -486,10 +498,14 @@ def create_drift_ranges(
         while not_found_range:
             if counter == 100:
                 raise EnvironmentError(
-                    f"Could not find a valid drift range after {counter} tries.".format(counter=counter)
+                    f"Could not find a valid drift range after {counter} tries.".format(
+                        counter=counter
+                    )
                 )
             # define a random drift range
-            random_drift_starting_position = rnd.randrange(start=1, stop=world_y_height - drift_length + 1)
+            random_drift_starting_position = rnd.randrange(
+                start=1, stop=world_y_height - drift_length + 1
+            )
             random_drift_range = range(
                 random_drift_starting_position,
                 random_drift_starting_position + drift_length,
@@ -518,10 +534,13 @@ def create_drift_ranges(
                     break
 
             if not overlapping_with_disallowed_range:
-
                 random_number = rnd.random()
                 is_visible = random_number >= invisible_drift_probability
-                is_fake = 0 < random_number - invisible_drift_probability <= fake_drift_probability
+                is_fake = (
+                    0
+                    < random_number - invisible_drift_probability
+                    <= fake_drift_probability
+                )
 
                 # the drifts randomly choose between a drift to the right and a drift to the left
                 if not use_variable_drift_intensity:
@@ -582,7 +601,9 @@ def create_agent_observation(
 
     # The width + 2 is because we have entries for the walls on the left and right, which don't count
     # towards the world width.
-    matrix = np.zeros(shape=(following_observation_size, world_x_width + 2), dtype=np.int16)
+    matrix = np.zeros(
+        shape=(following_observation_size, world_x_width + 2), dtype=np.int16
+    )
 
     add_drift_to_observation(
         observation_start_row=agent_y_position - agent_size + 1,
@@ -592,7 +613,6 @@ def create_agent_observation(
     )
 
     for index in range(following_observation_size):
-
         matrix_row = matrix[index, :]
 
         current_y_position = agent_y_position + index - agent_size + 1
@@ -608,7 +628,7 @@ def create_agent_observation(
                 current_relevant_object_dict_list=current_relevant_object_dict_list,
                 current_y_position=current_y_position,
                 matrix_row=matrix_row,
-                symbol=-1,
+                symbol=3,
             )
         else:
             add_objects_to_observation(
@@ -629,7 +649,9 @@ def create_agent_observation(
     return np.array(matrix)
 
 
-def add_agent_to_observation(agent_size, agent_x_position, index, matrix_row, world_x_width):
+def add_agent_to_observation(
+    agent_size, agent_x_position, index, matrix_row, world_x_width
+):
     if index <= (2 * agent_size - 2):
         for index_agent in range(
             max(0, int(agent_x_position - agent_size + 1)),
@@ -642,20 +664,28 @@ def add_agent_to_observation(agent_size, agent_x_position, index, matrix_row, wo
                 matrix_row[index_agent] = -10
 
 
-def add_objects_to_observation(current_relevant_object_dict_list, current_y_position, matrix_row, symbol):
+def add_objects_to_observation(
+    current_relevant_object_dict_list, current_y_position, matrix_row, symbol
+):
     for obj in current_relevant_object_dict_list:
         # check if obj lays in current position
-        if obj["y"] - obj["size"] + 1 <= current_y_position <= obj["y"] + obj["size"] - 1:
+        if (
+            obj["y"] - obj["size"] + 1
+            <= current_y_position
+            <= obj["y"] + obj["size"] - 1
+        ):
             # if so, mark the x positions of the obstacles
             matrix_row[obj["x"] - obj["size"] + 1 : obj["x"] + obj["size"]] = symbol
 
 
-def add_drift_to_observation(observation_start_row, following_observation_size, drift_ranges, matrix):
+def add_drift_to_observation(
+    observation_start_row, following_observation_size, drift_ranges, matrix
+):
     # Per default, there is no drift on either side, just the walls
     matrix[:, 0] = -1
     matrix[:, -1] = -1
 
-    for (start, end, drift, is_visible, is_fake) in drift_ranges:
+    for start, end, drift, is_visible, is_fake in drift_ranges:
         # Check whether either end of a drift is visible in the observation space, and the drift is visible
         if (
             not len(
