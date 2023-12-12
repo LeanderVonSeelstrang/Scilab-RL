@@ -14,6 +14,7 @@ from PIL import Image, ImageDraw
 from gymnasium import Env
 from gymnasium import spaces
 from hydra.utils import get_original_cwd
+from matplotlib import pyplot as plt
 
 # FIXME
 np.set_printoptions(threshold=np.inf)
@@ -113,6 +114,11 @@ class MoonlanderWorldEnv(Env):
         self.current_time = str(datetime.datetime.now())
         self.episode_counter = 0
         self.step_counter = 0
+
+        # for rendering
+        plt.ion()
+        self.fig, self.ax = plt.subplots()
+        self.im = self.ax.imshow(np.zeros((self.state.shape)))
 
         # DYNAMIC VARIABLES
         logging.info("initialisation" + self.current_time + str(self.episode_counter))
@@ -757,35 +763,41 @@ class MoonlanderWorldEnv(Env):
         return self.state.flatten(), reward, self.is_done(), truncated, info
 
     def render(self, mode="human"):
-        # read ascii text from numpy array
-        ascii_text = str(self.state)
+        self.im.set_data(self.state)
+        if mode == "human":
+            self.fig.canvas.draw_idle()
+        elif mode == "rgb_array":
+            # read ascii text from numpy array
+            ascii_text = str(self.state)
 
-        # Create a new Image
-        # make sure the dimensions (W and H) are big enough for the ascii art
-        W, H = (3000, 3000)
-        im = Image.new("RGBA", (W, H), "white")
+            # Create a new Image
+            # make sure the dimensions (W and H) are big enough for the ascii art
+            W, H = (3000, 3000)
+            im = Image.new("RGBA", (W, H), "white")
 
-        # Draw text to image
-        draw = ImageDraw.Draw(im)
-        _, _, w, h = draw.textbbox((0, 0), ascii_text)
-        # draws the text in the center of the image
-        draw.text(((W - w) / 2, (H - h) / 2), ascii_text, fill="black")
+            # Draw text to image
+            draw = ImageDraw.Draw(im)
+            _, _, w, h = draw.textbbox((0, 0), ascii_text)
+            # draws the text in the center of the image
+            draw.text(((W - w) / 2, (H - h) / 2), ascii_text, fill="black")
 
-        # show image
-        im.show()
+            # show image
+            im.show()
 
-        # Save Image
-        if not os.path.isdir(self.ROOT_DIR + "/rendering/" + str(self.episode_counter)):
-            os.mkdir(self.ROOT_DIR + "/rendering/" + str(self.episode_counter))
-        im.save(
-            self.ROOT_DIR
-            + "/rendering/"
-            + str(self.episode_counter)
-            + "/"
-            + str(self.step_counter)
-            + ".png",
-            "PNG",
-        )
+            # Save Image
+            if not os.path.isdir(
+                self.ROOT_DIR + "/rendering/" + str(self.episode_counter)
+            ):
+                os.mkdir(self.ROOT_DIR + "/rendering/" + str(self.episode_counter))
+            im.save(
+                self.ROOT_DIR
+                + "/rendering/"
+                + str(self.episode_counter)
+                + "/"
+                + str(self.step_counter)
+                + ".png",
+                "PNG",
+            )
 
     def reset(self, seed=None, options=None):
         """
