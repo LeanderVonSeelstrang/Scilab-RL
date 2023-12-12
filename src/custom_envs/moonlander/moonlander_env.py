@@ -15,6 +15,10 @@ from gymnasium import Env
 from gymnasium import spaces
 from hydra.utils import get_original_cwd
 
+# FIXME
+np.set_printoptions(threshold=np.inf)
+np.set_printoptions(linewidth=np.inf)
+
 import src.custom_envs.moonlander.helper_functions as hlp
 
 
@@ -27,7 +31,8 @@ class MoonlanderWorldEnv(Env):
         """
         self.ROOT_DIR = "."
         config_path = os.path.join(
-            get_original_cwd(), "src/custom_envs/moonlander/standard_config.yaml"
+            get_original_cwd(),
+            "custom_envs/moonlander/standard_config_second_task.yaml",
         )
 
         if config_path is not None:
@@ -765,6 +770,9 @@ class MoonlanderWorldEnv(Env):
         _, _, w, h = draw.textbbox((0, 0), ascii_text)
         # draws the text in the center of the image
         draw.text(((W - w) / 2, (H - h) / 2), ascii_text, fill="black")
+
+        # show image
+        im.show()
 
         # Save Image
         if not os.path.isdir(self.ROOT_DIR + "/rendering/" + str(self.episode_counter)):

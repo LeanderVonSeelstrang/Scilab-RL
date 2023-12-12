@@ -38,7 +38,7 @@ agent:
   initial_x_position:
 
 # Reward Function (simple, gaussian, pos_neg)
-reward_function: gaussian
+reward_function: pos_neg
 
 # Level of logging, affecting both printing and files
 verbose_level: 0
