@@ -384,14 +384,14 @@ class MoonlanderWorldEnv(Env):
 
         # Clamp x position to the allowed range, to avoid the agents clipping out of bounds when
         # a strong drift occurs and the agent simultaneously takes a step.
-        if self.x_position_of_agent < self.config["agent"]["size"] - 1:
-            self.x_position_of_agent = self.config["agent"]["size"] - 1
+        if self.x_position_of_agent < self.config["agent"]["size"]:
+            self.x_position_of_agent = self.config["agent"]["size"]
         elif (
             self.x_position_of_agent
-            > self.config["world"]["x_width"] + 2 - self.config["agent"]["size"]
+            > self.config["world"]["x_width"] + 1 - self.config["agent"]["size"]
         ):
             self.x_position_of_agent = (
-                self.config["world"]["x_width"] + 2 - self.config["agent"]["size"]
+                self.config["world"]["x_width"] + 1 - self.config["agent"]["size"]
             )
 
     def update_observation(self) -> None:
@@ -780,7 +780,7 @@ class MoonlanderWorldEnv(Env):
             ascii_text = str(img_state)
             # Create a new Image
             # make sure the dimensions (W and H) are big enough for the ascii art
-            W, H = (800, 600)
+            W, H = (550, 500)
             im = Image.new("RGBA", (W, H), "white")
 
             # Draw text to image
@@ -789,24 +789,6 @@ class MoonlanderWorldEnv(Env):
             # draws the text in the center of the image
             draw.text(((W - w) / 2, (H - h) / 2), ascii_text, fill="black")
             return np.array(im)
-
-            # show image
-            # im.show()
-            #
-            # # Save Image
-            # if not os.path.isdir(
-            #     self.ROOT_DIR + "/rendering/" + str(self.episode_counter)
-            # ):
-            #     os.mkdir(self.ROOT_DIR + "/rendering/" + str(self.episode_counter))
-            # im.save(
-            #     self.ROOT_DIR
-            #     + "/rendering/"
-            #     + str(self.episode_counter)
-            #     + "/"
-            #     + str(self.step_counter)
-            #     + ".png",
-            #     "PNG",
-            # )
 
     def reset(self, seed=None, options=None):
         """
