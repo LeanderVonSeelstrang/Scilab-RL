@@ -7,7 +7,7 @@ env: 'MoonlanderWorld-v0'
 eval_after_n_steps: 20000
 # The max. number of training epochs to run. One epoch consists of 'eval_after_n_steps' actions.
 n_epochs: 30
-hyperopt_criterion: 'train/rollout_rewards_mean'
+hyperopt_criterion: 'eval/mean_reward'
 
 algorithm:
   gamma: 0.99
