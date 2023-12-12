@@ -19,7 +19,7 @@ from hydra.utils import get_original_cwd
 np.set_printoptions(threshold=np.inf)
 np.set_printoptions(linewidth=np.inf)
 
-import src.custom_envs.moonlander.helper_functions as hlp
+import helper_functions as hlp
 
 
 class MoonlanderWorldEnv(Env):
