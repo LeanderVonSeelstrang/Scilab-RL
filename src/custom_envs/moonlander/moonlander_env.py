@@ -26,9 +26,9 @@ import custom_envs.moonlander.helper_functions as hlp
 class MoonlanderWorldEnv(Env):
     render_mode = None
     metadata = {
-            "render_modes": ["human", "rgb_array"],
-            "render_fps": 10,
-            }
+        "render_modes": ["human", "rgb_array"],
+        "render_fps": 10,
+    }
 
     def __init__(self, config: Dict = None, config_path: str = None):
         """
@@ -120,7 +120,6 @@ class MoonlanderWorldEnv(Env):
         self.current_time = str(datetime.datetime.now())
         self.episode_counter = 0
         self.step_counter = 0
-
 
         # DYNAMIC VARIABLES
         logging.info("initialisation" + self.current_time + str(self.episode_counter))
