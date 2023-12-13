@@ -4,24 +4,32 @@ import os
 import gymnasium as gym
 import numpy as np
 import yaml
+from PIL import Image, ImageDraw
 from hydra.utils import get_original_cwd
+from matplotlib import pyplot as plt
 
 # FIXME
 np.set_printoptions(threshold=np.inf)
 np.set_printoptions(linewidth=np.inf)
 
-from src.custom_envs.moonlander.moonlander_env import MoonlanderWorldEnv
+from custom_envs.moonlander.moonlander_env import MoonlanderWorldEnv
 
 
 class MetaEnv(gym.Env):
+    render_mode = None
+    metadata = {
+        "render_modes": ["human", "rgb_array"],
+        "render_fps": 10,
+    }
+
     def __init__(self):
         self.ROOT_DIR = "."
         config_path_dodge_asteroids = os.path.join(
-            get_original_cwd(), "custom_envs/moonlander/standard_config.yaml"
+            get_original_cwd(), "src/custom_envs/moonlander/standard_config.yaml"
         )
         config_path_collect_asteroids = os.path.join(
             get_original_cwd(),
-            "custom_envs/moonlander/standard_config_second_task.yaml",
+            "src/custom_envs/moonlander/standard_config_second_task.yaml",
         )
 
         with open(config_path_dodge_asteroids, "r") as file:
@@ -70,7 +78,18 @@ class MetaEnv(gym.Env):
         # concatenate state with vector of zeros
         self.mask = np.full(shape=self.state_of_collect_asteroids.shape, fill_value=5)
         self.current_task = 0
-        self.state = np.concatenate((self.state_of_dodge_asteroids, self.mask))
+        self.state = np.concatenate(
+            (self.state_of_dodge_asteroids.reshape(30, 42), self.mask.reshape(30, 42)),
+            axis=1,
+        ).flatten()
+
+        # for rendering
+        plt.ion()
+        self.fig, self.ax = plt.subplots()
+        eximg = np.zeros((30, 84))
+        eximg[0] = -10
+        eximg[1] = 5
+        self.im = self.ax.imshow(eximg)
 
         # counter
         self.episode_counter = 0
@@ -194,9 +213,21 @@ class MetaEnv(gym.Env):
                 raise ValueError("action must be 0, 1, 2, or 3")
 
         if self.current_task == 0:
-            self.state = np.concatenate((self.state_of_dodge_asteroids, self.mask))
+            self.state = np.concatenate(
+                (
+                    self.state_of_dodge_asteroids.reshape(30, 42),
+                    self.mask.reshape(30, 42),
+                ),
+                axis=1,
+            ).flatten()
         elif self.current_task == 1:
-            self.state = np.concatenate((self.mask, self.state_of_collect_asteroids))
+            self.state = np.concatenate(
+                (
+                    self.mask.reshape(30, 42),
+                    self.state_of_collect_asteroids.reshape(30, 42),
+                ),
+                axis=1,
+            ).flatten()
 
         self.step_counter += 1
         return (
@@ -208,63 +239,37 @@ class MetaEnv(gym.Env):
         )
 
     def render(self):
-        # print(self.state)
-        from PIL import Image, ImageDraw
+        observation = copy.deepcopy(self.state).reshape(30, 84)
+        self.im.set_data(observation)
+        if self.render_mode == "human":
+            self.fig.canvas.draw_idle()
+        elif self.render_mode == "rgb_array":
+            # read ascii text from numpy array
+            ascii_text = str(observation)
 
-        observation = copy.deepcopy(self.state).reshape(2, 30, 42)
-        dodge_task = observation[0]
-        collect_task = observation[1]
+            # Create a new Image
+            # make sure the dimensions (W and H) are big enough for the ascii art
+            W, H = (1100, 500)
+            im = Image.new("RGBA", (W, H), "white")
 
-        # read ascii text from numpy array
-        ascii_text_dodge = str(dodge_task)
-        ascii_text_collect = str(collect_task)
+            # Draw text to image
+            draw = ImageDraw.Draw(im)
+            _, _, w, h = draw.textbbox((0, 0), ascii_text)
+            # draws the text
+            draw.text(((W - w) / 2, (H - h) / 2), ascii_text, fill="black")
 
-        # Create a new Image
-        # make sure the dimensions (W and H) are big enough for the ascii art
-        W, H = (1000, 1000)
-        im = Image.new("RGBA", (W, H), "white")
+            return np.array(im)
 
-        # Draw text to image
-        draw = ImageDraw.Draw(im)
-        _, _, w_dodge, h_dodge = draw.textbbox((0, 0), ascii_text_dodge)
-        _, _, w_collect, h_collect = draw.textbbox((0, 0), ascii_text_collect)
-        # draws the text in the center of the image
-        draw.text((0, (H - h_dodge) / 2), ascii_text_dodge, fill="black")
-        draw.text(
-            ((W - w_collect), (H - h_collect) / 2), ascii_text_collect, fill="black"
-        )
-
-        # Save Image
-        if not os.path.isdir(
-            self.ROOT_DIR
-            + "src/custom_envs/moonlander"
-            + "/rendering/"
-            + str(self.episode_counter)
-        ):
-            os.mkdir(
-                self.ROOT_DIR
-                + "src/custom_envs/moonlander"
-                + "/rendering/"
-                + str(self.episode_counter)
-            )
-        im.save(
-            self.ROOT_DIR
-            + "src/custom_envs/moonlander"
-            + "/rendering/"
-            + str(self.episode_counter)
-            + "/"
-            + str(self.step_counter)
-            + ".png",
-            "PNG",
-        )
-
-    def reset(self, seed=None):
+    def reset(self, seed=None, options=None):
         self.state_of_dodge_asteroids, _ = self.dodge_asteroids.reset()
         self.state_of_collect_asteroids, _ = self.collect_asteroids.reset()
         # concatenate state with vector of zeros
         self.mask = np.full(shape=self.state_of_collect_asteroids.shape, fill_value=5)
         self.current_task = 0
-        self.state = np.concatenate((self.state_of_dodge_asteroids, self.mask))
+        self.state = np.concatenate(
+            (self.state_of_dodge_asteroids.reshape(30, 42), self.mask.reshape(30, 42)),
+            axis=1,
+        ).flatten()
 
         # counter
         self.episode_counter += 1
