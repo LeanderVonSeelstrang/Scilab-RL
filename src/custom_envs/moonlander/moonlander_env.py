@@ -37,12 +37,13 @@ class MoonlanderWorldEnv(Env):
             config_path: Path to a YAML config for the environment
         """
         self.ROOT_DIR = "."
-        config_path = os.path.join(
-            get_original_cwd(),
-            "src/custom_envs/moonlander/standard_config_second_task.yaml",
-        )
+        if config is None and config_path is None:
+            config_path = os.path.join(
+                get_original_cwd(),
+                "src/custom_envs/moonlander/standard_config_second_task.yaml",
+            )
 
-        if config_path is not None:
+        if config_path is not None and config is None:
             with open(config_path, "r") as file:
                 config = yaml.safe_load(file)
 
