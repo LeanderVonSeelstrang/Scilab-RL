@@ -9,6 +9,7 @@ import mlflow
 import gymnasium as gym
 # gym.register_envs()
 import wandb
+import myosuite
 
 from stable_baselines3.her import HerReplayBuffer
 from stable_baselines3.common.callbacks import CheckpointCallback, CallbackList
@@ -145,7 +146,7 @@ def main(cfg: DictConfig) -> (float, int):
         log_params_from_omegaconf_dict(cfg)
         OmegaConf.save(config=cfg, f='params.yaml')
         if cfg['seed'] == 0:
-            cfg['seed'] = int(time.time())
+            cfg['seed'] = int(time.time_ns() % 2**32)
         set_global_seeds(cfg.seed)
 
         train_env, eval_env = get_env_instance(cfg, logger)
