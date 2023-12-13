@@ -31,13 +31,13 @@ hydra:
         log: true
       ++algorithm. gamma:
         type: float
-        Low: 0.95
+        low: 0.95
         high: 0.99
       ++algorithm.gae_lambda:
         type: float
-        Low: 0.95
+        low: 0.95
         high: 0.99
       ++algorithm.ent_coef:
         type: float
-        Low: 0.005
+        low: 0.005
         high: 0.05
