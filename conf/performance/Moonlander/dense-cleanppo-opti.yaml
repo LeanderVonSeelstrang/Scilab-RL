@@ -1,7 +1,7 @@
 # @package _global_
 # Changes specified in this config should be interpreted as relative to the _global_ package.
 defaults:
-  - override /algorithm: ppo
+  - override /algorithm: cleanppo
 
 env: 'MoonlanderWorld-v0'
 eval_after_n_steps: 20000
@@ -16,16 +16,28 @@ algorithm:
   policy: MlpPolicy
 hydra:
   sweeper:
-    study_name: ppo_moonlander
+    study_name: cleanppo_moonlander
     max_trials: 100
     n_jobs: 10
     direction: maximize
     max_duration_minutes: 600
-    min_trials_per_param: 1
-    max_trials_per_param: 3
+    min_trials_per_param: 2
+    max_trials_per_param: 5
     search_space:
       ++algorithm.learning_rate:
         type: float
         low: 0.00005
         high: 0.005
         log: true
+      ++algorithm. gamma:
+        type: float
+        Low: 0.95
+        high: 0.99
+      ++algorithm.gae_lambda:
+        type: float
+        Low: 0.95
+        high: 0.99
+      ++algorithm.ent_coef:
+        type: float
+        Low: 0.005
+        high: 0.05
