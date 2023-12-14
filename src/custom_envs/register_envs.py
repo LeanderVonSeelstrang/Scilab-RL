@@ -123,13 +123,44 @@ def register_custom_envs():
     register(id='Reach1DOF-v0',
              entry_point='custom_envs.reach1dof.reach1dof_env:Reach1DOFEnv',
              max_episode_steps=50)
-    register(id="MoonlanderWorld-v0",
+
+    register(id="MoonlanderWorld-dodge-simple-v0",
              entry_point="custom_envs.moonlander.moonlander_env:MoonlanderWorldEnv",
+             kwargs={'task': 'dodge', 'reward_function': 'simple'},
              max_episode_steps=500)
-    register(id="MetaEnv-v0",
+    register(id="MoonlanderWorld-dodge-gaussian-v0",
+             entry_point="custom_envs.moonlander.moonlander_env:MoonlanderWorldEnv",
+             kwargs={'task': 'dodge', 'reward_function': 'gaussian'},
+             max_episode_steps=500)
+    register(id="MoonlanderWorld-dodge-pos_neg-v0",
+             entry_point="custom_envs.moonlander.moonlander_env:MoonlanderWorldEnv",
+             kwargs={'task': 'dodge', 'reward_function': 'pos_neg'},
+             max_episode_steps=500)
+    register(id="MoonlanderWorld-collect-simple-v0",
+             entry_point="custom_envs.moonlander.moonlander_env:MoonlanderWorldEnv",
+             kwargs={'task': 'collect', 'reward_function': 'simple'},
+             max_episode_steps=500)
+    register(id="MoonlanderWorld-collect-gaussian-v0",
+             entry_point="custom_envs.moonlander.moonlander_env:MoonlanderWorldEnv",
+             kwargs={'task': 'collect', 'reward_function': 'gaussian'},
+             max_episode_steps=500)
+    register(id="MoonlanderWorld-collect-pos_neg-v0",
+             entry_point="custom_envs.moonlander.moonlander_env:MoonlanderWorldEnv",
+             kwargs={'task': 'collect', 'reward_function': 'pos_neg'},
+             max_episode_steps=500)
+
+    register(id="MetaEnv-simple-v0",
              entry_point="custom_envs.moonlander.meta_env:MetaEnv",
-             # FIXME
-             max_episode_steps=5000)
+             kwargs={'reward_function': 'simple'},
+             max_episode_steps=500)
+    register(id="MetaEnv-gaussian-v0",
+             entry_point="custom_envs.moonlander.meta_env:MetaEnv",
+             kwargs={'reward_function': 'gaussian'},
+             max_episode_steps=500)
+    register(id="MetaEnv-pos_neg-v0",
+             entry_point="custom_envs.moonlander.meta_env:MetaEnv",
+             kwargs={'reward_function': 'pos_neg'},
+             max_episode_steps=500)
 
     for n_objects in range(3):
         register(id=f'Hook-o{n_objects}-v1',

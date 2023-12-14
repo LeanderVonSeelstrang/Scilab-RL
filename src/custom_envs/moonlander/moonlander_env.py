@@ -30,29 +30,44 @@ class MoonlanderWorldEnv(Env):
         "render_fps": 10,
     }
 
-    def __init__(self, config: Dict = None, config_path: str = None):
+    def __init__(self, task: str = "dodge", reward_function: str = "pos_neg"):
         """
         initialises the environment
         Args:
-            config_path: Path to a YAML config for the environment
         """
         self.ROOT_DIR = "."
-        if config is None and config_path is None:
+        if task == "dodge":
             config_path = os.path.join(
                 get_original_cwd(),
-                "src/custom_envs/moonlander/standard_config_second_task.yaml",
+                "custom_envs/moonlander/standard_config.yaml",
             )
+            # config_path = os.path.join(
+            #     "/home/annika/coding_projects/scilab-new/Scilab-RL/src",
+            #     "custom_envs/moonlander/standard_config.yaml",
+            # )
+        elif task == "collect":
+            config_path = os.path.join(
+                get_original_cwd(),
+                "custom_envs/moonlander/standard_config_second_task.yaml",
+            )
+            # config_path = os.path.join(
+            #     "/home/annika/coding_projects/scilab-new/Scilab-RL/src",
+            #     "custom_envs/moonlander/standard_config_second_task.yaml",
+            # )
+        else:
+            raise ValueError("Task {} not implemented".format(task))
 
-        if config_path is not None and config is None:
-            with open(config_path, "r") as file:
-                config = yaml.safe_load(file)
+        with open(config_path, "r") as file:
+            config = yaml.safe_load(file)
+        # overwrite current reward function
+        config["reward_function"] = reward_function
 
         # FIXED VARIABLES
         if (
-            config["agent"]["size"] < 1
-            or config["world"]["y_height"] < 1
-            or config["world"]["x_width"] < 1
-            or config["agent"]["observation_height"] < 1
+                config["agent"]["size"] < 1
+                or config["world"]["y_height"] < 1
+                or config["world"]["x_width"] < 1
+                or config["agent"]["observation_height"] < 1
         ):
             raise ValueError(
                 "Only numbers greater than zero are allowed. Please redefine the size, world height or "
@@ -60,13 +75,13 @@ class MoonlanderWorldEnv(Env):
             )
 
         if (
-            (not 0.0 <= config["world"]["drift"]["invisible_drift_probability"] <= 1.0)
-            or (not 0.0 <= config["world"]["drift"]["fake_drift_probability"] <= 1.0)
-            or (
+                (not 0.0 <= config["world"]["drift"]["invisible_drift_probability"] <= 1.0)
+                or (not 0.0 <= config["world"]["drift"]["fake_drift_probability"] <= 1.0)
+                or (
                 not config["world"]["drift"]["invisible_drift_probability"]
-                + config["world"]["drift"]["fake_drift_probability"]
-                <= 1.0
-            )
+                    + config["world"]["drift"]["fake_drift_probability"]
+                    <= 1.0
+        )
         ):
             raise ValueError(
                 "invisible_drift_probability and fake_drift_probability must be in the range of [0, 1] and"
@@ -98,8 +113,9 @@ class MoonlanderWorldEnv(Env):
             raise ValueError(
                 "Reward function {} not implemented".format(self.reward_function)
             )
-        if self.reward_function == "pos_neg":
-            self.pos_neg_reward_info_dict_per_step = {}
+        self.pos_neg_reward_info_dict_per_step = {}
+        self.gaussian_reward_info_per_step = 0
+        self.simple_reward_info_per_step = 0
 
         if "no_crashes" in config:
             self.no_crashes = config["no_crashes"]
@@ -186,9 +202,9 @@ class MoonlanderWorldEnv(Env):
         logging.info("drift ranges" + str(self.drift_ranges_with_drift_number))
 
         if (
-            objects_config["type"] == "coin"
-            and self.reward_function == "pos_neg"
-            and world_config["difficulty"] == "hard"
+                objects_config["type"] == "coin"
+                and self.reward_function == "pos_neg"
+                and world_config["difficulty"] == "hard"
         ):
             number_of_objects = 30
         else:
@@ -256,7 +272,7 @@ class MoonlanderWorldEnv(Env):
 
             ### OBJECTS
             self.filepath_for_object_list = (
-                self.ROOT_DIR + "/logs/" + self.current_time + "/object_list.csv"
+                    self.ROOT_DIR + "/logs/" + self.current_time + "/object_list.csv"
             )
             # write the objects list of each episode to file
             with open(self.filepath_for_object_list, "a") as file:
@@ -265,7 +281,7 @@ class MoonlanderWorldEnv(Env):
 
             ### WALLS
             self.filepath_for_walls_dict = (
-                self.ROOT_DIR + "/logs/" + self.current_time + "/walls_dict.csv"
+                    self.ROOT_DIR + "/logs/" + self.current_time + "/walls_dict.csv"
             )
             # write the walls definition to file --> same for every episode
             if not os.path.exists(self.filepath_for_walls_dict):
@@ -275,7 +291,7 @@ class MoonlanderWorldEnv(Env):
 
             ### DRIFT
             self.filepath_for_drift_ranges_list = (
-                self.ROOT_DIR + "/logs/" + self.current_time + "/drift_ranges.csv"
+                    self.ROOT_DIR + "/logs/" + self.current_time + "/drift_ranges.csv"
             )
             # write the drift ranges of each episode to file
             with open(self.filepath_for_drift_ranges_list, "a") as file:
@@ -287,21 +303,21 @@ class MoonlanderWorldEnv(Env):
             ### LOGGING EVERY EPISODE
             if verbose_level == 2:
                 self.filepath = (
-                    self.ROOT_DIR
-                    + "/logs/"
-                    + self.current_time
-                    + "/"
-                    + str(self.episode_counter)
-                    + ".csv"
+                        self.ROOT_DIR
+                        + "/logs/"
+                        + self.current_time
+                        + "/"
+                        + str(self.episode_counter)
+                        + ".csv"
                 )
 
                 self.filepath_for_vis = (
-                    self.ROOT_DIR
-                    + "/logs/"
-                    + self.current_time
-                    + "/"
-                    + str(self.episode_counter)
-                    + "_vis.csv"
+                        self.ROOT_DIR
+                        + "/logs/"
+                        + self.current_time
+                        + "/"
+                        + str(self.episode_counter)
+                        + "_vis.csv"
                 )
 
                 # write the initial state to file
@@ -326,9 +342,9 @@ class MoonlanderWorldEnv(Env):
 
         """
         return (
-            self.crashed
-            or self.y_position_of_agent + self.config["agent"]["observation_height"]
-            == self.config["world"]["y_height"]
+                self.crashed
+                or self.y_position_of_agent + self.config["agent"]["observation_height"]
+                == self.config["world"]["y_height"]
         )
 
     def apply_action(self, action: int, step_width: int) -> None:
@@ -359,8 +375,8 @@ class MoonlanderWorldEnv(Env):
         (_, _, drift, _, is_drift_fake) = next(
             filter(
                 lambda drift_range: drift_range[0]
-                <= self.y_position_of_agent
-                <= drift_range[1],
+                                    <= self.y_position_of_agent
+                                    <= drift_range[1],
                 self.drift_ranges_with_drift_number,
             ),
             [0, 0, 0, True, False],
@@ -368,9 +384,9 @@ class MoonlanderWorldEnv(Env):
 
         # Only apply drift of intensity n at every nth step
         if (
-            not is_drift_fake
-            and drift != 0
-            and self.y_position_of_agent % abs(drift) == 0
+                not is_drift_fake
+                and drift != 0
+                and self.y_position_of_agent % abs(drift) == 0
         ):
             # Keep the direction (sign) but only move one step in the specified direction.
             # The magnitude indicates the intensity of the drift, but we don't have to
@@ -388,11 +404,11 @@ class MoonlanderWorldEnv(Env):
         if self.x_position_of_agent < self.config["agent"]["size"]:
             self.x_position_of_agent = self.config["agent"]["size"]
         elif (
-            self.x_position_of_agent
-            > self.config["world"]["x_width"] + 1 - self.config["agent"]["size"]
+                self.x_position_of_agent
+                > self.config["world"]["x_width"] + 1 - self.config["agent"]["size"]
         ):
             self.x_position_of_agent = (
-                self.config["world"]["x_width"] + 1 - self.config["agent"]["size"]
+                    self.config["world"]["x_width"] + 1 - self.config["agent"]["size"]
             )
 
     def update_observation(self) -> None:
@@ -423,246 +439,250 @@ class MoonlanderWorldEnv(Env):
         """
         # state is current observation
         # check for crash if crashes are allowed:
-        if not self.no_crashes:
-            if self.config["world"]["objects"]["type"] == "obstacle":
-                # agent is in obstacle or wall = crash
-                if (
-                    self.has_agent_collided_with_wall()
-                    or len(self.find_intersections(self.object_dict_list)) > 0
-                ):
-                    self.crashed = True
-                    if self.reward_function == "simple":
+        reward = 0
+
+        # FIXME: crashing in wall no longer possible
+        self.gaussian_reward_info_per_step = -1000
+        self.simple_reward_info_per_step = -100
+        if self.config["world"]["objects"]["type"] == "obstacle":
+            if (
+                    len(self.find_intersections(self.object_dict_list)) > 0
+            ):
+                self.crashed = True
+                if self.reward_function == "simple":
+                    if not self.no_crashes:
                         return -100
-                    elif self.reward_function == "gaussian":
+                elif self.reward_function == "gaussian":
+                    if not self.no_crashes:
                         return -1000
-                    elif self.reward_function == "pos_neg":
+                elif self.reward_function == "pos_neg":
+                    if not self.no_crashes:
                         raise ValueError(
                             "Reward function {} can not be used with crashes".format(
                                 self.reward_function
                             )
                         )
 
+        # self.reward_function == "simple":
+        relevant_shortened_state = list()
+        for row in self.state[0: 2 * self.config["agent"]["size"]]:
+            relevant_shortened_state.append(
+                row[
+                max(
+                    self.x_position_of_agent - self.config["agent"]["size"], 0
+                ): min(
+                    self.x_position_of_agent + self.config["agent"]["size"] + 1,
+                    self.state.shape[1],
+                )
+                ]
+            )
+        relevant_shortened_state = np.array(relevant_shortened_state)
+        simple_reward = 0
+        if self.config["world"]["objects"]["type"] == "obstacle":
+            if 3 in relevant_shortened_state:
+                simple_reward = 0
+                if not self.crashed:
+                    self.simple_reward_info_per_step = 0
             else:
-                # agent is in wall = crash
-                if self.has_agent_collided_with_wall():
-                    self.crashed = True
-                    if self.reward_function == "simple":
-                        return -100
-                    elif self.reward_function == "gaussian":
-                        return -1000
-                    elif self.reward_function == "pos_neg":
-                        raise ValueError(
-                            "Reward function {} can not be used with crashes".format(
-                                self.reward_function
-                            )
-                        )
-                    else:
-                        raise ValueError(
-                            "Reward function {} not implemented".format(
-                                self.reward_function
-                            )
-                        )
+                simple_reward = 10
+                if not self.crashed:
+                    self.simple_reward_info_per_step = 10
+        else:
+            collected_coins = self.find_intersections(self.object_dict_list)
+            if len(collected_coins) > 0:
+                # Prevent coins from being collected multiple times
+                for coin in collected_coins:
+                    self.object_dict_list.remove(coin)
+                simple_reward = 10 * len(collected_coins)
+                if not self.crashed:
+                    self.simple_reward_info_per_step = len(collected_coins) * 10
+            else:
+                simple_reward = 0
+                if not self.crashed:
+                    self.simple_reward_info_per_step = 0
 
         if self.reward_function == "simple":
-            relevant_shortened_state = list()
-            for row in self.state[0 : 2 * self.config["agent"]["size"]]:
-                relevant_shortened_state.append(
-                    row[
-                        max(
-                            self.x_position_of_agent - self.config["agent"]["size"], 0
-                        ) : min(
-                            self.x_position_of_agent + self.config["agent"]["size"] + 1,
-                            self.state.shape[1],
-                        )
-                    ]
-                )
-            relevant_shortened_state = np.array(relevant_shortened_state)
+            reward = simple_reward
 
-            if self.config["world"]["objects"]["type"] == "obstacle":
-                if -1 in relevant_shortened_state:
-                    return 0
-                return 10
-            else:
-                collected_coins = self.find_intersections(self.object_dict_list)
-                if len(collected_coins) > 0:
-                    # Prevent coins from being collected multiple times
-                    for coin in collected_coins:
-                        self.object_dict_list.remove(coin)
-                    return len(collected_coins) * 10
+        # self.reward_function == "gaussian":
+        # remove agent from state
+        blurred_state = copy.deepcopy(self.state)
+        blurred_state[blurred_state == 1] = 0
+        # remove walls & agent in wall
+        blurred_state[blurred_state == -1] = 0
+        blurred_state[blurred_state == -10] = 0
+        blurred_state[blurred_state == -5] = 0
 
-                return 0
-        elif self.reward_function == "gaussian":
-            # remove agent from state
-            blurred_state = copy.deepcopy(self.state)
-            blurred_state[blurred_state == 1] = 0
+        range_of_agent = range(
+            -(math.floor(self.config["agent"]["size"] / 2)),
+            (math.floor(self.config["agent"]["size"] / 2)) + 1,
+        )
+        if self.config["world"]["objects"]["type"] == "coin":
+            collected_coins = self.find_intersections(self.object_dict_list)
+            if len(collected_coins) > 0:
+                # Prevent coins from being collected multiple times
+                for coin in collected_coins:
+                    self.object_dict_list.remove(coin)
 
-            range_of_agent = range(
-                -(math.floor(self.config["agent"]["size"] / 2)),
-                (math.floor(self.config["agent"]["size"] / 2)) + 1,
-            )
-            if self.config["world"]["objects"]["type"] == "coin":
-                collected_coins = self.find_intersections(self.object_dict_list)
-                if len(collected_coins) > 0:
-                    # Prevent coins from being collected multiple times
-                    for coin in collected_coins:
-                        self.object_dict_list.remove(coin)
+                    # find positions where agent is on coin --> only last row of agent is possible
+                    # FIXME: why? coin does not disappear in rendering
+                    row = 2 * self.config["agent"]["size"] - 1
 
-                        # find positions where agent is on coin --> only last row of agent is possible
-                        row = 2 * self.config["agent"]["size"] - 1
-
-                        x_positions_of_agent = []
-                        for index in range_of_agent:
-                            x_positions_of_agent.append(
-                                self.x_position_of_agent + index
-                            )
-
-                        range_of_coin = range(
-                            -(math.floor(coin["size"] / 2)),
-                            (math.floor(coin["size"] / 2) + 1),
-                        )
-                        x_positions_of_coin = []
-                        for index in range_of_coin:
-                            x_positions_of_coin.append(coin["x"] + index)
-                        x_positions_where_agent_is_on_coin = list(
-                            set(x_positions_of_agent).intersection(x_positions_of_coin)
+                    x_positions_of_agent = []
+                    for index in range_of_agent:
+                        x_positions_of_agent.append(
+                            self.x_position_of_agent + index
                         )
 
-                        # replace values of intersection of agent and coin with 2
-                        blurred_state[row - 1, x_positions_where_agent_is_on_coin] = 2
+                    range_of_coin = range(
+                        -(math.floor(coin["size"] / 2)),
+                        (math.floor(coin["size"] / 2) + 1),
+                    )
+                    x_positions_of_coin = []
+                    for index in range_of_coin:
+                        x_positions_of_coin.append(coin["x"] + index)
+                    x_positions_where_agent_is_on_coin = list(
+                        set(x_positions_of_agent).intersection(x_positions_of_coin)
+                    )
 
-                # replace -1 with 255
-                blurred_state[blurred_state == -1] = 255
+                    # replace values of intersection of agent and coin with 2
+                    blurred_state[row - 1, x_positions_where_agent_is_on_coin] = 2
+
+                # replace 3 with 255
+                blurred_state[blurred_state == 3] = 255
                 # replace 0 with 127
                 blurred_state[blurred_state == 0] = 127
                 # replace 2 with 0
                 blurred_state[blurred_state == 2] = 0
 
-            # when obstacles are present, -1 is automatically replaced with 255 and 0 stays 0 when forming to np.uint8
-            # form state to np.uint8
-            blurred_state = np.asarray(blurred_state, dtype=np.uint8)
+        # when obstacles are present, -1 is automatically replaced with 255 and 0 stays 0 when forming to np.uint8
+        # form state to np.uint8
+        blurred_state = np.asarray(blurred_state, dtype=np.uint8)
 
-            # apply gaussian filter (7x7)
-            blurred_state = cv2.GaussianBlur(blurred_state, (7, 7), 0)
+        # apply gaussian filter (7x7)
+        blurred_state = cv2.GaussianBlur(blurred_state, (7, 7), 0)
 
-            # get values of each pixel of current agent position
-            values_of_agent_position = []
-            # rows
-            for i in range(2 * self.config["agent"]["size"] - 1):
-                # columns
-                if len(range_of_agent) == 0:
-                    values_of_agent_position.append(
-                        blurred_state[i][self.x_position_of_agent]
-                    )
-                else:
-                    for j in range_of_agent:
-                        values_of_agent_position.append(
-                            blurred_state[i][self.x_position_of_agent - j]
-                        )
-
-            # calculate reward
-            reward = 0
-            for value in values_of_agent_position:
-                reward += abs(value - 255)
-            # normalize reward
-            if self.config["world"]["objects"]["type"] == "coin":
-                # the reward when no coin is near is 128*9=1152 for a 2-sized agent --> this should be 0
-                # the lowest reward possible when collecting a coin for is 1275 a 2-sized agent --> this should be 500
-                # the function for this is: f(x) = 0.246x + 1152
-                # we calculate the corresponding normalized reward x for the current reward f(x)
-                # for reward of 10 when no coin is near:
-                # normalized_reward = (reward - 1149.5) / 0.25
-                normalized_reward = ((reward - 1152) / 0.246) / 10
+        # get values of each pixel of current agent position
+        values_of_agent_position = []
+        # rows
+        for i in range(2 * self.config["agent"]["size"] - 1):
+            # columns
+            if len(range_of_agent) == 0:
+                values_of_agent_position.append(
+                    blurred_state[i][self.x_position_of_agent]
+                )
             else:
-                # we want the same distance as before 10 for successful step, 0 if near an obstacle (obstacle task)
-                # the biggest reward possible when near an obstacle is 2219 for a 2-sized agent --> this should be 0
-                # the highest reward possible when not near an obstacle is 255 for a 2-sized agent --> this should be 10
-                # the function for this is: f(x) = 7.6x + 2219
-                # we calculate the corresponding normalized reward x for the current reward f(x)
-                normalized_reward = (reward - 2219) / 7.6
-            return int(normalized_reward)
-            # TODO: test for image state
-        elif self.reward_function == "pos_neg":
-            if (
+                for j in range_of_agent:
+                    values_of_agent_position.append(
+                        blurred_state[i][self.x_position_of_agent - j]
+                    )
+
+        # calculate reward
+        gaussian_reward = 0
+        for value in values_of_agent_position:
+            gaussian_reward += abs(value - 255)
+        # normalize reward
+        if self.config["world"]["objects"]["type"] == "coin":
+            # the reward when no coin is near is 128*9=1152 for a 2-sized agent --> this should be 0
+            # the lowest reward possible when collecting a coin for is 1275 a 2-sized agent --> this should be 500
+            # the function for this is: f(x) = 0.246x + 1152
+            # we calculate the corresponding normalized reward x for the current reward f(x)
+            # for reward of 10 when no coin is near:
+            # normalized_reward = (reward - 1149.5) / 0.25
+            normalized_reward = ((gaussian_reward - 1152) / 0.246) / 10
+        else:
+            # we want the same distance as before 10 for successful step, 0 if near an obstacle (obstacle task)
+            # the biggest reward possible when near an obstacle is 2219 for a 2-sized agent --> this should be 0
+            # the highest reward possible when not near an obstacle is 255 for a 2-sized agent --> this should be 10
+            # the function for this is: f(x) = 7.6x + 2219
+            # we calculate the corresponding normalized reward x for the current reward f(x)
+            normalized_reward = (gaussian_reward - 2219) / 7.6
+        gaussian_reward = int(normalized_reward)
+        if not self.crashed:
+            self.gaussian_reward_info_per_step = gaussian_reward
+        if self.reward_function == "gaussian":
+            reward = gaussian_reward
+        # TODO: test for image state
+        # self.reward_function == "pos_neg":
+        if (
                 self.config["world"]["difficulty"] != "easy"
                 and self.config["world"]["difficulty"] != "hard"
-            ):
-                raise ValueError(
-                    "Reward function {} can only be used with easy and hard difficulty".format(
-                        self.reward_function
-                    )
+        ):
+            raise ValueError(
+                "Reward function {} can only be used with easy and hard difficulty".format(
+                    self.reward_function
                 )
-            # positive reward because of passing
-            reward = 0
-            self.pos_neg_reward_info_dict_per_step["pos"] = [0]
-            self.pos_neg_reward_info_dict_per_step["neg"] = [0]
-            for object in self.object_dict_list:
-                if (
+            )
+        # positive reward because of passing
+        pos_neg_reward = 0
+        self.pos_neg_reward_info_dict_per_step["pos"] = [0]
+        self.pos_neg_reward_info_dict_per_step["neg"] = [0]
+        for object in self.object_dict_list:
+            if (
                     object["y"] + (2 * self.config["agent"]["size"] - 1)
                     == self.y_position_of_agent
                     and object not in self.already_crashed_objects
-                ):
-                    if self.config["world"]["difficulty"] == "easy":
-                        if self.config["world"]["objects"]["type"] == "coin":
-                            reward -= 7
-                            if self.pos_neg_reward_info_dict_per_step["neg"] != [0]:
-                                self.pos_neg_reward_info_dict_per_step["neg"].append(-7)
-                            else:
-                                self.pos_neg_reward_info_dict_per_step["neg"] = [-7]
+            ):
+                if self.config["world"]["difficulty"] == "easy":
+                    if self.config["world"]["objects"]["type"] == "coin":
+                        pos_neg_reward -= 7
+                        if self.pos_neg_reward_info_dict_per_step["neg"] != [0]:
+                            self.pos_neg_reward_info_dict_per_step["neg"].append(-7)
                         else:
-                            reward += 7
-                            if self.pos_neg_reward_info_dict_per_step["pos"] != [0]:
-                                self.pos_neg_reward_info_dict_per_step["pos"].append(7)
-                            else:
-                                self.pos_neg_reward_info_dict_per_step["pos"] = [7]
-                    elif self.config["world"]["difficulty"] == "hard":
-                        if self.config["world"]["objects"]["type"] == "coin":
-                            reward -= 3
-                            if self.pos_neg_reward_info_dict_per_step["neg"] != [0]:
-                                self.pos_neg_reward_info_dict_per_step["neg"].append(-3)
-                            else:
-                                self.pos_neg_reward_info_dict_per_step["neg"] = [-3]
+                            self.pos_neg_reward_info_dict_per_step["neg"] = [-7]
+                    else:
+                        pos_neg_reward += 7
+                        if self.pos_neg_reward_info_dict_per_step["pos"] != [0]:
+                            self.pos_neg_reward_info_dict_per_step["pos"].append(7)
                         else:
-                            reward += 1
-                            if self.pos_neg_reward_info_dict_per_step["pos"] != [0]:
-                                self.pos_neg_reward_info_dict_per_step["pos"].append(1)
-                            else:
-                                self.pos_neg_reward_info_dict_per_step["pos"] = [1]
-            for crash in self.find_intersections(self.object_dict_list):
-                if crash not in self.already_crashed_objects:
-                    if self.config["world"]["difficulty"] == "easy":
-                        if self.config["world"]["objects"]["type"] == "coin":
-                            reward += 7
-                            if self.pos_neg_reward_info_dict_per_step["pos"] != [0]:
-                                self.pos_neg_reward_info_dict_per_step["pos"].append(7)
-                            else:
-                                self.pos_neg_reward_info_dict_per_step["pos"] = [7]
+                            self.pos_neg_reward_info_dict_per_step["pos"] = [7]
+                elif self.config["world"]["difficulty"] == "hard":
+                    if self.config["world"]["objects"]["type"] == "coin":
+                        pos_neg_reward -= 3
+                        if self.pos_neg_reward_info_dict_per_step["neg"] != [0]:
+                            self.pos_neg_reward_info_dict_per_step["neg"].append(-3)
                         else:
-                            reward -= 7
-                            if self.pos_neg_reward_info_dict_per_step["neg"] != [0]:
-                                self.pos_neg_reward_info_dict_per_step["neg"].append(-7)
-                            else:
-                                self.pos_neg_reward_info_dict_per_step["neg"] = [-7]
-                    elif self.config["world"]["difficulty"] == "hard":
-                        if self.config["world"]["objects"]["type"] == "coin":
-                            reward += 3
-                            if self.pos_neg_reward_info_dict_per_step["pos"] != [0]:
-                                self.pos_neg_reward_info_dict_per_step["pos"].append(3)
-                            else:
-                                self.pos_neg_reward_info_dict_per_step["pos"] = [3]
+                            self.pos_neg_reward_info_dict_per_step["neg"] = [-3]
+                    else:
+                        pos_neg_reward += 1
+                        if self.pos_neg_reward_info_dict_per_step["pos"] != [0]:
+                            self.pos_neg_reward_info_dict_per_step["pos"].append(1)
                         else:
-                            reward -= 3
-                            if self.pos_neg_reward_info_dict_per_step["neg"] != [0]:
-                                self.pos_neg_reward_info_dict_per_step["neg"].append(-3)
-                            else:
-                                self.pos_neg_reward_info_dict_per_step["neg"] = [-3]
+                            self.pos_neg_reward_info_dict_per_step["pos"] = [1]
+        for crash in self.find_intersections(self.object_dict_list):
+            if crash not in self.already_crashed_objects:
+                if self.config["world"]["difficulty"] == "easy":
+                    if self.config["world"]["objects"]["type"] == "coin":
+                        pos_neg_reward += 7
+                        if self.pos_neg_reward_info_dict_per_step["pos"] != [0]:
+                            self.pos_neg_reward_info_dict_per_step["pos"].append(7)
+                        else:
+                            self.pos_neg_reward_info_dict_per_step["pos"] = [7]
+                    else:
+                        pos_neg_reward -= 7
+                        if self.pos_neg_reward_info_dict_per_step["neg"] != [0]:
+                            self.pos_neg_reward_info_dict_per_step["neg"].append(-7)
+                        else:
+                            self.pos_neg_reward_info_dict_per_step["neg"] = [-7]
+                elif self.config["world"]["difficulty"] == "hard":
+                    if self.config["world"]["objects"]["type"] == "coin":
+                        pos_neg_reward += 3
+                        if self.pos_neg_reward_info_dict_per_step["pos"] != [0]:
+                            self.pos_neg_reward_info_dict_per_step["pos"].append(3)
+                        else:
+                            self.pos_neg_reward_info_dict_per_step["pos"] = [3]
+                    else:
+                        pos_neg_reward -= 3
+                        if self.pos_neg_reward_info_dict_per_step["neg"] != [0]:
+                            self.pos_neg_reward_info_dict_per_step["neg"].append(-3)
+                        else:
+                            self.pos_neg_reward_info_dict_per_step["neg"] = [-3]
 
-                    self.already_crashed_objects.append(crash)
+                self.already_crashed_objects.append(crash)
+        if self.reward_function == "pos_neg":
+            reward = pos_neg_reward
 
-            return reward
-        else:
-            raise ValueError(
-                "Reward function {} not implemented".format(self.reward_function)
-            )
+        return reward
 
     def has_agent_collided_with_wall(self) -> bool:
         """
@@ -675,9 +695,9 @@ class MoonlanderWorldEnv(Env):
             # - 1 because the left wall isn't included in the world width
             wall_index = str(self.y_position_of_agent - (size - 1) + agent_y_index)
             if (
-                self.x_position_of_agent - size < self.walls_dict[wall_index][0]
-                or self.x_position_of_agent + size - 1
-                > self.walls_dict[wall_index][1] - 1
+                    self.x_position_of_agent - size < self.walls_dict[wall_index][0]
+                    or self.x_position_of_agent + size - 1
+                    > self.walls_dict[wall_index][1] - 1
             ):
                 return True
         return False
@@ -696,8 +716,8 @@ class MoonlanderWorldEnv(Env):
             # them to be exactly side by side, and they are minimum width 1 each)
             radius = obj["size"] + self.config["agent"]["size"] - 2
             return (
-                abs(self.y_position_of_agent - obj["y"]) <= radius
-                and abs(self.x_position_of_agent - obj["x"]) <= radius
+                    abs(self.y_position_of_agent - obj["y"]) <= radius
+                    and abs(self.x_position_of_agent - obj["x"]) <= radius
             )
 
         return list(filter(collides_with_agent, objects))
@@ -728,17 +748,15 @@ class MoonlanderWorldEnv(Env):
         # UPDATE OBSERVATION
         self.update_observation()
 
-        # set placeholder for info
-        if self.reward_function == "pos_neg":
-            info = self.pos_neg_reward_info_dict_per_step
-        else:
-            info = {}
-
         # set placeholder for truncated
         truncated = False
 
         # CALCULATE REWARD
         reward = self.calculate_reward()
+
+        # info of rewards
+        info = {"simple": self.simple_reward_info_per_step, "gaussian": self.gaussian_reward_info_per_step,
+                "pos_neg": self.pos_neg_reward_info_dict_per_step}
 
         self.positions_and_action = self.positions_and_action + [
             [
@@ -846,9 +864,9 @@ class MoonlanderWorldEnv(Env):
             ]
 
         if (
-            objects_config["type"] == "coin"
-            and self.reward_function == "pos_neg"
-            and world_config["difficulty"] == "hard"
+                objects_config["type"] == "coin"
+                and self.reward_function == "pos_neg"
+                and world_config["difficulty"] == "hard"
         ):
             number_of_objects = 15
         else:
@@ -896,27 +914,27 @@ class MoonlanderWorldEnv(Env):
             ### LOGGING EVERY EPISODE
             if self.config["verbose_level"] == 2:
                 self.filepath = (
-                    self.ROOT_DIR
-                    + "/logs/"
-                    + self.current_time
-                    + "/"
-                    + str(self.episode_counter)
-                    + ".csv"
+                        self.ROOT_DIR
+                        + "/logs/"
+                        + self.current_time
+                        + "/"
+                        + str(self.episode_counter)
+                        + ".csv"
                 )
                 self.filepath_for_vis = (
-                    self.ROOT_DIR
-                    + "/logs/"
-                    + self.current_time
-                    + "/"
-                    + str(self.episode_counter)
-                    + "_vis.csv"
+                        self.ROOT_DIR
+                        + "/logs/"
+                        + self.current_time
+                        + "/"
+                        + str(self.episode_counter)
+                        + "_vis.csv"
                 )
 
         # set placeholder for info
-        info = {}
+        self.pos_neg_reward_info_dict_per_step = {}
+        self.gaussian_reward_info_per_step = 0
+        self.simple_reward_info_per_step = 0
+        info = {"simple": self.simple_reward_info_per_step, "gaussian": self.gaussian_reward_info_per_step,
+                "pos_neg": self.pos_neg_reward_info_dict_per_step}
 
         return self.state.flatten(), info
-
-    # added for scilab-rl
-    # def _set_action(self, action):
-    #     return action

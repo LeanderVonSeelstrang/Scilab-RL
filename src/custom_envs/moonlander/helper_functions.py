@@ -6,15 +6,15 @@ import scipy.stats
 
 
 def create_ranges_of_objects_funnels_and_drifts(
-    world_x_width: int = 80,
-    world_y_height: int = 2100,
-    height_padding_areas: int = 60,
-    level_difficulty: str = "easy",
-    drift_length: int = 5,
-    agent_size: int = 1,
-    use_variable_drift_intensity: bool = False,
-    invisible_drift_probability: float = 0.0,
-    fake_drift_probability: float = 0.0,
+        world_x_width: int = 80,
+        world_y_height: int = 2100,
+        height_padding_areas: int = 60,
+        level_difficulty: str = "easy",
+        drift_length: int = 5,
+        agent_size: int = 1,
+        use_variable_drift_intensity: bool = False,
+        invisible_drift_probability: float = 0.0,
+        fake_drift_probability: float = 0.0,
 ) -> Tuple[List[List[int]], List[List[int]], List[List[int]]]:
     """
     creates a list of ranges where objects occur
@@ -171,13 +171,13 @@ def create_ranges_of_objects_funnels_and_drifts(
 
 
 def create_list_of_object_dicts(
-    object_range_list: List[List[int]] = None,
-    object_size: int = 1,
-    world_x_width: int = 80,
-    level_difficulty: str = "no",
-    normalized_object_placement: bool = False,
-    allow_overlapping_objects: bool = True,
-    number_of_objects: int = None,
+        object_range_list: List[List[int]] = None,
+        object_size: int = 1,
+        world_x_width: int = 80,
+        level_difficulty: str = "no",
+        normalized_object_placement: bool = False,
+        allow_overlapping_objects: bool = True,
+        number_of_objects: int = None,
 ) -> List[Dict[str, int]]:
     """
     creates a list of object dictionaries; the objects are in the ranges defined in the hand overed ranges list
@@ -254,13 +254,13 @@ def create_list_of_object_dicts(
 
 
 def generate_object_field(
-    number_of_objects: int,
-    object_size: int = 1,
-    x_width: int = 80,
-    range_start: int = 1,
-    range_end: int = 5,
-    normalized_object_placement: bool = False,
-    allow_overlapping_objects: bool = True,
+        number_of_objects: int,
+        object_size: int = 1,
+        x_width: int = 80,
+        range_start: int = 1,
+        range_end: int = 5,
+        normalized_object_placement: bool = False,
+        allow_overlapping_objects: bool = True,
 ) -> np.array:
     """
     Generates an array of 2D vectors, each indicating the location for an obstacle.
@@ -365,7 +365,7 @@ def generate_object_field(
 
             # Set the corresponding ranges to 0
             probability_table[
-                min_invalid_x:max_invalid_x, min_invalid_y:max_invalid_y
+            min_invalid_x:max_invalid_x, min_invalid_y:max_invalid_y
             ] = 0
 
     # Convert flattened indices back to 2D indices
@@ -382,10 +382,10 @@ def generate_object_field(
 
 ### WALLS
 def create_dict_of_world_walls(
-    list_of_free_ranges: List[List[int]],
-    world_y_height: int = 2100,
-    world_x_width: int = 80,
-    agent_size: int = 1,
+        list_of_free_ranges: List[List[int]],
+        world_y_height: int = 2100,
+        world_x_width: int = 80,
+        agent_size: int = 1,
 ) -> Dict[str, List[int]]:
     """
     creates a dict with every y in the world as a key, the value of each key describes where the wall is,
@@ -419,10 +419,10 @@ def create_dict_of_world_walls(
             if counter < lengths_of_funnel:
                 # this if prevents from making the funnel too small --> the agent still has to pass
                 if len(
-                    range(
-                        current_wall_change_number,
-                        world_x_width + 1 - current_wall_change_number,
-                    )
+                        range(
+                            current_wall_change_number,
+                            world_x_width + 1 - current_wall_change_number,
+                        )
                 ) >= (agent_size + 2):
                     current_wall_change_number += 1
                 else:
@@ -452,13 +452,13 @@ def create_dict_of_world_walls(
 
 ### DRIFT
 def create_drift_ranges(
-    world_y_height: int = 2100,
-    number_of_drifts: int = 0,
-    drift_length: int = 5,
-    safe_ranges: List[List[int]] = [],
-    use_variable_drift_intensity: bool = False,
-    invisible_drift_probability: float = 0.0,
-    fake_drift_probability: float = 0.0,
+        world_y_height: int = 2100,
+        number_of_drifts: int = 0,
+        drift_length: int = 5,
+        safe_ranges: List[List[int]] = [],
+        use_variable_drift_intensity: bool = False,
+        invisible_drift_probability: float = 0.0,
+        fake_drift_probability: float = 0.0,
 ) -> List[List[int]]:
     """
     creates ranges where drift occurs
@@ -518,16 +518,16 @@ def create_drift_ranges(
 
             for disallowed_range in disallowed_ranges:
                 if not (
-                    len(
-                        range(
-                            max(random_drift_range[0], disallowed_range[0]),
-                            # random_drift_range is a range object, so the last element is needed
-                            # disallowed_range is a list, so we need the second element and not the last one
-                            # because there are other elements in the list
-                            min(random_drift_range[-1] + 1, disallowed_range[1]),
+                        len(
+                            range(
+                                max(random_drift_range[0], disallowed_range[0]),
+                                # random_drift_range is a range object, so the last element is needed
+                                # disallowed_range is a list, so we need the second element and not the last one
+                                # because there are other elements in the list
+                                min(random_drift_range[-1] + 1, disallowed_range[1]),
+                            )
                         )
-                    )
-                    == 0
+                        == 0
                 ):
                     overlapping_with_disallowed_range = True
                     counter += 1
@@ -537,9 +537,9 @@ def create_drift_ranges(
                 random_number = rnd.random()
                 is_visible = random_number >= invisible_drift_probability
                 is_fake = (
-                    0
-                    < random_number - invisible_drift_probability
-                    <= fake_drift_probability
+                        0
+                        < random_number - invisible_drift_probability
+                        <= fake_drift_probability
                 )
 
                 # the drifts randomly choose between a drift to the right and a drift to the left
@@ -564,15 +564,15 @@ def create_drift_ranges(
 
 
 def create_agent_observation(
-    following_observation_size: int,
-    drift_ranges: List[List[int]],
-    walls_dict: Dict[str, List[int]],
-    object_dict_list: List[Dict[str, int]],
-    agent_x_position: int,
-    agent_y_position: int,
-    world_x_width: int,
-    agent_size: int = 1,
-    object_type: str = "obstacle",
+        following_observation_size: int,
+        drift_ranges: List[List[int]],
+        walls_dict: Dict[str, List[int]],
+        object_dict_list: List[Dict[str, int]],
+        agent_x_position: int,
+        agent_y_position: int,
+        world_x_width: int,
+        agent_size: int = 1,
+        object_type: str = "obstacle",
 ) -> np.ndarray:
     """
     creates the agent observation (matrix)
@@ -650,36 +650,39 @@ def create_agent_observation(
 
 
 def add_agent_to_observation(
-    agent_size, agent_x_position, index, matrix_row, world_x_width
+        agent_size, agent_x_position, index, matrix_row, world_x_width
 ):
     if index <= (2 * agent_size - 2):
         for index_agent in range(
-            max(0, int(agent_x_position - agent_size + 1)),
-            min(world_x_width + 2, int(agent_x_position + agent_size)),
+                max(0, int(agent_x_position - agent_size + 1)),
+                min(world_x_width + 2, int(agent_x_position + agent_size)),
         ):
             # means that the current number at the index of the agent can be 0 (nothing) or 2 (coin)
-            if matrix_row[index_agent] >= 0:
+            # 0, 1, 2, 3
+            if matrix_row[index_agent] == 0 or matrix_row[index_agent] == 1:
                 matrix_row[index_agent] = 1
-            else:
+            elif matrix_row[index_agent] == -1:
+                matrix_row[index_agent] = -5
+            elif matrix_row[index_agent] == 2 or matrix_row[index_agent] == 3:
                 matrix_row[index_agent] = -10
 
 
 def add_objects_to_observation(
-    current_relevant_object_dict_list, current_y_position, matrix_row, symbol
+        current_relevant_object_dict_list, current_y_position, matrix_row, symbol
 ):
     for obj in current_relevant_object_dict_list:
         # check if obj lays in current position
         if (
-            obj["y"] - obj["size"] + 1
-            <= current_y_position
-            <= obj["y"] + obj["size"] - 1
+                obj["y"] - obj["size"] + 1
+                <= current_y_position
+                <= obj["y"] + obj["size"] - 1
         ):
             # if so, mark the x positions of the obstacles
-            matrix_row[obj["x"] - obj["size"] + 1 : obj["x"] + obj["size"]] = symbol
+            matrix_row[obj["x"] - obj["size"] + 1: obj["x"] + obj["size"]] = symbol
 
 
 def add_drift_to_observation(
-    observation_start_row, following_observation_size, drift_ranges, matrix
+        observation_start_row, following_observation_size, drift_ranges, matrix
 ):
     # Per default, there is no drift on either side, just the walls
     matrix[:, 0] = -1
@@ -688,44 +691,44 @@ def add_drift_to_observation(
     for start, end, drift, is_visible, is_fake in drift_ranges:
         # Check whether either end of a drift is visible in the observation space, and the drift is visible
         if (
-            not len(
-                range(
-                    max(start, observation_start_row),
-                    min(end, observation_start_row + following_observation_size) + 1,
-                ),
-            )
-            == 0
+                not len(
+                    range(
+                        max(start, observation_start_row),
+                        min(end, observation_start_row + following_observation_size) + 1,
+                    ),
+                )
+                    == 0
         ) and is_visible:
             start_index = max(start - observation_start_row, 0)
             end_index = min(end - observation_start_row, following_observation_size)
 
             if drift < 0:
-                matrix[start_index : end_index + 1, -1] = -5
+                matrix[start_index: end_index + 1, -1] = -5
             elif drift > 0:
-                matrix[start_index : end_index + 1, 0] = -5
+                matrix[start_index: end_index + 1, 0] = -5
 
 
 def add_funnels_to_observation(current_y_position, walls_dict, matrix_row):
     # depth of the funnel (1 at the first step, then 2, then 3, etc.)
     funnel_level = walls_dict[str(int(current_y_position))][0]
     if funnel_level > 0:
-        matrix_row[1 : funnel_level + 1] = -1
-        matrix_row[-funnel_level - 1 : -1] = -1
+        matrix_row[1: funnel_level + 1] = -1
+        matrix_row[-funnel_level - 1: -1] = -1
 
 
 def find_visible_objects(
-    following_observation_size: int,
-    object_dict_list: List[Dict[str, int]],
-    agent_y_position: int,
-    agent_size: int = 1,
+        following_observation_size: int,
+        object_dict_list: List[Dict[str, int]],
+        agent_y_position: int,
+        agent_size: int = 1,
 ):
     # get relevant obstacles
     relevant_object_dict_list = []
     # check which obstacles are in the current observation space
     for obj in object_dict_list:
         if (
-            agent_y_position + following_observation_size >= obj["y"] - obj["size"] + 1
-            and obj["y"] + obj["size"] - 1 >= agent_y_position - agent_size + 1
+                agent_y_position + following_observation_size >= obj["y"] - obj["size"] + 1
+                and obj["y"] + obj["size"] - 1 >= agent_y_position - agent_size + 1
         ):
             relevant_object_dict_list.append(obj)
 

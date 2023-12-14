@@ -22,7 +22,7 @@ class MetaEnv(gym.Env):
         "render_fps": 10,
     }
 
-    def __init__(self):
+    def __init__(self, reward_function: str = "pos_neg"):
         self.ROOT_DIR = "."
         config_path_dodge_asteroids = os.path.join(
             get_original_cwd(), "src/custom_envs/moonlander/standard_config.yaml"
@@ -31,6 +31,13 @@ class MetaEnv(gym.Env):
             get_original_cwd(),
             "src/custom_envs/moonlander/standard_config_second_task.yaml",
         )
+        # config_path_dodge_asteroids = os.path.join(
+        #     "/home/annika/coding_projects/scilab-new/Scilab-RL", "src/custom_envs/moonlander/standard_config.yaml"
+        # )
+        # config_path_collect_asteroids = os.path.join(
+        #     "/home/annika/coding_projects/scilab-new/Scilab-RL",
+        #     "src/custom_envs/moonlander/standard_config_second_task.yaml",
+        # )
 
         with open(config_path_dodge_asteroids, "r") as file:
             config_dodge_asteroids = yaml.safe_load(file)
@@ -71,8 +78,8 @@ class MetaEnv(gym.Env):
         # reward is added from each task
 
         # first state
-        self.dodge_asteroids = MoonlanderWorldEnv(config=config_dodge_asteroids)
-        self.collect_asteroids = MoonlanderWorldEnv(config=config_collect_asteroids)
+        self.dodge_asteroids = MoonlanderWorldEnv(task="dodge", reward_function=reward_function)
+        self.collect_asteroids = MoonlanderWorldEnv(task="collect", reward_function=reward_function)
         self.state_of_dodge_asteroids, _ = self.dodge_asteroids.reset()
         self.state_of_collect_asteroids, _ = self.collect_asteroids.reset()
         # concatenate state with vector of zeros
@@ -107,14 +114,14 @@ class MetaEnv(gym.Env):
                         reward_dodge_asteroids,
                         is_done_dodge,
                         _,
-                        _,
+                        info_dodge,
                     ) = self.dodge_asteroids.step(action=0)
                     (
                         self.state_of_collect_asteroids,
                         reward_collect_asteroids,
                         is_done_collect,
                         _,
-                        _,
+                        info_collect,
                     ) = self.collect_asteroids.step(action=1)
                 elif self.current_task == 1:
                     (
@@ -122,14 +129,14 @@ class MetaEnv(gym.Env):
                         reward_dodge_asteroids,
                         is_done_dodge,
                         _,
-                        _,
+                        info_dodge,
                     ) = self.dodge_asteroids.step(action=1)
                     (
                         self.state_of_collect_asteroids,
                         reward_collect_asteroids,
                         is_done_collect,
                         _,
-                        _,
+                        info_collect,
                     ) = self.collect_asteroids.step(action=0)
             case 1:
                 # stay action
@@ -138,14 +145,14 @@ class MetaEnv(gym.Env):
                     reward_dodge_asteroids,
                     is_done_dodge,
                     _,
-                    _,
+                    info_dodge,
                 ) = self.dodge_asteroids.step(action=1)
                 (
                     self.state_of_collect_asteroids,
                     reward_collect_asteroids,
                     is_done_collect,
                     _,
-                    _,
+                    info_collect,
                 ) = self.collect_asteroids.step(action=1)
             case 2:
                 # right action
@@ -155,14 +162,14 @@ class MetaEnv(gym.Env):
                         reward_dodge_asteroids,
                         is_done_dodge,
                         _,
-                        _,
+                        info_dodge,
                     ) = self.dodge_asteroids.step(action=2)
                     (
                         self.state_of_collect_asteroids,
                         reward_collect_asteroids,
                         is_done_collect,
                         _,
-                        _,
+                        info_collect,
                     ) = self.collect_asteroids.step(action=1)
                 elif self.current_task == 1:
                     (
@@ -170,14 +177,14 @@ class MetaEnv(gym.Env):
                         reward_dodge_asteroids,
                         is_done_dodge,
                         _,
-                        _,
+                        info_dodge,
                     ) = self.dodge_asteroids.step(action=1)
                     (
                         self.state_of_collect_asteroids,
                         reward_collect_asteroids,
                         is_done_collect,
                         _,
-                        _,
+                        info_collect,
                     ) = self.collect_asteroids.step(action=2)
             case 3:
                 # switch
@@ -189,14 +196,14 @@ class MetaEnv(gym.Env):
                     reward_dodge_asteroids,
                     is_done_dodge,
                     _,
-                    _,
+                    info_dodge,
                 ) = self.dodge_asteroids.step(action=1)
                 (
                     self.state_of_collect_asteroids,
                     reward_collect_asteroids,
                     is_done_collect,
                     _,
-                    _,
+                    info_collect,
                 ) = self.collect_asteroids.step(action=1)
 
                 if self.current_task == 0:
@@ -230,12 +237,13 @@ class MetaEnv(gym.Env):
             ).flatten()
 
         self.step_counter += 1
+        info = {"dodge": info_dodge, "collect": info_dodge}
         return (
             self.state,
             reward_dodge_asteroids + reward_collect_asteroids,
             is_done_dodge or is_done_collect,
             False,
-            {},
+            info,
         )
 
     def render(self):
