@@ -3,7 +3,6 @@
 defaults:
   - override /algorithm: cleanppo
 
-env: 'MoonlanderWorld-v0'
 eval_after_n_steps: 20000
 # The max. number of training epochs to run. One epoch consists of 'eval_after_n_steps' actions.
 n_epochs: 30
@@ -13,10 +12,9 @@ algorithm:
   gamma: 0.99
   gae_lambda: 0.95
   batch_size: 64
-  policy: MlpPolicy
 hydra:
   sweeper:
-    study_name: cleanppo_moonlander
+    study_name: cleanppo_moonlander_dodge
     max_trials: 100
     n_jobs: 10
     direction: maximize
@@ -41,3 +39,9 @@ hydra:
         type: float
         low: 0.005
         high: 0.05
+      ++env:
+        type: categorical
+        choices:
+          - MoonlanderWorld-dodge-simple-v0
+          - MoonlanderWorld-dodge-gaussian-v0
+          - MoonlanderWorld-dodge-pos_neg-v0

@@ -386,8 +386,9 @@ class CLEANPPO:
             new_obs, rewards, dones, infos = env.step(clipped_actions)
             self.logger.record("train/rollout_rewards_step", float(rewards.mean()))
             self.logger.record_mean("train/rollout_rewards_mean", float(rewards.mean()))
-            self.logger.record("rollout_reward_simple", float(infos[0]["simple"]))
-            self.logger.record("rollout_reward_gaussian", float(infos[0]["gaussian"]))
+            if "simple" in infos[0].keys():
+                self.logger.record("rollout_reward_simple", float(infos[0]["simple"]))
+                self.logger.record("rollout_reward_gaussian", float(infos[0]["gaussian"]))
             self.num_timesteps += env.num_envs
 
             # Give access to local variables
