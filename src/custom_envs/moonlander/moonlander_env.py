@@ -7,6 +7,7 @@ import os
 import random as rnd
 from typing import List, Dict
 
+import custom_envs.moonlander.helper_functions as hlp
 import cv2
 import numpy as np
 import yaml
@@ -15,12 +16,6 @@ from gymnasium import Env
 from gymnasium import spaces
 from hydra.utils import get_original_cwd
 from matplotlib import pyplot as plt
-
-# FIXME
-np.set_printoptions(threshold=np.inf)
-np.set_printoptions(linewidth=np.inf)
-
-import custom_envs.moonlander.helper_functions as hlp
 
 
 class MoonlanderWorldEnv(Env):
@@ -203,7 +198,6 @@ class MoonlanderWorldEnv(Env):
 
         if (
                 objects_config["type"] == "coin"
-                and self.reward_function == "pos_neg"
                 and world_config["difficulty"] == "hard"
         ):
             number_of_objects = 30
@@ -809,6 +803,7 @@ class MoonlanderWorldEnv(Env):
         """
         resets the environment
         """
+        super().reset(seed=seed)
         # logging.info("reset " + self.current_time + str(self.episode_counter))
         self.episode_counter += 1
         self.step_counter = 0

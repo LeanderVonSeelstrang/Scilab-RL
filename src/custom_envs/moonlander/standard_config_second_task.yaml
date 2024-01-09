@@ -3,7 +3,7 @@ world:
   x_width: 40
   y_height: 500
   # Difficulty (empty, easy, middle, hard) scaling the number of objects and drifts
-  difficulty: hard
+  difficulty: easy
   drift:
     # Length of a drift range
     length: 15
