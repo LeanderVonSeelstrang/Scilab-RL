@@ -39,7 +39,7 @@ class MoonlanderWorldEnv(Env):
         if task == "dodge":
             config_path = os.path.join(
                 get_original_cwd(),
-                "custom_envs/moonlander/standard_config.yaml",
+                "src/custom_envs/moonlander/standard_config.yaml",
             )
             # config_path = os.path.join(
             #     "/home/annika/coding_projects/scilab-new/Scilab-RL/src",
@@ -48,7 +48,7 @@ class MoonlanderWorldEnv(Env):
         elif task == "collect":
             config_path = os.path.join(
                 get_original_cwd(),
-                "custom_envs/moonlander/standard_config_second_task.yaml",
+                "src/custom_envs/moonlander/standard_config_second_task.yaml",
             )
             # config_path = os.path.join(
             #     "/home/annika/coding_projects/scilab-new/Scilab-RL/src",
