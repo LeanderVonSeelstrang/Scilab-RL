@@ -374,7 +374,9 @@ class CLEANPPO:
             with torch.no_grad():
                 actions, log_probs, _, values = self.policy.get_action_and_value(self._last_obs)
             actions = actions.cpu().numpy()
-
+            log_prob_float = float(np.mean(log_probs.cpu().numpy()))
+            self.logger.record("train/rollout_logprob_step", float(log_prob_float))
+            self.logger.record_mean("train/rollout_logprob_mean", float(log_prob_float))
             # Rescale and perform action
             clipped_actions = actions
             # Clip the actions to avoid out of bound error

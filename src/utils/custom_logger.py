@@ -17,9 +17,11 @@ def setup_logger(run_dir, run_name, cfg):
     if cfg['wandb']:
         non_nested_cfg = flatten_dictConf(cfg)
         os.environ['WANDB_START_METHOD'] = "thread"
+        project_name = cfg.project_name
+        if project_name is None:
+            project_name = run_name
         # FIXME: not hardcoded
         wandb_args = dict(project="cleanppo_MoonlanderWorld",
-                          name=cfg.project_name if cfg.project_name else run_name,
                           config=non_nested_cfg)
         print(wandb_args)
         if 'entity' in cfg:
