@@ -386,6 +386,7 @@ def create_dict_of_world_walls(
         world_y_height: int = 2100,
         world_x_width: int = 80,
         agent_size: int = 1,
+        no_crashes: bool = False,
 ) -> Dict[str, List[int]]:
     """
     creates a dict with every y in the world as a key, the value of each key describes where the wall is,
@@ -395,46 +396,49 @@ def create_dict_of_world_walls(
         world_y_height: height of world
         world_x_width: width of the world (excluding walls)
         agent_size: size of the agent
+        no_crashes: defines whether the agent should be able to crash into a wall and obstacles (if yes: create funnels, otherwise not)
 
     Returns: dict with every y value and its corresponding wall value
 
     """
     wall_dict = dict()
-    for free_range in list_of_free_ranges:
-        # the funnel gets smaller and wider in the complete free range
-        # the lengths of the funnel indicates one of this cones
-        lengths_of_funnel = int((len(range(free_range[0], free_range[1]))) / 2)
-        current_wall_change_number = 0
-        counter = 0
-        count_same_size = 0
+    if not no_crashes:
+        for free_range in list_of_free_ranges:
+            # the funnel gets smaller and wider in the complete free range
+            # the lengths of the funnel indicates one of this cones
+            lengths_of_funnel = int((len(range(free_range[0], free_range[1]))) / 2)
+            current_wall_change_number = 0
+            counter = 0
+            count_same_size = 0
 
-        for index in range(free_range[0], free_range[1]):
-            # x and y value of the wall
-            wall_dict[str(index)] = [
-                0 + current_wall_change_number,
-                world_x_width + 1 - current_wall_change_number,
-            ]
+            for index in range(free_range[0], free_range[1]):
 
-            # check if the funnel should get smaller or wider
-            if counter < lengths_of_funnel:
-                # this if prevents from making the funnel too small --> the agent still has to pass
-                if len(
-                        range(
-                            current_wall_change_number,
-                            world_x_width + 1 - current_wall_change_number,
-                        )
-                ) >= (agent_size + 2):
-                    current_wall_change_number += 1
+                # x and y value of the wall
+                wall_dict[str(index)] = [
+                    0 + current_wall_change_number,
+                    world_x_width + 1 - current_wall_change_number,
+                ]
+
+                # check if the funnel should get smaller or wider
+                if counter < lengths_of_funnel:
+                    # this if prevents from making the funnel too small --> the agent still has to pass
+                    if len(
+                            range(
+                                current_wall_change_number,
+                                world_x_width + 1 - current_wall_change_number,
+                            )
+                    ) >= (agent_size + 2):
+                        current_wall_change_number += 1
+                    else:
+                        count_same_size += 1
                 else:
-                    count_same_size += 1
-            else:
-                # this if prevents from making the funnel two small --> the agent still has to pass
-                if count_same_size > 0:
-                    count_same_size -= 1
-                else:
-                    current_wall_change_number -= 1
+                    # this if prevents from making the funnel two small --> the agent still has to pass
+                    if count_same_size > 0:
+                        count_same_size -= 1
+                    else:
+                        current_wall_change_number -= 1
 
-            counter += 1
+                counter += 1
 
     # create dict entry for all y values that are not covered in the free ranges
     for index in range(1, world_y_height + 1):
@@ -573,6 +577,7 @@ def create_agent_observation(
         world_x_width: int,
         agent_size: int = 1,
         object_type: str = "obstacle",
+        no_crashes: bool = False,
 ) -> np.ndarray:
     """
     creates the agent observation (matrix)
@@ -587,6 +592,7 @@ def create_agent_observation(
         agent_size: size of the agent
         object_type: Which type the object passed have ('obstacle' or 'coin'). Obstacles are rendered as a -1, coins as
                     a 2.
+        no_crashes: defines whether the agent should be able to crash into a wall and obstacles
 
     Returns: returns an agent observation matrix of shape: (channels, height, width)
 
@@ -644,13 +650,14 @@ def create_agent_observation(
             index=index,
             matrix_row=matrix_row,
             world_x_width=world_x_width,
+            no_crashes=no_crashes,
         )
 
     return np.array(matrix)
 
 
 def add_agent_to_observation(
-        agent_size, agent_x_position, index, matrix_row, world_x_width
+        agent_size, agent_x_position, index, matrix_row, world_x_width, no_crashes
 ):
     if index <= (2 * agent_size - 2):
         for index_agent in range(
@@ -659,12 +666,15 @@ def add_agent_to_observation(
         ):
             # means that the current number at the index of the agent can be 0 (nothing) or 2 (coin)
             # 0, 1, 2, 3
-            if matrix_row[index_agent] == 0 or matrix_row[index_agent] == 1:
+            if matrix_row[index_agent] == 0:
                 matrix_row[index_agent] = 1
-            elif matrix_row[index_agent] == -1:
-                matrix_row[index_agent] = -5
-            elif matrix_row[index_agent] == 2 or matrix_row[index_agent] == 3:
+            elif matrix_row[index_agent] == -1 or matrix_row[index_agent] == -5:
                 matrix_row[index_agent] = -10
+            elif matrix_row[index_agent] == 2 or matrix_row[index_agent] == 3:
+                if no_crashes:
+                    matrix_row[index_agent] = 1
+                else:
+                    matrix_row[index_agent] = -10
 
 
 def add_objects_to_observation(

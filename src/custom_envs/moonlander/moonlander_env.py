@@ -34,7 +34,7 @@ class MoonlanderWorldEnv(Env):
         if task == "dodge":
             config_path = os.path.join(
                 get_original_cwd(),
-                "src/custom_envs/moonlander/standard_config.yaml",
+                "custom_envs/moonlander/standard_config.yaml",
             )
             # config_path = os.path.join(
             #     "/home/annika/coding_projects/scilab-new/Scilab-RL/src",
@@ -43,7 +43,7 @@ class MoonlanderWorldEnv(Env):
         elif task == "collect":
             config_path = os.path.join(
                 get_original_cwd(),
-                "src/custom_envs/moonlander/standard_config_second_task.yaml",
+                "custom_envs/moonlander/standard_config_second_task.yaml",
             )
             # config_path = os.path.join(
             #     "/home/annika/coding_projects/scilab-new/Scilab-RL/src",
@@ -227,6 +227,7 @@ class MoonlanderWorldEnv(Env):
             world_y_height=world_config["y_height"],
             world_x_width=world_config["x_width"],
             agent_size=agent_config["size"],
+            no_crashes=config["no_crashes"],
         )
         self.walls_dict = walls_dict
         logging.info("walls_dict" + str(walls_dict))
@@ -395,15 +396,29 @@ class MoonlanderWorldEnv(Env):
 
         # Clamp x position to the allowed range, to avoid the agents clipping out of bounds when
         # a strong drift occurs and the agent simultaneously takes a step.
-        if self.x_position_of_agent < self.config["agent"]["size"]:
-            self.x_position_of_agent = self.config["agent"]["size"]
-        elif (
-                self.x_position_of_agent
-                > self.config["world"]["x_width"] + 1 - self.config["agent"]["size"]
-        ):
-            self.x_position_of_agent = (
-                    self.config["world"]["x_width"] + 1 - self.config["agent"]["size"]
-            )
+
+        # agent cannot be in a wall
+        if self.config["no_crashes"] == True:
+            if self.x_position_of_agent < self.config["agent"]["size"]:
+                self.x_position_of_agent = self.config["agent"]["size"]
+            elif (
+                    self.x_position_of_agent
+                    > self.config["world"]["x_width"] + 1 - self.config["agent"]["size"]
+            ):
+                self.x_position_of_agent = (
+                        self.config["world"]["x_width"] + 1 - self.config["agent"]["size"]
+                )
+        # agent can end in a wall
+        else:
+            if self.x_position_of_agent < self.config["agent"]["size"] - 1:
+                self.x_position_of_agent = self.config["agent"]["size"] - 1
+            elif (
+                    self.x_position_of_agent
+                    > self.config["world"]["x_width"] + 2 - self.config["agent"]["size"]
+            ):
+                self.x_position_of_agent = (
+                        self.config["world"]["x_width"] + 2 - self.config["agent"]["size"]
+                )
 
     def update_observation(self) -> None:
         """
@@ -420,6 +435,7 @@ class MoonlanderWorldEnv(Env):
             world_x_width=self.config["world"]["x_width"],
             agent_size=self.config["agent"]["size"],
             object_type=self.config["world"]["objects"]["type"],
+            no_crashes=self.config["no_crashes"],
         )
 
     def calculate_reward(self) -> int:
@@ -489,7 +505,7 @@ class MoonlanderWorldEnv(Env):
             relevant_shortened_state = np.array(relevant_shortened_state)
 
             if self.config["world"]["objects"]["type"] == "obstacle":
-                if -1 in relevant_shortened_state:
+                if 3 in relevant_shortened_state or (-1 in relevant_shortened_state and not self.no_crashes):
                     return 0
                 return 10
             else:
@@ -505,51 +521,77 @@ class MoonlanderWorldEnv(Env):
             # remove agent from state
             blurred_state = copy.deepcopy(self.state)
             blurred_state[blurred_state == 1] = 0
+            # handle drift as wall tiles
+            blurred_state[blurred_state == -5] = -1
+            # if no crashes in walls (and obstacles) are possible, remove walls from state
+            if self.no_crashes:
+                blurred_state[blurred_state == -1] = 0
+            # replace walls (-1)(maybe already removed through no crashes) with the highest value (255)
+            blurred_state[blurred_state == -1] = 255
 
             range_of_agent = range(
                 -(math.floor(self.config["agent"]["size"] / 2)),
                 (math.floor(self.config["agent"]["size"] / 2)) + 1,
             )
-            if self.config["world"]["objects"]["type"] == "coin":
-                collected_coins = self.find_intersections(self.object_dict_list)
-                if len(collected_coins) > 0:
+            collected_objects = self.find_intersections(self.object_dict_list)
+            if len(collected_objects) > 0:
+                for obj in collected_objects:
                     # Prevent coins from being collected multiple times
-                    for coin in collected_coins:
-                        self.object_dict_list.remove(coin)
+                    if self.config["world"]["objects"]["type"] == "coin":
+                        self.object_dict_list.remove(obj)
 
-                        # find positions where agent is on coin --> only last row of agent is possible
-                        row = 2 * self.config["agent"]["size"] - 1
-
-                        x_positions_of_agent = []
-                        for index in range_of_agent:
-                            x_positions_of_agent.append(
-                                self.x_position_of_agent + index
-                            )
-
-                        range_of_coin = range(
-                            -(math.floor(coin["size"] / 2)),
-                            (math.floor(coin["size"] / 2) + 1),
+                    # find positions where agent is on object --> only last row of agent is possible
+                    x_positions_of_agent = []
+                    y_positions_of_agent = []
+                    for index in range_of_agent:
+                        x_positions_of_agent.append(
+                            self.x_position_of_agent + index
                         )
-                        x_positions_of_coin = []
-                        for index in range_of_coin:
-                            x_positions_of_coin.append(coin["x"] + index)
-                        x_positions_where_agent_is_on_coin = list(
-                            set(x_positions_of_agent).intersection(x_positions_of_coin)
+                        y_positions_of_agent.append(
+                            self.y_position_of_agent + index
                         )
+                    agent_positions = [(x_positions_of_agent[i], y_positions_of_agent[i]) for i in
+                                       range(0, len(x_positions_of_agent))]
 
-                        # replace values of intersection of agent and coin with 2
-                        blurred_state[row - 1, x_positions_where_agent_is_on_coin] = 2
+                    range_of_object = range(
+                        -(math.floor(obj["size"] / 2)),
+                        (math.floor(obj["size"] / 2) + 1),
+                    )
+                    x_positions_of_object = []
+                    y_positions_of_object = []
+                    for index in range_of_object:
+                        x_positions_of_object.append(obj["x"] + index)
+                        y_positions_of_object.append(obj["y"] + index)
+                    object_positions = [(x_positions_of_object[i], y_positions_of_object[i]) for i in
+                                        range(0, len(x_positions_of_object))]
 
-                # replace -1 with 255
-                blurred_state[blurred_state == -1] = 255
-                # replace 0 with 127
+                    positions_where_agent_is_on_object = list(
+                        set(agent_positions).intersection(object_positions)
+                    )
+                    # FIXME: what about multiple objects???
+
+                    if self.config["world"]["objects"]["type"] == "coin":
+                        for index, pos in enumerate(positions_where_agent_is_on_object):
+                            # replace values of intersection of agent and coin with 2
+                            blurred_state[index, positions_where_agent_is_on_object[index][0]] = 2
+                    else:
+                        for index, pos in enumerate(positions_where_agent_is_on_object):
+                            # replace values of intersection of agent and obstacle with 3
+                            blurred_state[index, positions_where_agent_is_on_object[index][0]] = 3
+            if self.config["world"]["objects"]["type"] == "coin":
+                # replace nothing (0) with middle value (127)
                 blurred_state[blurred_state == 0] = 127
-                # replace 2 with 0
+                # replace coins (2) with the lowest value (0)
                 blurred_state[blurred_state == 2] = 0
-
-            # when obstacles are present, -1 is automatically replaced with 255 and 0 stays 0 when forming to np.uint8
-            # form state to np.uint8
-            blurred_state = np.asarray(blurred_state, dtype=np.uint8)
+                # replace collect (-10) with the lowest value (0)
+                # -10 here not possible for crashes, because it would already handled above
+                blurred_state[blurred_state == -10] = 0
+            else:
+                # replace obstacles (3) with the highest value (255)
+                blurred_state[blurred_state == 3] = 255
+                # replace crash (-10) with the highest value (255)
+                # -10 here not possible for crashes, because it would already handled above
+                blurred_state[blurred_state == -10] = 255
 
             # apply gaussian filter (7x7)
             blurred_state = cv2.GaussianBlur(blurred_state, (7, 7), 0)
