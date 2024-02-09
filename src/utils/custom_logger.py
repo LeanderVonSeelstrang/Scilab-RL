@@ -1,13 +1,14 @@
-from typing import Any, Dict, List, TextIO, Tuple, Union
-import warnings
 import os
 import sys
-from stable_baselines3.common.logger import KVWriter, Video, FormatUnsupportedError, SeqWriter, configure
+import warnings
+from typing import Any, Dict, List, TextIO, Tuple, Union
+
 import mlflow
 import wandb
 from omegaconf import OmegaConf
+from stable_baselines3.common.logger import KVWriter, Video, FormatUnsupportedError, SeqWriter, configure
 from utils.util import flatten_dictConf
-from moviepy.editor import VideoFileClip
+
 
 def setup_logger(run_dir, run_name, cfg):
     logger = configure(folder=run_dir, format_strings=[])
@@ -21,7 +22,7 @@ def setup_logger(run_dir, run_name, cfg):
         if project_name is None:
             project_name = run_name
         # FIXME: not hardcoded
-        wandb_args = dict(project="cleanppo_MoonlanderWorld",
+        wandb_args = dict(project="cleanppo_gridworld",
                           config=non_nested_cfg)
         print(wandb_args)
         if 'entity' in cfg:
@@ -79,8 +80,6 @@ class WandBOutputFormat(KVWriter, SeqWriter):
         for k in keys_to_del:
             del new_key_values[k]
         wandb.log(new_key_values, step=step)
-
-
 
     def write_sequence(self, sequence: List) -> None:
         pass

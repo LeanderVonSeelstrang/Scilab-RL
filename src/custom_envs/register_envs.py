@@ -9,8 +9,8 @@ RESET = R = "r"  # Initial Reset position of the agent
 GOAL = G = "g"
 COMBINED = C = "c"  # These cells can be selected as goal or reset locations
 
-class MazeMap:
 
+class MazeMap:
     OPEN = [
         [1, 1, 1, 1, 1, 1, 1],
         [1, 0, 0, 0, 0, 0, 1],
@@ -47,13 +47,13 @@ class MazeMap:
         [1, 1, 1, 1, 1],
     ]
     MEDIUM_CUSTOM_DIVERSE_GR = [[1, 1, 1, 1, 1, 1, 1, 1],
-                              [1, C, C, 1, 1, C, C, 1],
-                              [1, C, C, 1, C, C, C, 1],
-                              [1, 1, C, C, C, 1, 1, 1],
-                              [1, C, C, 1, C, C, C, 1],
-                              [1, C, 1, C, C, 1, C, 1],
-                              [1, C, C, C, 1, C, C, 1],
-                              [1, 1, 1, 1, 1, 1, 1, 1]]
+                                [1, C, C, 1, 1, C, C, 1],
+                                [1, C, C, 1, C, C, C, 1],
+                                [1, 1, C, C, C, 1, 1, 1],
+                                [1, C, C, 1, C, C, C, 1],
+                                [1, C, 1, C, C, 1, C, 1],
+                                [1, C, C, C, 1, C, C, 1],
+                                [1, 1, 1, 1, 1, 1, 1, 1]]
     name2map = {"open": OPEN,
                 "open_dg": OPEN_DIVERSE_G,
                 "open_dgr": OPEN_DIVERSE_GR,
@@ -61,6 +61,7 @@ class MazeMap:
                 "small_open_dgr": SMALL_OPEN_DIVERSE_GR,
                 "medium_custom_dgr": MEDIUM_CUSTOM_DIVERSE_GR,
                 }
+
 
 def _merge(a, b):
     a.update(b)
@@ -81,27 +82,7 @@ def register_custom_envs():
 
     ## Custom Ant environments
     for reward_type in ["sparse", "sparseneg", "dense"]:
-        for fs in [5,10,15,20]:
-            for dt in [0.5,1.0,1.5]:
-                for map in MazeMap.name2map.keys():
-                    for continuing_task in [1, 0]:
-                        for reset_target in [1, 0]:
-                                for max_ep_Steps in [300, 500, 700]:
-                                    kwargs = {
-                                        "reward_type": reward_type,
-                                        'frame_skip': fs,
-                                        "distance_threshold": dt,
-                                        "maze_map": MazeMap.name2map[map],
-                                        "continuing_task": continuing_task,
-                                        "reset_target": reset_target,
-                                    }
-                                    register(id=f'AntGym-{reward_type}-{fs}-{dt}-{map}-c{continuing_task}-rt{reset_target}-s{max_ep_Steps}-v0',
-                                        entry_point='custom_envs.maze.ant_env:AntGymMod',
-                                        kwargs = kwargs,
-                                        max_episode_steps = max_ep_Steps,
-                                        )
-    ## Custom PointMaze environments
-    for reward_type in ["sparse", "sparseneg", "dense"]:
+        for fs in [5, 10, 15, 20]:
             for dt in [0.5, 1.0, 1.5]:
                 for map in MazeMap.name2map.keys():
                     for continuing_task in [1, 0]:
@@ -109,17 +90,38 @@ def register_custom_envs():
                             for max_ep_Steps in [300, 500, 700]:
                                 kwargs = {
                                     "reward_type": reward_type,
+                                    'frame_skip': fs,
                                     "distance_threshold": dt,
                                     "maze_map": MazeMap.name2map[map],
                                     "continuing_task": continuing_task,
                                     "reset_target": reset_target,
                                 }
                                 register(
-                                    id=f'PointGym-{reward_type}-{dt}-{map}-c{continuing_task}-rt{reset_target}-s{max_ep_Steps}-v0',
-                                    entry_point='custom_envs.maze.point_env:PointGymMod',
+                                    id=f'AntGym-{reward_type}-{fs}-{dt}-{map}-c{continuing_task}-rt{reset_target}-s{max_ep_Steps}-v0',
+                                    entry_point='custom_envs.maze.ant_env:AntGymMod',
                                     kwargs=kwargs,
                                     max_episode_steps=max_ep_Steps,
                                     )
+    ## Custom PointMaze environments
+    for reward_type in ["sparse", "sparseneg", "dense"]:
+        for dt in [0.5, 1.0, 1.5]:
+            for map in MazeMap.name2map.keys():
+                for continuing_task in [1, 0]:
+                    for reset_target in [1, 0]:
+                        for max_ep_Steps in [300, 500, 700]:
+                            kwargs = {
+                                "reward_type": reward_type,
+                                "distance_threshold": dt,
+                                "maze_map": MazeMap.name2map[map],
+                                "continuing_task": continuing_task,
+                                "reset_target": reset_target,
+                            }
+                            register(
+                                id=f'PointGym-{reward_type}-{dt}-{map}-c{continuing_task}-rt{reset_target}-s{max_ep_Steps}-v0',
+                                entry_point='custom_envs.maze.point_env:PointGymMod',
+                                kwargs=kwargs,
+                                max_episode_steps=max_ep_Steps,
+                            )
 
     register(id='Reach1DOF-v0',
              entry_point='custom_envs.reach1dof.reach1dof_env:Reach1DOFEnv',
@@ -161,6 +163,10 @@ def register_custom_envs():
     register(id="MetaEnv-pos_neg-v0",
              entry_point="custom_envs.moonlander.meta_env:MetaEnv",
              kwargs={'reward_function': 'pos_neg'},
+             max_episode_steps=500)
+
+    register(id="GridworldEnv-v0",
+             entry_point="custom_envs.grid_world.grid_world_env:GridWorldEnv",
              max_episode_steps=500)
 
     for n_objects in range(3):
