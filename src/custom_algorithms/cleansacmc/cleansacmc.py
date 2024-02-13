@@ -1,20 +1,19 @@
+import io
+import pathlib
 from typing import Dict, Optional, Tuple, Union
 
-import pathlib
-import io
 import numpy as np
 import torch
+from gymnasium import spaces
+from stable_baselines3.common.buffers import ReplayBuffer, DictReplayBuffer
+from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.logger import Logger
+from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback
+from stable_baselines3.her.her_replay_buffer import HerReplayBuffer
 from torch import nn
 from torch.nn import functional as F
-from gymnasium import spaces
 
-from stable_baselines3.common.logger import Logger
-from stable_baselines3.common.callbacks import BaseCallback
-from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback
-from stable_baselines3.common.buffers import ReplayBuffer, DictReplayBuffer
-from stable_baselines3.her.her_replay_buffer import HerReplayBuffer
 from .mc import MorphologicalNetworks
-
 
 LOG_STD_MAX = 2
 LOG_STD_MIN = -20
@@ -32,23 +31,28 @@ class Actor(nn.Module):
         self.fc1 = nn.Linear(obs_shape, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
         self.fc3 = nn.Linear(hidden_size, hidden_size)
-        self.fc_mean = nn.Linear(hidden_size, np.prod(env.action_space.shape))
-        self.fc_logstd = nn.Linear(hidden_size, np.prod(env.action_space.shape))
-        # action rescaling
-        self.register_buffer(
-            "action_scale",
-            torch.tensor(
-                (env.action_space.high - env.action_space.low) / 2.0,
-                dtype=torch.float32,
-            ),
-        )
-        self.register_buffer(
-            "action_bias",
-            torch.tensor(
-                (env.action_space.high + env.action_space.low) / 2.0,
-                dtype=torch.float32,
-            ),
-        )
+        # FIXME: what is about the register buffer for discrete action spaces???
+        if isinstance(env.action_space, spaces.Discrete):
+            self.fc_mean = nn.Linear(hidden_size, np.prod((1,)))
+            self.fc_logstd = nn.Linear(hidden_size, np.prod((1,)))
+        else:
+            self.fc_mean = nn.Linear(hidden_size, np.prod(env.action_space.shape))
+            self.fc_logstd = nn.Linear(hidden_size, np.prod(env.action_space.shape))
+            # action rescaling
+            self.register_buffer(
+                "action_scale",
+                torch.tensor(
+                    (env.action_space.high - env.action_space.low) / 2.0,
+                    dtype=torch.float32,
+                ),
+            )
+            self.register_buffer(
+                "action_bias",
+                torch.tensor(
+                    (env.action_space.high + env.action_space.low) / 2.0,
+                    dtype=torch.float32,
+                ),
+            )
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
@@ -84,7 +88,10 @@ class Critic(nn.Module):
             )
         else:
             obs_shape = np.sum(env.observation_space.shape)
-        self.fc1 = nn.Linear(obs_shape + np.prod(env.action_space.shape), hidden_size)
+        if isinstance(env.action_space, spaces.Discrete):
+            self.fc1 = nn.Linear(obs_shape + np.prod((1,)), hidden_size)
+        else:
+            self.fc1 = nn.Linear(obs_shape + np.prod(env.action_space.shape), hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
         self.fc3 = nn.Linear(hidden_size, hidden_size)
         self.fc4 = nn.Linear(hidden_size, 1)
@@ -114,14 +121,22 @@ def flatten_obs(obs, device):
         if isinstance(obs, np.ndarray):
             obs = torch.tensor(obs)
         return obs.to(device)
-    observation, ag, dg = obs["observation"], obs["achieved_goal"], obs["desired_goal"]
-    if isinstance(observation, np.ndarray):
-        observation = torch.from_numpy(observation).to(device)
-    if isinstance(ag, np.ndarray):
-        ag = torch.from_numpy(ag).to(device)
-    if isinstance(dg, np.ndarray):
-        dg = torch.from_numpy(dg).to(device)
-    return torch.cat([observation, ag, dg], dim=1).to(dtype=torch.float32)
+    if "agent" in obs and "target" in obs:
+        agent, target = obs['agent'][0], obs['target'][0]
+        if isinstance(agent, np.ndarray):
+            agent = torch.from_numpy(agent).to(device)
+        if isinstance(target, np.ndarray):
+            target = torch.from_numpy(target).to(device)
+        return torch.cat([agent, target]).to(dtype=torch.float32).detach().clone()
+    else:
+        observation, ag, dg = obs["observation"], obs["achieved_goal"], obs["desired_goal"]
+        if isinstance(observation, np.ndarray):
+            observation = torch.from_numpy(observation).to(device)
+        if isinstance(ag, np.ndarray):
+            ag = torch.from_numpy(ag).to(device)
+        if isinstance(dg, np.ndarray):
+            dg = torch.from_numpy(dg).to(device)
+        return torch.cat([observation, ag, dg], dim=1).to(dtype=torch.float32)
 
 
 class CLEANSACMC:
@@ -142,19 +157,19 @@ class CLEANSACMC:
     """
 
     def __init__(
-        self,
-        env: GymEnv,
-        learning_rate: float = 3e-4,
-        buffer_size: int = 1_000_000,
-        learning_starts: int = 100,
-        batch_size: int = 256,
-        tau: float = 0.005,
-        gamma: float = 0.99,
-        ent_coef: Union[str, float] = "auto",
-        use_her: bool = True,
-        n_critics: int = 2,
-        hidden_size: int = 256,
-        mc: dict = {},
+            self,
+            env: GymEnv,
+            learning_rate: float = 3e-4,
+            buffer_size: int = 1_000_000,
+            learning_starts: int = 100,
+            batch_size: int = 256,
+            tau: float = 0.005,
+            gamma: float = 0.99,
+            ent_coef: Union[str, float] = "auto",
+            use_her: bool = True,
+            n_critics: int = 2,
+            hidden_size: int = 256,
+            mc: dict = {},
     ):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.learning_rate = learning_rate
@@ -245,19 +260,20 @@ class CLEANSACMC:
         )
 
     def learn(
-        self,
-        total_timesteps: int,
-        callback: MaybeCallback = None,
-        log_interval=None,
+            self,
+            total_timesteps: int,
+            callback: MaybeCallback = None,
+            log_interval=None,
     ):
         callback.init_callback(self)
         callback.on_training_start(locals(), globals())
 
         obs = self.env.reset()
-        if len(obs) == 2:
-            self._last_obs = obs[0]
-        else:
-            self._last_obs = obs
+        # FIXME: what is this?
+        # if len(obs) == 2:
+        #    self._last_obs = obs[0]
+        # else:
+        self._last_obs = obs
 
         while self.num_timesteps < total_timesteps:
             continue_training = self.collect_rollout(callback=callback)
@@ -288,11 +304,13 @@ class CLEANSACMC:
 
         # perform action
         new_obs, rewards, dones, infos = self.env.step(actions)
+        if isinstance(self.env.action_space, spaces.Discrete):
+            actions = np.array([actions])
         self.calc_reward(
-                flatten_obs(new_obs, self.device).float(),
-                torch.from_numpy(actions).to(self.device).float(),
-                torch.from_numpy(rewards).view(1, -1).to(self.device).float(),
-                is_executing=True
+            flatten_obs(new_obs, self.device).float(),
+            torch.from_numpy(actions).to(self.device).float(),
+            torch.from_numpy(rewards).view(1, -1).to(self.device).float(),
+            is_executing=True
         )
         self.logger.record("actor_entropy", -log_prob.mean().cpu().item(), exclude="tensorboard")
         self.logger.record("train/rollout_rewards_step", np.mean(rewards))
@@ -329,6 +347,7 @@ class CLEANSACMC:
         self.mc_optimizer.step()
 
     def calc_reward(self, observations, actions, e_rewards, is_executing=False):
+        observations = observations.unsqueeze(0)
         forward_normal, world_normal = self.mc_network(observations, actions)
         _err = (
             torch.distributions.kl.kl_divergence(forward_normal, world_normal)
@@ -337,12 +356,12 @@ class CLEANSACMC:
         )
         i_rewards = _err.clone() * self.mc["reward_eta"]
         rewards = e_rewards + i_rewards
-        if is_executing: # If this action is actually executed, log only the current step for visualizing the value.
+        if is_executing:  # If this action is actually executed, log only the current step for visualizing the value.
             self.logger.record("mc/i_reward", i_rewards.mean().item())
             self.logger.record("mc/e_reward", e_rewards.mean().item())
             self.logger.record("mc/kld", _err.mean().item())
             self.logger.record("mc/reward", rewards.mean().item())
-        else: # Take mean of all logged values until dump.
+        else:  # Take mean of all logged values until dump.
             self.logger.record_mean("mc/i_reward", i_rewards.mean().item())
             self.logger.record_mean("mc/e_reward", e_rewards.mean().item())
             self.logger.record_mean("mc/kld", _err.mean().item())
@@ -390,10 +409,10 @@ class CLEANSACMC:
                 observations, next_state_actions, replay_data.rewards
             )
             next_q_value = (
-                rewards.flatten()
-                + (1 - replay_data.dones.flatten())
-                * self.gamma
-                * min_crit_next_target.flatten()
+                    rewards.flatten()
+                    + (1 - replay_data.dones.flatten())
+                    * self.gamma
+                    * min_crit_next_target.flatten()
             )
 
         critic_a_values = self.critic(observations, replay_data.actions)
@@ -419,7 +438,7 @@ class CLEANSACMC:
 
         # Update target networks with polyak update
         for param, target_param in zip(
-            self.critic.parameters(), self.critic_target.parameters()
+                self.critic.parameters(), self.critic_target.parameters()
         ):
             target_param.data.mul_(1 - self.tau)
             torch.add(
@@ -427,11 +446,11 @@ class CLEANSACMC:
             )
 
     def predict(
-        self,
-        obs: Union[np.ndarray, Dict[str, np.ndarray]],
-        state: Optional[Tuple[np.ndarray, ...]] = None,
-        episode_start: Optional[np.ndarray] = None,
-        deterministic: bool = False,
+            self,
+            obs: Union[np.ndarray, Dict[str, np.ndarray]],
+            state: Optional[Tuple[np.ndarray, ...]] = None,
+            episode_start: Optional[np.ndarray] = None,
+            deterministic: bool = False,
     ) -> Tuple[np.ndarray, None]:
         """
         Get the policy action given an observation.

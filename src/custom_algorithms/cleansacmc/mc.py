@@ -2,11 +2,12 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.distributions import Normal
 from gymnasium import spaces
+from torch.distributions import Normal
 
 LOG_STD_MAX = 2
 LOG_STD_MIN = -20
+
 
 class MorphologicalNetworks(nn.Module):
     def __init__(self, env, cfg):
@@ -18,7 +19,7 @@ class MorphologicalNetworks(nn.Module):
             )
         else:
             self.obs_shape = np.sum(env.observation_space.shape)
-        self.action_shape = np.prod(env.action_space.shape)
+        self.action_shape = int(np.prod(env.action_space.shape))
 
         self.state_action_encoder = nn.Sequential(
             nn.Linear(self.obs_shape + self.action_shape, hidden_size),

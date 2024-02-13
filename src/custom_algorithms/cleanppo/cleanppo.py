@@ -26,19 +26,7 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
 
 
 def flatten_obs(obs):
-    if "observation" in obs and "achieved_goal" in obs and "desired_goal" in obs:
-        observation, ag, dg = obs['observation'], obs['achieved_goal'], obs['desired_goal']
-        if isinstance(observation, np.ndarray):
-            observation = torch.from_numpy(observation).to(device)
-        if isinstance(ag, np.ndarray):
-            ag = torch.from_numpy(ag).to(device)
-        if isinstance(dg, np.ndarray):
-            dg = torch.from_numpy(dg).to(device)
-        if len(ag.shape) > 1:
-            return torch.cat([observation, ag, dg], dim=1).to(dtype=torch.float32).detach().clone()
-        else:
-            return torch.cat([observation, ag, dg]).to(dtype=torch.float32).detach().clone()
-    elif "agent" in obs and "target" in obs:
+    if "agent" in obs and "target" in obs:
         agent, target = obs['agent'][0], obs['target'][0]
         if isinstance(agent, np.ndarray):
             agent = torch.from_numpy(agent).to(device)
@@ -46,7 +34,14 @@ def flatten_obs(obs):
             target = torch.from_numpy(target).to(device)
         return torch.cat([agent, target]).to(dtype=torch.float32).detach().clone()
     else:
-        raise NotImplementedError("Unsupported dictionary as observation")
+        observation, ag, dg = obs["observation"], obs["achieved_goal"], obs["desired_goal"]
+        if isinstance(observation, np.ndarray):
+            observation = torch.from_numpy(observation).to(device)
+        if isinstance(ag, np.ndarray):
+            ag = torch.from_numpy(ag).to(device)
+        if isinstance(dg, np.ndarray):
+            dg = torch.from_numpy(dg).to(device)
+        return torch.cat([observation, ag, dg], dim=1).to(dtype=torch.float32)
 
 
 class Agent(nn.Module):
