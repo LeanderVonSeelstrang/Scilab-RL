@@ -26,17 +26,27 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
 
 
 def flatten_obs(obs):
-    observation, ag, dg = obs['observation'], obs['achieved_goal'], obs['desired_goal']
-    if isinstance(observation, np.ndarray):
-        observation = torch.from_numpy(observation).to(device)
-    if isinstance(ag, np.ndarray):
-        ag = torch.from_numpy(ag).to(device)
-    if isinstance(dg, np.ndarray):
-        dg = torch.from_numpy(dg).to(device)
-    if len(ag.shape) > 1:
-        return torch.cat([observation, ag, dg], dim=1).to(dtype=torch.float32).detach().clone()
+    if "observation" in obs and "achieved_goal" in obs and "desired_goal" in obs:
+        observation, ag, dg = obs['observation'], obs['achieved_goal'], obs['desired_goal']
+        if isinstance(observation, np.ndarray):
+            observation = torch.from_numpy(observation).to(device)
+        if isinstance(ag, np.ndarray):
+            ag = torch.from_numpy(ag).to(device)
+        if isinstance(dg, np.ndarray):
+            dg = torch.from_numpy(dg).to(device)
+        if len(ag.shape) > 1:
+            return torch.cat([observation, ag, dg], dim=1).to(dtype=torch.float32).detach().clone()
+        else:
+            return torch.cat([observation, ag, dg]).to(dtype=torch.float32).detach().clone()
+    elif "agent" in obs and "target" in obs:
+        agent, target = obs['agent'][0], obs['target'][0]
+        if isinstance(agent, np.ndarray):
+            agent = torch.from_numpy(agent).to(device)
+        if isinstance(target, np.ndarray):
+            target = torch.from_numpy(target).to(device)
+        return torch.cat([agent, target]).to(dtype=torch.float32).detach().clone()
     else:
-        return torch.cat([observation, ag, dg]).to(dtype=torch.float32).detach().clone()
+        raise NotImplementedError("Unsupported dictionary as observation")
 
 
 class Agent(nn.Module):
@@ -382,6 +392,7 @@ class CLEANPPO:
             # Clip the actions to avoid out of bound error
             if isinstance(self.action_space, spaces.Box):
                 clipped_actions = np.clip(actions, self.action_space.low, self.action_space.high)
+            # FIXME: why has this to commented out when using gridworld?
             elif isinstance(self.action_space, spaces.Discrete):
                 clipped_actions = actions[0]
 
