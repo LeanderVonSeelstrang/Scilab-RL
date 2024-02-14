@@ -27,12 +27,12 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
 
 def flatten_obs(obs):
     if "agent" in obs and "target" in obs:
-        agent, target = obs['agent'][0], obs['target'][0]
+        agent, target = obs['agent'], obs['target']
         if isinstance(agent, np.ndarray):
             agent = torch.from_numpy(agent).to(device)
         if isinstance(target, np.ndarray):
             target = torch.from_numpy(target).to(device)
-        return torch.cat([agent, target]).to(dtype=torch.float32).detach().clone()
+        return torch.cat([agent, target], dim=1).to(dtype=torch.float32).detach().clone()
     else:
         observation, ag, dg = obs["observation"], obs["achieved_goal"], obs["desired_goal"]
         if isinstance(observation, np.ndarray):
@@ -387,7 +387,6 @@ class CLEANPPO:
             # Clip the actions to avoid out of bound error
             if isinstance(self.action_space, spaces.Box):
                 clipped_actions = np.clip(actions, self.action_space.low, self.action_space.high)
-            # FIXME: why has this to commented out when using gridworld?
             elif isinstance(self.action_space, spaces.Discrete):
                 clipped_actions = actions[0]
 
@@ -423,6 +422,8 @@ class CLEANPPO:
                 ):
                     terminal_obs = infos[idx]["terminal_observation"]
                     with torch.no_grad():
+                        terminal_obs["agent"] = np.expand_dims(terminal_obs["agent"], axis=0)
+                        terminal_obs["target"] = np.expand_dims(terminal_obs["target"], axis=0)
                         terminal_value = self.policy.get_value(terminal_obs)[0]
                     rewards[idx] += self.gamma * terminal_value
 
