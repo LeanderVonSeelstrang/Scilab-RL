@@ -21,10 +21,9 @@ def setup_logger(run_dir, run_name, cfg):
         project_name = cfg.project_name
         if project_name is None:
             project_name = run_name
-        # FIXME: not hardcoded
-        wandb_args = dict(project="cleanppo_gridworld",
-                          config=non_nested_cfg)
-        print(wandb_args)
+        # FIXME: changed for me
+        wandb_args = dict(project=cfg['env'],
+                          config=non_nested_cfg, name=cfg['algorithm']['name'])
         if 'entity' in cfg:
             wandb_args['entity'] = cfg['entity']
         if 'group' in cfg:
