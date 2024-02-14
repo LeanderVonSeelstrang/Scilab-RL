@@ -16,7 +16,7 @@ from torch.distributions.categorical import Categorical
 from torch.distributions.normal import Normal
 from torch.nn import functional as F
 
-from src.custom_algorithms.cleansacmc.mc import MorphologicalNetworks
+from custom_algorithms.cleansacmc.mc import MorphologicalNetworks
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -108,8 +108,8 @@ class Agent(nn.Module):
 
             # TODO: put prediction of mc network into observation --> standard deviation or whole observation?
             # TODO: logging! mean or not?
-            logger.record_mean("mc/loc", forward_normal.mean)
-            logger.record_mean("mc/stddev", forward_normal.stddev)
+            logger.record_mean("mc/loc", forward_normal.mean.mean().item())
+            logger.record_mean("mc/stddev", forward_normal.stddev.mean().item())
             return action.unsqueeze(0), distribution.log_prob(action), distribution.entropy(), self.critic(x)
         else:
             action_mean = self.actor_mean(x)
