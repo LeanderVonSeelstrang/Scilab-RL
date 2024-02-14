@@ -33,8 +33,17 @@ class Actor(nn.Module):
         self.fc3 = nn.Linear(hidden_size, hidden_size)
         # FIXME: what is about the register buffer for discrete action spaces???
         if isinstance(env.action_space, spaces.Discrete):
+            self.env = env
             self.fc_mean = nn.Linear(hidden_size, np.prod((1,)))
             self.fc_logstd = nn.Linear(hidden_size, np.prod((1,)))
+            self.register_buffer(
+                "action_scale",
+                torch.tensor(env.action_space.n, dtype=torch.int32)
+            )
+            self.register_buffer(
+                "action_bias",
+                torch.tensor(0, dtype=torch.int32),
+            )
         else:
             self.fc_mean = nn.Linear(hidden_size, np.prod(env.action_space.shape))
             self.fc_logstd = nn.Linear(hidden_size, np.prod(env.action_space.shape))
@@ -347,7 +356,8 @@ class CLEANSACMC:
         self.mc_optimizer.step()
 
     def calc_reward(self, observations, actions, e_rewards, is_executing=False):
-        observations = observations.unsqueeze(0)
+        if isinstance(self.env.action_space, spaces.Discrete):
+            observations = observations.unsqueeze(0)
         forward_normal, world_normal = self.mc_network(observations, actions)
         _err = (
             torch.distributions.kl.kl_divergence(forward_normal, world_normal)
