@@ -1,18 +1,18 @@
-import io
-import pathlib
 from typing import Dict, Optional, Tuple, Union
 
+import pathlib
+import io
 import numpy as np
 import torch
-from gymnasium import spaces
-from stable_baselines3.common.buffers import ReplayBuffer, DictReplayBuffer
-from stable_baselines3.common.callbacks import BaseCallback
-from stable_baselines3.common.logger import Logger
-from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback
-from stable_baselines3.her.her_replay_buffer import HerReplayBuffer
 from torch import nn
 from torch.nn import functional as F
+from gymnasium import spaces
 
+from stable_baselines3.common.logger import Logger
+from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback
+from stable_baselines3.common.buffers import ReplayBuffer, DictReplayBuffer
+from stable_baselines3.her.her_replay_buffer import HerReplayBuffer
 from .mc import MorphologicalNetworks
 
 LOG_STD_MAX = 2
@@ -31,37 +31,23 @@ class Actor(nn.Module):
         self.fc1 = nn.Linear(obs_shape, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
         self.fc3 = nn.Linear(hidden_size, hidden_size)
-        # FIXME: what is about the register buffer for discrete action spaces???
-        if isinstance(env.action_space, spaces.Discrete):
-            self.env = env
-            self.fc_mean = nn.Linear(hidden_size, np.prod((1,)))
-            self.fc_logstd = nn.Linear(hidden_size, np.prod((1,)))
-            self.register_buffer(
-                "action_scale",
-                torch.tensor(env.action_space.n, dtype=torch.int32)
-            )
-            self.register_buffer(
-                "action_bias",
-                torch.tensor(0, dtype=torch.int32),
-            )
-        else:
-            self.fc_mean = nn.Linear(hidden_size, np.prod(env.action_space.shape))
-            self.fc_logstd = nn.Linear(hidden_size, np.prod(env.action_space.shape))
-            # action rescaling
-            self.register_buffer(
-                "action_scale",
-                torch.tensor(
-                    (env.action_space.high - env.action_space.low) / 2.0,
-                    dtype=torch.float32,
-                ),
-            )
-            self.register_buffer(
-                "action_bias",
-                torch.tensor(
-                    (env.action_space.high + env.action_space.low) / 2.0,
-                    dtype=torch.float32,
-                ),
-            )
+        self.fc_mean = nn.Linear(hidden_size, np.prod(env.action_space.shape))
+        self.fc_logstd = nn.Linear(hidden_size, np.prod(env.action_space.shape))
+        # action rescaling
+        self.register_buffer(
+            "action_scale",
+            torch.tensor(
+                (env.action_space.high - env.action_space.low) / 2.0,
+                dtype=torch.float32,
+            ),
+        )
+        self.register_buffer(
+            "action_bias",
+            torch.tensor(
+                (env.action_space.high + env.action_space.low) / 2.0,
+                dtype=torch.float32,
+            ),
+        )
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
@@ -97,10 +83,7 @@ class Critic(nn.Module):
             )
         else:
             obs_shape = np.sum(env.observation_space.shape)
-        if isinstance(env.action_space, spaces.Discrete):
-            self.fc1 = nn.Linear(obs_shape + np.prod((1,)), hidden_size)
-        else:
-            self.fc1 = nn.Linear(obs_shape + np.prod(env.action_space.shape), hidden_size)
+        self.fc1 = nn.Linear(obs_shape + np.prod(env.action_space.shape), hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
         self.fc3 = nn.Linear(hidden_size, hidden_size)
         self.fc4 = nn.Linear(hidden_size, 1)
@@ -130,22 +113,14 @@ def flatten_obs(obs, device):
         if isinstance(obs, np.ndarray):
             obs = torch.tensor(obs)
         return obs.to(device)
-    if "agent" in obs and "target" in obs:
-        agent, target = obs['agent'][0], obs['target'][0]
-        if isinstance(agent, np.ndarray):
-            agent = torch.from_numpy(agent).to(device)
-        if isinstance(target, np.ndarray):
-            target = torch.from_numpy(target).to(device)
-        return torch.cat([agent, target]).to(dtype=torch.float32).detach().clone()
-    else:
-        observation, ag, dg = obs["observation"], obs["achieved_goal"], obs["desired_goal"]
-        if isinstance(observation, np.ndarray):
-            observation = torch.from_numpy(observation).to(device)
-        if isinstance(ag, np.ndarray):
-            ag = torch.from_numpy(ag).to(device)
-        if isinstance(dg, np.ndarray):
-            dg = torch.from_numpy(dg).to(device)
-        return torch.cat([observation, ag, dg], dim=1).to(dtype=torch.float32)
+    observation, ag, dg = obs["observation"], obs["achieved_goal"], obs["desired_goal"]
+    if isinstance(observation, np.ndarray):
+        observation = torch.from_numpy(observation).to(device)
+    if isinstance(ag, np.ndarray):
+        ag = torch.from_numpy(ag).to(device)
+    if isinstance(dg, np.ndarray):
+        dg = torch.from_numpy(dg).to(device)
+    return torch.cat([observation, ag, dg], dim=1).to(dtype=torch.float32)
 
 
 class CLEANSACMC:
@@ -278,11 +253,10 @@ class CLEANSACMC:
         callback.on_training_start(locals(), globals())
 
         obs = self.env.reset()
-        # FIXME: what is this?
-        # if len(obs) == 2:
-        #    self._last_obs = obs[0]
-        # else:
-        self._last_obs = obs
+        if len(obs) == 2:
+            self._last_obs = obs[0]
+        else:
+            self._last_obs = obs
 
         while self.num_timesteps < total_timesteps:
             continue_training = self.collect_rollout(callback=callback)
@@ -313,8 +287,6 @@ class CLEANSACMC:
 
         # perform action
         new_obs, rewards, dones, infos = self.env.step(actions)
-        if isinstance(self.env.action_space, spaces.Discrete):
-            actions = np.array([actions])
         self.calc_reward(
             flatten_obs(new_obs, self.device).float(),
             torch.from_numpy(actions).to(self.device).float(),
@@ -356,8 +328,6 @@ class CLEANSACMC:
         self.mc_optimizer.step()
 
     def calc_reward(self, observations, actions, e_rewards, is_executing=False):
-        if isinstance(self.env.action_space, spaces.Discrete):
-            observations = observations.unsqueeze(0)
         forward_normal, world_normal = self.mc_network(observations, actions)
         _err = (
             torch.distributions.kl.kl_divergence(forward_normal, world_normal)
