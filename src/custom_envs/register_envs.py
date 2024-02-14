@@ -101,7 +101,7 @@ def register_custom_envs():
                                     entry_point='custom_envs.maze.ant_env:AntGymMod',
                                     kwargs=kwargs,
                                     max_episode_steps=max_ep_Steps,
-                                    )
+                                )
     ## Custom PointMaze environments
     for reward_type in ["sparse", "sparseneg", "dense"]:
         for dt in [0.5, 1.0, 1.5]:
@@ -167,7 +167,7 @@ def register_custom_envs():
 
     register(id="GridworldEnv-v0",
              entry_point="custom_envs.grid_world.grid_world_env:GridWorldEnv",
-             max_episode_steps=500)
+             max_episode_steps=10)
 
     for n_objects in range(3):
         register(id=f'Hook-o{n_objects}-v1',
