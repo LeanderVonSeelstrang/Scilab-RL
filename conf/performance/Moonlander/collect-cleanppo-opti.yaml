@@ -27,7 +27,7 @@ hydra:
         low: 0.00005
         high: 0.005
         log: true
-      ++algorithm. gamma:
+      ++algorithm.gamma:
         type: float
         low: 0.95
         high: 0.99
