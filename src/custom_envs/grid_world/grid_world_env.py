@@ -1,3 +1,5 @@
+import random
+
 import gymnasium as gym
 import numpy as np
 import pygame
@@ -7,9 +9,16 @@ from gymnasium import spaces
 class GridWorldEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
-    def __init__(self, render_mode=None, size=5):
+    def __init__(self, render_mode=None, size=5, is_it_possible_that_input_noise_is_applied: bool = False):
         self.size = size  # The size of the square grid
         self.window_size = 512  # The size of the PyGame window
+
+        self.is_it_possible_that_input_noise_is_applied = is_it_possible_that_input_noise_is_applied
+        # is it in general possible that the agent can encounter input noise?
+        if self.is_it_possible_that_input_noise_is_applied:
+            # does this episode have input noise?
+            self.input_noise_is_applied_in_this_episode = random.choice([True, False])
+            print("input noise is applied in this episode:", self.input_noise_is_applied_in_this_episode)
 
         # Observations are dictionaries with the agent's and the target's location.
         # Each location is encoded as an element of {0, ..., `size`}^2, i.e. MultiDiscrete([size, size]).
@@ -20,7 +29,8 @@ class GridWorldEnv(gym.Env):
             }
         )
 
-        # We have 8 actions, corresponding to "right", "up", "left", "down"
+        # We have 8 actions, corresponding to
+        # "right", "right down", "down", "left down", "left", "left up", "up", "right up"
         self.action_space = spaces.Discrete(8)
 
         """
@@ -66,6 +76,12 @@ class GridWorldEnv(gym.Env):
         # We need the following line to seed self.np_random
         super().reset(seed=seed)
 
+        # is it in general possible that the agent can encounter input noise?
+        if self.is_it_possible_that_input_noise_is_applied:
+            # does this episode have input noise?
+            self.input_noise_is_applied_in_this_episode = random.choice([True, False])
+            print("input noise is applied in this episode:", self.input_noise_is_applied_in_this_episode)
+
         # FIXME: not hardcoded
         self._target_location = np.array([4, 0])
         self._agent_location = np.array([0, 4])
@@ -79,7 +95,12 @@ class GridWorldEnv(gym.Env):
         return observation, info
 
     def step(self, action):
-        # Map the action (element of {0,1,2,3}) to the direction we walk in
+        # Map the action (element of {0,1,2,3,4,5,6,7}) to the direction we walk in
+        if self.input_noise_is_applied_in_this_episode:
+            possible_actions = [0, 1, 2, 3, 4, 5, 6, 7]
+            weights = [0.5 / 7 for _ in range(len(possible_actions))]
+            weights[action] = 0.5
+            action = random.choices(population=possible_actions, weights=weights, k=1)[0]
         direction = self._action_to_direction[action]
         # We use `np.clip` to make sure we don't leave the grid
         self._agent_location = np.clip(
