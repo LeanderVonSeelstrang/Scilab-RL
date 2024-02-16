@@ -168,6 +168,10 @@ def register_custom_envs():
     register(id="GridworldEnv-v0",
              entry_point="custom_envs.grid_world.grid_world_env:GridWorldEnv",
              max_episode_steps=10)
+    register(id="GridworldEnv-v1",
+             entry_point="custom_envs.grid_world.grid_world_env:GridWorldEnv",
+             kwargs={'is_it_possible_that_input_noise_is_applied': True},
+             max_episode_steps=10)
 
     for n_objects in range(3):
         register(id=f'Hook-o{n_objects}-v1',
