@@ -32,23 +32,10 @@ class MoonlanderWorldEnv(Env):
         """
         self.ROOT_DIR = "."
         if task == "dodge":
-            config_path = os.path.join(
-                get_original_cwd(),
-                "custom_envs/moonlander/standard_config.yaml",
-            )
-            # config_path = os.path.join(
-            #     "/home/annika/coding_projects/scilab-new/Scilab-RL/src",
-            #     "custom_envs/moonlander/standard_config.yaml",
-            # )
+            config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "standard_config.yaml")
         elif task == "collect":
-            config_path = os.path.join(
-                get_original_cwd(),
-                "custom_envs/moonlander/standard_config_second_task.yaml",
-            )
-            # config_path = os.path.join(
-            #     "/home/annika/coding_projects/scilab-new/Scilab-RL/src",
-            #     "custom_envs/moonlander/standard_config_second_task.yaml",
-            # )
+            config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                       "standard_config_second_task.yaml")
         else:
             raise ValueError("Task {} not implemented".format(task))
 
