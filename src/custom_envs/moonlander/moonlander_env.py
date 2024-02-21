@@ -425,7 +425,7 @@ class MoonlanderWorldEnv(Env):
             no_crashes=self.config["no_crashes"],
         )
 
-    def calculate_reward(self) -> int:
+    def calculate_reward(self) -> tuple[int, int]:
         """
         calculates reward if the agent has crashed in the wall or in an obstacle
         if agent is in obstacle or wall, reward is -100 & crashed is True
@@ -436,6 +436,7 @@ class MoonlanderWorldEnv(Env):
         """
         actual_reward = 0
         collected_objects = self.find_intersections(self.object_dict_list)
+        number_of_crashed_or_collected_objects = len(collected_objects)
         # state is current observation
         # agent is in obstacle or wall = crash and crashes are lead to end the episode --> same reward for both tasks
         if (((self.config["world"]["objects"]["type"] == "obstacle" and
@@ -475,7 +476,7 @@ class MoonlanderWorldEnv(Env):
             if self.reward_function == "pos_neg":
                 actual_reward = reward_pos_neg
 
-        return actual_reward
+        return actual_reward, number_of_crashed_or_collected_objects
 
     def calculate_simple_reward(self, collected_objects: list[dict]) -> int:
         current_simple_reward = 0
@@ -804,11 +805,12 @@ class MoonlanderWorldEnv(Env):
         truncated = False
 
         # CALCULATE REWARD
-        reward = self.calculate_reward()
+        reward, number_of_crashed_or_collected_objects = self.calculate_reward()
 
         # info of rewards
         info = {"simple": self.simple_reward_info_per_step, "gaussian": self.gaussian_reward_info_per_step,
-                "pos_neg": self.pos_neg_reward_info_dict_per_step}
+                "pos_neg": self.pos_neg_reward_info_dict_per_step,
+                "number_of_crashed_or_collected_objects": number_of_crashed_or_collected_objects}
 
         self.positions_and_action = self.positions_and_action + [
             [
@@ -988,6 +990,6 @@ class MoonlanderWorldEnv(Env):
         self.gaussian_reward_info_per_step = 0
         self.simple_reward_info_per_step = 0
         info = {"simple": self.simple_reward_info_per_step, "gaussian": self.gaussian_reward_info_per_step,
-                "pos_neg": self.pos_neg_reward_info_dict_per_step}
+                "pos_neg": self.pos_neg_reward_info_dict_per_step, "number_of_crashed_or_collected_objects": 0}
 
         return self.state.flatten(), info

@@ -399,6 +399,8 @@ class CLEANPPO:
                 self.logger.record("rollout_reward_gaussian", float(infos[0]["gaussian"]))
                 self.logger.record("rollout_reward_pos_neg",
                                    float(infos[0]["pos_neg"]["pos"][0] + infos[0]["pos_neg"]["neg"][0]))
+                self.logger.record("rollout_number_of_crashed_or_collected_objects",
+                                   float(infos[0]["number_of_crashed_or_collected_objects"]))
             self.num_timesteps += env.num_envs
 
             # Give access to local variables
