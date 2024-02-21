@@ -1,4 +1,4 @@
-name: 'cleanppomc'
+name: 'cleanppofm'
 
 learning_rate: 3e-4
 n_steps: 2048
@@ -13,8 +13,8 @@ ent_coef: 0.0
 vf_coef: 0.5
 max_grad_norm: 0.5
 
-# morphological computation hyperparameters
-mc:
+# forward model computation hyperparameters
+fm:
   learning_rate: 0.001
   reward_eta: 0.2 # small bonus by default
   hidden_size: 256

@@ -86,7 +86,7 @@ class Agent(nn.Module):
             x = torch.tensor(x, device=device, dtype=torch.float32).detach().clone()
         return self.critic(x)
 
-    def get_action_and_value(self, mc_network, x, action=None, deterministic=False, logger=None):
+    def get_action_and_value(self, fm_network, x, action=None, deterministic=False, logger=None):
         if self.flatten:
             x = flatten_obs(x)
         else:
@@ -104,12 +104,12 @@ class Agent(nn.Module):
                     forward_normal_action = action.unsqueeze(0)
             else:
                 forward_normal_action = action.unsqueeze(1)
-            forward_normal, _ = mc_network(x, forward_normal_action.float())
+            forward_normal, _ = fm_network(x, forward_normal_action.float())
 
-            # TODO: put prediction of mc network into observation --> standard deviation or whole observation?
+            # TODO: put prediction of fm network into observation --> standard deviation or whole observation?
             # TODO: logging! mean or not?
-            logger.record_mean("mc/loc", forward_normal.mean.mean().item())
-            logger.record_mean("mc/stddev", forward_normal.stddev.mean().item())
+            logger.record_mean("fm/loc", forward_normal.mean.mean().item())
+            logger.record_mean("fm/stddev", forward_normal.stddev.mean().item())
             return action.unsqueeze(0), distribution.log_prob(action), distribution.entropy(), self.critic(x)
         else:
             action_mean = self.actor_mean(x)
@@ -124,7 +124,7 @@ class Agent(nn.Module):
             return action, distribution.log_prob(action).sum(1), distribution.entropy().sum(1), self.critic(x)
 
 
-class CLEANPPOMC:
+class CLEANPPOFM:
     """
     Proximal Policy Optimization algorithm (PPO) (clip version)
     This is a simplified one-file version of the stable-baselines3 PPO implementation.
@@ -172,7 +172,7 @@ class CLEANPPOMC:
             ent_coef: float = 0.0,
             vf_coef: float = 0.5,
             max_grad_norm: float = 0.5,
-            mc: dict = {}
+            fm: dict = {}
     ):
         self.num_timesteps = 0
         self.learning_rate = learning_rate
@@ -198,10 +198,10 @@ class CLEANPPOMC:
         self.vf_coef = vf_coef
         self.max_grad_norm = max_grad_norm
 
-        self.mc = mc
-        self.mc_network = MorphologicalNetworks(self.env, self.mc).to(device)
-        self.mc_optimizer = torch.optim.Adam(
-            self.mc_network.parameters(), lr=self.mc["learning_rate"]
+        self.fm = fm
+        self.fm_network = MorphologicalNetworks(self.env, self.fm).to(device)
+        self.fm_optimizer = torch.optim.Adam(
+            self.fm_network.parameters(), lr=self.fm["learning_rate"]
         )
 
         # Sanity check, otherwise it will lead to noisy gradient and NaN
@@ -278,9 +278,9 @@ class CLEANPPOMC:
                     # Convert discrete action from float to long
                     actions = rollout_data.actions.long().flatten()
 
-                self.train_mc(observations, next_observations, actions)
+                self.train_fm(observations, next_observations, actions)
 
-                _, log_prob, entropy, values = self.policy.get_action_and_value(mc_network=self.mc_network,
+                _, log_prob, entropy, values = self.policy.get_action_and_value(fm_network=self.fm_network,
                                                                                 x=observations,
                                                                                 action=actions, logger=self.logger)
                 values = values.flatten()
@@ -409,7 +409,7 @@ class CLEANPPOMC:
 
         while n_steps < self.n_steps:
             with torch.no_grad():
-                actions, log_probs, _, values = self.policy.get_action_and_value(mc_network=self.mc_network,
+                actions, log_probs, _, values = self.policy.get_action_and_value(fm_network=self.fm_network,
                                                                                  x=self._last_obs, logger=self.logger)
             actions = actions.cpu().numpy()
             log_prob_float = float(np.mean(log_probs.cpu().numpy()))
@@ -483,18 +483,18 @@ class CLEANPPOMC:
 
         return True
 
-    def train_mc(self, observations, next_observations, actions):
+    def train_fm(self, observations, next_observations, actions):
         # FIXME: not hardcoded
         observations = flatten_obs(observations)
         next_observations = flatten_obs(next_observations)
-        forward_normal, _ = self.mc_network(observations, actions.float().unsqueeze(1))
+        forward_normal, _ = self.fm_network(observations, actions.float().unsqueeze(1))
         fw_loss = -forward_normal.log_prob(next_observations)
         loss = fw_loss.mean()
 
-        self.logger.record("mc/fw_loss", loss.item())
-        self.mc_optimizer.zero_grad()
+        self.logger.record("fm/fw_loss", loss.item())
+        self.fm_optimizer.zero_grad()
         loss.backward()
-        self.mc_optimizer.step()
+        self.fm_optimizer.step()
 
     def predict(
             self,
@@ -504,7 +504,7 @@ class CLEANPPOMC:
             deterministic: bool = False,
     ) -> Tuple[np.ndarray, Optional[Tuple[np.ndarray, ...]]]:
         with torch.no_grad():
-            action, _, _, _ = self.policy.get_action_and_value(mc_network=self.mc_network, x=observation,
+            action, _, _, _ = self.policy.get_action_and_value(fm_network=self.fm_network, x=observation,
                                                                deterministic=deterministic, logger=self.logger)
         return action.cpu().numpy(), state
 
@@ -519,7 +519,7 @@ class CLEANPPOMC:
             del data[to_exclude]
         # save network parameters
         data["_policy"] = self.policy.state_dict()
-        data["_mc"] = self.mc_network.state_dict()
+        data["_fm"] = self.fm_network.state_dict()
         torch.save(data, path)
 
     @classmethod
@@ -527,11 +527,11 @@ class CLEANPPOMC:
         model = cls(env=env, **kwargs)
         loaded_dict = torch.load(path)
         for k in loaded_dict:
-            if k not in ["_policy", "_mc"]:
+            if k not in ["_policy", "_fm"]:
                 model.__dict__[k] = loaded_dict[k]
         # load network states
         model.policy.load_state_dict(loaded_dict["_policy"])
-        model.mc_network.load_state_dict(loaded_dict["_mc"])
+        model.fm_network.load_state_dict(loaded_dict["_fm"])
         return model
 
     def set_logger(self, logger):
