@@ -93,6 +93,7 @@ class Agent(nn.Module):
             x = torch.tensor(x, device=device, dtype=torch.float32).detach().clone()
 
         if self.discrete_actions:
+            # FIXME: simulate all three actions instead of one
             action_mean = self.actor_mean(x)
             distribution = Categorical(logits=action_mean)
             if action is None:
@@ -105,6 +106,18 @@ class Agent(nn.Module):
             else:
                 forward_normal_action = action.unsqueeze(1)
             forward_normal, _ = fm_network(x, forward_normal_action.float())
+            # formal_normal_action in form of tensor([[action]])
+            # simulate all three actions
+            forward_normal_0, _ = fm_network(x, torch.tensor([[0]]).float())
+            forward_normal_1, _ = fm_network(x, torch.tensor([[1]]).float())
+            forward_normal_2, _ = fm_network(x, torch.tensor([[2]]).float())
+
+            logger.record_mean("fm_0/loc", forward_normal_0.mean.mean().item())
+            logger.record_mean("fm_0/stddev", forward_normal_0.stddev.mean().item())
+            logger.record_mean("fm_1/loc", forward_normal_1.mean.mean().item())
+            logger.record_mean("fm_1/stddev", forward_normal_1.stddev.mean().item())
+            logger.record_mean("fm_2/loc", forward_normal_2.mean.mean().item())
+            logger.record_mean("fm_2/stddev", forward_normal_2.stddev.mean().item())
 
             # TODO: put prediction of fm network into observation --> standard deviation or whole observation?
             # TODO: logging! mean or not?
@@ -428,6 +441,7 @@ class CLEANPPOFM:
             self.logger.record_mean("train/rollout_rewards_mean", float(rewards.mean()))
             # this is only logged when no hyperparameter tuning is running?
             if "simple" in infos[0].keys():
+                print("infos[0]", infos[0])
                 self.logger.record("rollout_reward_simple", float(infos[0]["simple"]))
                 self.logger.record("rollout_reward_gaussian", float(infos[0]["gaussian"]))
                 self.logger.record("rollout_reward_pos_neg",
