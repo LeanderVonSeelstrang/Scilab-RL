@@ -33,6 +33,15 @@ def flatten_obs(obs):
         if isinstance(target, np.ndarray):
             target = torch.from_numpy(target).to(device)
         return torch.cat([agent, target], dim=1).to(dtype=torch.float32).detach().clone()
+    elif "agent_0" in obs and "agent_1" in obs and "target" in obs:
+        agent_0, agent_1, target = obs['agent_0'], obs['agent_1'], obs['target']
+        if isinstance(agent_0, np.ndarray):
+            agent_0 = torch.from_numpy(agent_0).to(device)
+        if isinstance(agent_1, np.ndarray):
+            agent_1 = torch.from_numpy(agent_1).to(device)
+        if isinstance(target, np.ndarray):
+            target = torch.from_numpy(target).to(device)
+        return torch.cat([agent_0, agent_1, target], dim=1).to(dtype=torch.float32).detach().clone()
     else:
         observation, ag, dg = obs["observation"], obs["achieved_goal"], obs["desired_goal"]
         if isinstance(observation, np.ndarray):
@@ -433,7 +442,8 @@ class CLEANPPO:
                 ):
                     terminal_obs = infos[idx]["terminal_observation"]
                     with torch.no_grad():
-                        terminal_obs["agent"] = np.expand_dims(terminal_obs["agent"], axis=0)
+                        terminal_obs["agent_0"] = np.expand_dims(terminal_obs["agent_0"], axis=0)
+                        terminal_obs["agent_1"] = np.expand_dims(terminal_obs["agent_1"], axis=0)
                         terminal_obs["target"] = np.expand_dims(terminal_obs["target"], axis=0)
                         terminal_value = self.policy.get_value(terminal_obs)[0]
                     rewards[idx] += self.gamma * terminal_value
