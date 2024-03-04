@@ -5,12 +5,7 @@ import gymnasium as gym
 import numpy as np
 import yaml
 from PIL import Image, ImageDraw
-from hydra.utils import get_original_cwd
 from matplotlib import pyplot as plt
-
-# FIXME
-np.set_printoptions(threshold=np.inf)
-np.set_printoptions(linewidth=np.inf)
 
 from custom_envs.moonlander.moonlander_env import MoonlanderWorldEnv
 
@@ -24,20 +19,9 @@ class MetaEnv(gym.Env):
 
     def __init__(self, reward_function: str = "pos_neg"):
         self.ROOT_DIR = "."
-        config_path_dodge_asteroids = os.path.join(
-            get_original_cwd(), "src/custom_envs/moonlander/standard_config.yaml"
-        )
-        config_path_collect_asteroids = os.path.join(
-            get_original_cwd(),
-            "src/custom_envs/moonlander/standard_config_second_task.yaml",
-        )
-        # config_path_dodge_asteroids = os.path.join(
-        #     "/home/annika/coding_projects/scilab-new/Scilab-RL", "src/custom_envs/moonlander/standard_config.yaml"
-        # )
-        # config_path_collect_asteroids = os.path.join(
-        #     "/home/annika/coding_projects/scilab-new/Scilab-RL",
-        #     "src/custom_envs/moonlander/standard_config_second_task.yaml",
-        # )
+        config_path_dodge_asteroids = os.path.join(os.path.dirname(os.path.realpath(__file__)), "standard_config.yaml")
+        config_path_collect_asteroids = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                                     "standard_config_second_task.yaml")
 
         with open(config_path_dodge_asteroids, "r") as file:
             config_dodge_asteroids = yaml.safe_load(file)
@@ -104,6 +88,7 @@ class MetaEnv(gym.Env):
         self.switch_counter = 0
 
     def step(self, action: int):
+        task_switching_costs = 0
         # action 0,1, or 2 (left, stay, right) for each task
         match action:
             case 0:
@@ -212,6 +197,7 @@ class MetaEnv(gym.Env):
                     self.current_task = 0
 
                 ### TODO: TASK-SWITCHING COSTS ###
+                task_switching_costs = -10
                 reward_dodge_asteroids -= 5
                 reward_collect_asteroids -= 5
 
@@ -237,7 +223,7 @@ class MetaEnv(gym.Env):
             ).flatten()
 
         self.step_counter += 1
-        info = {"dodge": info_dodge, "collect": info_dodge}
+        info = {"dodge": info_dodge, "collect": info_collect, "task_switching_costs": task_switching_costs}
         return (
             self.state,
             reward_dodge_asteroids + reward_collect_asteroids,

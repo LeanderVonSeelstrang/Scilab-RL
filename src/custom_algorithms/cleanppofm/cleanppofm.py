@@ -79,6 +79,8 @@ class Agent(nn.Module):
         )
         self.actor_logstd = nn.Parameter(torch.zeros(1, action_shape))
 
+        self.env = env
+
     def get_value(self, x):
         if self.flatten:
             x = flatten_obs(x)
@@ -107,17 +109,11 @@ class Agent(nn.Module):
                 forward_normal_action = action.unsqueeze(1)
             forward_normal, _ = fm_network(x, forward_normal_action.float())
             # formal_normal_action in form of tensor([[action]])
-            # simulate all three actions
-            forward_normal_0, _ = fm_network(x, torch.tensor([[0]]).float())
-            forward_normal_1, _ = fm_network(x, torch.tensor([[1]]).float())
-            forward_normal_2, _ = fm_network(x, torch.tensor([[2]]).float())
-
-            logger.record_mean("fm_0/loc", forward_normal_0.mean.mean().item())
-            logger.record_mean("fm_0/stddev", forward_normal_0.stddev.mean().item())
-            logger.record_mean("fm_1/loc", forward_normal_1.mean.mean().item())
-            logger.record_mean("fm_1/stddev", forward_normal_1.stddev.mean().item())
-            logger.record_mean("fm_2/loc", forward_normal_2.mean.mean().item())
-            logger.record_mean("fm_2/stddev", forward_normal_2.stddev.mean().item())
+            # simulate all actions
+            for i in range(self.env.action_space.n):
+                forward_normal, _ = fm_network(x, torch.full((x.size(dim=0), 1), i).float())
+                logger.record_mean(f"fm_{i}/loc", forward_normal.mean.mean().item())
+                logger.record_mean(f"fm_{i}/stddev", forward_normal.stddev.mean().item())
 
             # TODO: put prediction of fm network into observation --> standard deviation or whole observation?
             # TODO: logging! mean or not?
@@ -440,6 +436,7 @@ class CLEANPPOFM:
             self.logger.record("train/rollout_rewards_step", float(rewards.mean()))
             self.logger.record_mean("train/rollout_rewards_mean", float(rewards.mean()))
             # this is only logged when no hyperparameter tuning is running?
+            # dodge/collect env
             if "simple" in infos[0].keys():
                 print("infos[0]", infos[0])
                 self.logger.record("rollout_reward_simple", float(infos[0]["simple"]))
@@ -448,6 +445,14 @@ class CLEANPPOFM:
                                    float(infos[0]["pos_neg"]["pos"][0] + infos[0]["pos_neg"]["neg"][0]))
                 self.logger.record("rollout_number_of_crashed_or_collected_objects",
                                    float(infos[0]["number_of_crashed_or_collected_objects"]))
+            # gridworld env
+            if "input_noise_is_applied_in_this_episode" in infos[0].keys():
+                self.logger.record("input_noise_applied", infos[0]["input_noise_is_applied_in_this_episode"])
+            # meta env
+            if "dodge" in infos[0].keys():
+                self.logger.record("dodge_gaussian_reward", infos[0]["dodge"]["gaussian"])
+                self.logger.record("collect_gaussian_reward", infos[0]["collect"]["gaussian"])
+                self.logger.record("task_switching_costs", infos[0]["task_switching_costs"])
             self.num_timesteps += env.num_envs
 
             # Give access to local variables

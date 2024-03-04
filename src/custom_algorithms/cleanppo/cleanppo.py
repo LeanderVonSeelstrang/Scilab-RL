@@ -394,6 +394,7 @@ class CLEANPPO:
             self.logger.record("train/rollout_rewards_step", float(rewards.mean()))
             self.logger.record_mean("train/rollout_rewards_mean", float(rewards.mean()))
             # this is only logged when no hyperparameter tuning is running?
+            # dodge/collect env
             if "simple" in infos[0].keys():
                 self.logger.record("rollout_reward_simple", float(infos[0]["simple"]))
                 self.logger.record("rollout_reward_gaussian", float(infos[0]["gaussian"]))
@@ -401,6 +402,14 @@ class CLEANPPO:
                                    float(infos[0]["pos_neg"]["pos"][0] + infos[0]["pos_neg"]["neg"][0]))
                 self.logger.record("rollout_number_of_crashed_or_collected_objects",
                                    float(infos[0]["number_of_crashed_or_collected_objects"]))
+            # gridworld env
+            if "input_noise_is_applied_in_this_episode" in infos[0].keys():
+                self.logger.record("input_noise_applied", infos[0]["input_noise_is_applied_in_this_episode"])
+            # meta env
+            if "dodge" in infos[0].keys():
+                self.logger.record("dodge_gaussian_reward", infos[0]["dodge"]["gaussian"])
+                self.logger.record("collect_gaussian_reward", infos[0]["collect"]["gaussian"])
+                self.logger.record("task_switching_costs", infos[0]["task_switching_costs"])
             self.num_timesteps += env.num_envs
 
             # Give access to local variables

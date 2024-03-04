@@ -69,7 +69,8 @@ class GridWorldEnv(gym.Env):
         return {
             "distance": np.linalg.norm(
                 self._agent_location - self._target_location, ord=1
-            )
+            ),
+            "self.input_noise_is_applied_in_this_episode": self.input_noise_is_applied_in_this_episode
         }
 
     def reset(self, seed=None, options=None):
