@@ -95,8 +95,8 @@ class Agent(nn.Module):
             x = torch.tensor(x, device=device, dtype=torch.float32).detach().clone()
 
         if self.discrete_actions:
-            # action_mean = self.actor_mean(x)
-            # distribution = Categorical(logits=action_mean)
+            action_mean = self.actor_mean(x)
+            distribution = Categorical(logits=action_mean)
             # if action is None:
             #     if deterministic:
             #         action = torch.argmax(action_mean)
