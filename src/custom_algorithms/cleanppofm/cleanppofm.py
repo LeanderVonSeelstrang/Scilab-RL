@@ -97,15 +97,15 @@ class Agent(nn.Module):
         if self.discrete_actions:
             action_mean = self.actor_mean(x)
             distribution = Categorical(logits=action_mean)
-            # if action is None:
-            #     if deterministic:
-            #         action = torch.argmax(action_mean)
-            #         forward_normal_action = action.unsqueeze(0).unsqueeze(0)
-            #     else:
-            #         action = distribution.sample()
-            #         forward_normal_action = action.unsqueeze(0)
+            if action is None:
+                if deterministic:
+                    action = torch.argmax(action_mean)
+                    # forward_normal_action = action.unsqueeze(0).unsqueeze(0)
+                else:
+                    action = distribution.sample()
+                    # forward_normal_action = action.unsqueeze(0)
             # else:
-            #     forward_normal_action = action.unsqueeze(1)
+            # forward_normal_action = action.unsqueeze(1)
             # forward_normal, _ = fm_network(x, forward_normal_action.float())
             # formal_normal_action in form of tensor([[action]])
             # simulate all actions instead of action mean
