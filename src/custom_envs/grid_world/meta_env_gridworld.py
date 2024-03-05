@@ -167,15 +167,22 @@ class MetaEnvGridworld(gym.Env):
             pygame.init()
             pygame.display.init()
             self.window = pygame.display.set_mode(
-                (512, 512)
+                (512 * 2, 512)
             )
         if self.clock is None and self.render_mode == "human":
             self.clock = pygame.time.Clock()
 
-        canvas = pygame.Surface((512, 512))
-        canvas.fill((255, 255, 255))
+        canvas = pygame.Surface((512 * 2, 512))
+        if self.current_agent == 0:
+            canvas.fill((255, 255, 255), (0, 0, self.window.get_width() // 2, self.window.get_height()))
+            canvas.fill((136, 136, 136),
+                        (self.window.get_width() // 2, 0, self.window.get_width() // 2, self.window.get_height()))
+        else:
+            canvas.fill((136, 136, 136), (0, 0, self.window.get_width() // 2, self.window.get_height()))
+            canvas.fill((255, 255, 255),
+                        (self.window.get_width() // 2, 0, self.window.get_width() // 2, self.window.get_height()))
         pix_square_size = (
-                512 / (2 * 5)
+                512 / 5
         )  # The size of a single grid square in pixels
 
         # First we draw the target 0
@@ -188,15 +195,17 @@ class MetaEnvGridworld(gym.Env):
             ),
         )
         # Second we draw the target 1
+        target_location_1 = np.copy(self._target_location)
+        target_location_1[0] += 5
         pygame.draw.rect(
             canvas,
-            (255, 0, 0),
+            (100, 0, 0),
             pygame.Rect(
-                pix_square_size * self._target_location,
+                pix_square_size * target_location_1,
                 (pix_square_size, pix_square_size),
             ),
         )
-        # now we draw the traps
+        # now we draw the traps for env 0
         pygame.draw.rect(
             canvas,
             (0, 255, 0),
@@ -229,6 +238,39 @@ class MetaEnvGridworld(gym.Env):
                 (pix_square_size, pix_square_size),
             ),
         )
+        # now we draw the traps for env 1
+        pygame.draw.rect(
+            canvas,
+            (0, 100, 0),
+            pygame.Rect(
+                pix_square_size * np.array([6, 4]),
+                (pix_square_size, pix_square_size),
+            ),
+        )
+        pygame.draw.rect(
+            canvas,
+            (0, 100, 0),
+            pygame.Rect(
+                pix_square_size * np.array([7, 3]),
+                (pix_square_size, pix_square_size),
+            ),
+        )
+        pygame.draw.rect(
+            canvas,
+            (0, 100, 0),
+            pygame.Rect(
+                pix_square_size * np.array([8, 2]),
+                (pix_square_size, pix_square_size),
+            ),
+        )
+        pygame.draw.rect(
+            canvas,
+            (0, 100, 0),
+            pygame.Rect(
+                pix_square_size * np.array([9, 1]),
+                (pix_square_size, pix_square_size),
+            ),
+        )
         # Now we draw the agent 0
         pygame.draw.circle(
             canvas,
@@ -237,27 +279,29 @@ class MetaEnvGridworld(gym.Env):
             pix_square_size / 3,
         )
         # Now we draw the agent 1
+        agent_1_location = np.copy(self._agent_1_location)
+        agent_1_location[0] += 5
         pygame.draw.circle(
             canvas,
-            (0, 0, 255),
-            (self._agent_1_location + 0.5) * pix_square_size,
+            (0, 0, 200),
+            (agent_1_location + 0.5) * pix_square_size,
             pix_square_size / 3,
         )
 
         # Finally, add some gridlines
-        for x in range(5 + 1):
+        for x in range(10 + 1):
             pygame.draw.line(
                 canvas,
                 0,
                 (0, pix_square_size * x),
-                (512, pix_square_size * x),
+                (512 * 2, pix_square_size * x),
                 width=3,
             )
             pygame.draw.line(
                 canvas,
                 0,
                 (pix_square_size * x, 0),
-                (pix_square_size * x, 512),
+                (pix_square_size * x, 512 * 2),
                 width=3,
             )
 
