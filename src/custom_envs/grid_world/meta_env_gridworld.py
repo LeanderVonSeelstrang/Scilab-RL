@@ -106,9 +106,12 @@ class MetaEnvGridworld(gym.Env):
         # TODO: implement cleaner!
         # no switch but step
         if not action == 8:
+            # random step for other agent
+            possible_actions = [0, 1, 2, 3, 4, 5, 6, 7]
+            action_for_other_agent = random.choices(population=possible_actions, k=1)[0]
+            direction_for_other_agent = self._action_to_direction[action_for_other_agent]
             # Map the action (element of {0,1,2,3,4,5,6,7}) to the direction we walk in
             if self.input_noise_is_applied_in_this_episode:
-                possible_actions = [0, 1, 2, 3, 4, 5, 6, 7]
                 weights = [0.5 / 7 for _ in range(len(possible_actions))]
                 weights[action] = 0.5
                 action = random.choices(population=possible_actions, weights=weights, k=1)[0]
@@ -118,37 +121,51 @@ class MetaEnvGridworld(gym.Env):
                 self._agent_0_location = np.clip(
                     self._agent_0_location + direction, 0, 5 - 1
                 )
-                # An episode is done iff the agent has reached the target
+                # An episode is done iff the current agent has reached the target
                 terminated = np.array_equal(self._agent_0_location, self._target_location)
-                # reward
-                if np.array_equal(self._agent_0_location, np.array([1, 4])) or np.array_equal(self._agent_0_location,
-                                                                                              np.array([2,
-                                                                                                        3])) or np.array_equal(
-                    self._agent_0_location, np.array([3, 2])) or np.array_equal(self._agent_0_location,
-                                                                                np.array([4, 1])):
-                    reward = -100
-                else:
-                    reward = 1 if terminated else -1
+
+                # still do a random step in the other env because that is what we defined
+                self._agent_1_location = np.clip(
+                    self._agent_1_location + direction_for_other_agent, 0, 5 - 1
+                )
             else:
                 self._agent_1_location = np.clip(
                     self._agent_1_location + direction, 0, 5 - 1
                 )
-                # An episode is done iff the agent has reached the target
+                # An episode is done iff the current agent has reached the target
                 terminated = np.array_equal(self._agent_1_location, self._target_location)
-                # reward
-                if np.array_equal(self._agent_1_location, np.array([1, 4])) or np.array_equal(self._agent_1_location,
-                                                                                              np.array([2,
-                                                                                                        3])) or np.array_equal(
-                    self._agent_1_location, np.array([3, 2])) or np.array_equal(self._agent_1_location,
-                                                                                np.array([4, 1])):
-                    reward = -100
-                else:
-                    reward = 1 if terminated else -1
+
+                # still do a random step in the other env because that is what we defined
+                self._agent_0_location = np.clip(
+                    self._agent_0_location + direction_for_other_agent, 0, 5 - 1
+                )
         else:
+            # still do a step because that is what we defined
             self.current_agent = 1 - self.current_agent
             # FIXME: how to define task switching costs
             reward = -3
             terminated = False
+
+        # reward
+        if np.array_equal(self._agent_0_location, np.array([1, 4])) or np.array_equal(self._agent_0_location,
+                                                                                      np.array([2,
+                                                                                                3])) or np.array_equal(
+            self._agent_0_location, np.array([3, 2])) or np.array_equal(self._agent_0_location,
+                                                                        np.array([4, 1])):
+            reward_agent_0 = -100
+        else:
+            reward_agent_0 = 1 if terminated else -1
+        # reward
+        if np.array_equal(self._agent_1_location, np.array([1, 4])) or np.array_equal(self._agent_1_location,
+                                                                                      np.array([2,
+                                                                                                3])) or np.array_equal(
+            self._agent_1_location, np.array([3, 2])) or np.array_equal(self._agent_1_location,
+                                                                        np.array([4, 1])):
+            reward_agent_1 = -100
+        else:
+            reward_agent_1 = 1 if terminated else -1
+
+        reward = reward_agent_0 + reward_agent_1
 
         observation = self._get_obs()
         info = self._get_info()
