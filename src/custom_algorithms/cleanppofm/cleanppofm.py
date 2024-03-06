@@ -112,9 +112,12 @@ class Agent(nn.Module):
             forward_normal, _ = fm_network(x, forward_normal_action.float())
 
             # TODO: put prediction of fm network into observation --> standard deviation or whole observation?
-            # TODO: logging! mean or not?
-            logger.record_mean("fm/loc", forward_normal.mean.mean().item())
             # std describes the (un-)certainty of the prediction of each pixel
+            for index, element in enumerate(forward_normal.stddev[0]):
+                logger.record(f"fm/stddev_{index}", element)
+            # loc describes the predicted position values
+            for index, element in enumerate(forward_normal.loc[0]):
+                logger.record(f"fm/loc_{index}", element)
             logger.record_mean("fm/stddev", forward_normal.stddev.mean().item())
             return action.unsqueeze(0), distribution.log_prob(action), distribution.entropy(), self.critic(
                 x), forward_normal

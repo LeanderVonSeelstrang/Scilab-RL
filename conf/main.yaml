@@ -23,8 +23,10 @@ env_kwargs: { }
 # algorithm. Maybe put them in the algorithm/xyz.yaml
 render: 'none' # 'display', 'record', or anything else for neither one
 render_freq: 5 # epochs
-render_metrics_train: [ 'train/rollout_rewards_step', 'rollout_reward_simple', 'rollout_reward_gaussian', 'rollout_reward_pos_neg', 'rollout_number_of_crashed_or_collected_objects', 'fm/loc', 'fm_0/loc' , 'fm_1/loc' , 'fm_2/loc' ] #'fm/loc', 'fm/stddev', 'fm/fw_loss'
-render_metrics_test: [ 'eval/rollout_rewards_step', 'rollout_reward_simple', 'rollout_reward_gaussian', 'rollout_reward_pos_neg', 'rollout_number_of_crashed_or_collected_objects', 'fm/loc', 'fm_0/loc' , 'fm_1/loc' , 'fm_2/loc' ] #'fm/loc', 'fm/stddev', 'fm/fw_loss'
+# render_metrics_train: [ 'train/rollout_rewards_step', 'train/rollout_rewards_mean', 'dodge_gaussian_reward', 'collect_gaussian_reward', 'task_switching_costs', 'task_switching_costs' ]#'fm/loc', 'fm/stddev', 'input_noise_applied' ] #'rollout_reward_simple', 'rollout_reward_gaussian', 'rollout_reward_pos_neg', 'rollout_number_of_crashed_or_collected_objects', #'fm_0/loc' , 'fm_1/loc' , 'fm_2/loc' , 'fm_0/stddev' , 'fm_1/stddev' , 'fm_2/stddev'
+# render_metrics_test: [ 'eval/rollout_rewards_step', 'eval/rollout_rewards_mean', 'dodge_gaussian_reward', 'collect_gaussian_reward', 'task_switching_costs', 'task_switching_costs' ] #'fm/loc', 'fm/stddev', 'input_noise_applied' ] #'rollout_reward_simple', 'rollout_reward_gaussian', 'rollout_reward_pos_neg', 'rollout_number_of_crashed_or_collected_objects', # 'fm_0/loc' , 'fm_1/loc' , 'fm_2/loc', 'fm_0/stddev' , 'fm_1/stddev' , 'fm_2/stddev'
+render_metrics_train: [ 'train/rollout_rewards_step', 'train/rollout_rewards_mean', 'fm/stddev', 'fm/stddev_0', 'fm/stddev_1', 'fm/stddev_2', 'fm/stddev_3', 'fm/loc_0', 'fm/loc_1', 'fm/loc_2', 'fm/loc_3' ]
+render_metrics_test: [ 'eval/rollout_rewards_step', 'eval/rollout_rewards_mean', 'fm/loc', 'fm/stddev' ]
 render_frames_per_clip: 0 # Number of frames per clip when recording. If set to 0, one episode is recorded.
 
 # If the seed is 0, it will be set to a pseudo-random value (int(time.time()))
@@ -41,7 +43,7 @@ restore_policy: null
 eval_after_n_steps: 2000
 
 # The max. number of training epochs to run. One epoch consists of 'eval_after_n_steps' actions.
-n_epochs: 100
+n_epochs: 50
 
 # The number of testing rollouts.
 n_test_rollouts: 10
