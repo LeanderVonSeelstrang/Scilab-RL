@@ -1,8 +1,12 @@
 import copy
 import os
+import sys
 
 import gymnasium as gym
 import numpy as np
+
+# FIXME: needed for rendering rgb array
+np.set_printoptions(threshold=sys.maxsize)
 import yaml
 from PIL import Image, ImageDraw
 from matplotlib import pyplot as plt
@@ -240,6 +244,10 @@ class MetaEnv(gym.Env):
         elif self.render_mode == "rgb_array":
             # read ascii text from numpy array
             ascii_text = str(observation)
+            ascii_text = ascii_text.replace("\n", "")
+            ascii_text = ascii_text.replace("   ", "  ")
+            ascii_text = ascii_text.replace("  ", " ")
+            ascii_text = ascii_text.replace("]", "]\n")
 
             # Create a new Image
             # make sure the dimensions (W and H) are big enough for the ascii art
