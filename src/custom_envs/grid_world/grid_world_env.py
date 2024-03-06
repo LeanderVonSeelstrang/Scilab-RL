@@ -14,11 +14,11 @@ class GridWorldEnv(gym.Env):
         self.window_size = 512  # The size of the PyGame window
 
         self.is_it_possible_that_input_noise_is_applied = is_it_possible_that_input_noise_is_applied
+        self.input_noise_is_applied_in_this_episode = False
         # is it in general possible that the agent can encounter input noise?
         if self.is_it_possible_that_input_noise_is_applied:
             # does this episode have input noise?
             self.input_noise_is_applied_in_this_episode = random.choice([True, False])
-            print("input noise is applied in this episode:", self.input_noise_is_applied_in_this_episode)
 
         # Observations are dictionaries with the agent's and the target's location.
         # Each location is encoded as an element of {0, ..., `size`}^2, i.e. MultiDiscrete([size, size]).
@@ -78,10 +78,10 @@ class GridWorldEnv(gym.Env):
         super().reset(seed=seed)
 
         # is it in general possible that the agent can encounter input noise?
+        self.input_noise_is_applied_in_this_episode = False
         if self.is_it_possible_that_input_noise_is_applied:
             # does this episode have input noise?
             self.input_noise_is_applied_in_this_episode = random.choice([True, False])
-            print("input noise is applied in this episode:", self.input_noise_is_applied_in_this_episode)
 
         # FIXME: not hardcoded
         self._target_location = np.array([4, 0])
@@ -91,7 +91,9 @@ class GridWorldEnv(gym.Env):
         info = self._get_info()
 
         if self.render_mode == "human":
-            self._render_frame()
+            _render_frame(window=self.window, render_mode=self.render_mode, clock=self.clock,
+                          window_size=self.window_size, size=self.size, agent_location=self._agent_location,
+                          target_location=self._target_location)
 
         return observation, info
 
@@ -121,112 +123,181 @@ class GridWorldEnv(gym.Env):
         info = self._get_info()
 
         if self.render_mode == "human":
-            self._render_frame()
+            _render_frame(window=self.window, render_mode=self.render_mode, clock=self.clock,
+                          window_size=self.window_size, size=self.size, agent_location=self._agent_location,
+                          target_location=self._target_location)
 
         return observation, reward, terminated, False, info
 
     def render(self):
         if self.render_mode == "rgb_array":
-            return self._render_frame()
-
-    def _render_frame(self):
-        if self.window is None and self.render_mode == "human":
-            pygame.init()
-            pygame.display.init()
-            self.window = pygame.display.set_mode(
-                (self.window_size, self.window_size)
-            )
-        if self.clock is None and self.render_mode == "human":
-            self.clock = pygame.time.Clock()
-
-        canvas = pygame.Surface((self.window_size, self.window_size))
-        canvas.fill((255, 255, 255))
-        pix_square_size = (
-                self.window_size / self.size
-        )  # The size of a single grid square in pixels
-
-        # First we draw the target
-        pygame.draw.rect(
-            canvas,
-            (255, 0, 0),
-            pygame.Rect(
-                pix_square_size * self._target_location,
-                (pix_square_size, pix_square_size),
-            ),
-        )
-        # now we draw the traps
-        pygame.draw.rect(
-            canvas,
-            (0, 255, 0),
-            pygame.Rect(
-                pix_square_size * np.array([1, 4]),
-                (pix_square_size, pix_square_size),
-            ),
-        )
-        pygame.draw.rect(
-            canvas,
-            (0, 255, 0),
-            pygame.Rect(
-                pix_square_size * np.array([2, 3]),
-                (pix_square_size, pix_square_size),
-            ),
-        )
-        pygame.draw.rect(
-            canvas,
-            (0, 255, 0),
-            pygame.Rect(
-                pix_square_size * np.array([3, 2]),
-                (pix_square_size, pix_square_size),
-            ),
-        )
-        pygame.draw.rect(
-            canvas,
-            (0, 255, 0),
-            pygame.Rect(
-                pix_square_size * np.array([4, 1]),
-                (pix_square_size, pix_square_size),
-            ),
-        )
-        # Now we draw the agent
-        pygame.draw.circle(
-            canvas,
-            (0, 0, 255),
-            (self._agent_location + 0.5) * pix_square_size,
-            pix_square_size / 3,
-        )
-
-        # Finally, add some gridlines
-        for x in range(self.size + 1):
-            pygame.draw.line(
-                canvas,
-                0,
-                (0, pix_square_size * x),
-                (self.window_size, pix_square_size * x),
-                width=3,
-            )
-            pygame.draw.line(
-                canvas,
-                0,
-                (pix_square_size * x, 0),
-                (pix_square_size * x, self.window_size),
-                width=3,
-            )
-
-        if self.render_mode == "human":
-            # The following line copies our drawings from `canvas` to the visible window
-            self.window.blit(canvas, canvas.get_rect())
-            pygame.event.pump()
-            pygame.display.update()
-
-            # We need to ensure that human-rendering occurs at the predefined framerate.
-            # The following line will automatically add a delay to keep the framerate stable.
-            self.clock.tick(self.metadata["render_fps"])
-        else:  # rgb_array
-            return np.transpose(
-                np.array(pygame.surfarray.pixels3d(canvas)), axes=(1, 0, 2)
-            )
+            return _render_frame(window=self.window, render_mode=self.render_mode, clock=self.clock,
+                                 window_size=self.window_size, size=self.size, agent_location=self._agent_location,
+                                 target_location=self._target_location)
 
     def close(self):
         if self.window is not None:
             pygame.display.quit()
             pygame.quit()
+
+
+def _render_frame(agent_location, target_location, predicted_agent_location=None, predicted_target_location=None,
+                  window=None, clock=None, window_size=512, render_mode="human",
+                  size=5, title="GridWorld"):
+    if predicted_agent_location is not None and predicted_target_location is not None:
+        range_of_grid = size * 2
+        grid_window_size = window_size * 2
+    else:
+        range_of_grid = size
+        grid_window_size = window_size
+
+    if window is None and render_mode == "human":
+        pygame.init()
+        pygame.display.init()
+        window = pygame.display.set_mode(
+            (grid_window_size, window_size)
+        )
+        pygame.display.set_caption(title)
+    if clock is None and render_mode == "human":
+        clock = pygame.time.Clock()
+
+    canvas = pygame.Surface((grid_window_size, window_size))
+    canvas.fill((255, 255, 255))
+    pix_square_size = (
+            window_size / size
+    )  # The size of a single grid square in pixels
+
+    # First we draw the target
+    pygame.draw.rect(
+        canvas,
+        (255, 0, 0),
+        pygame.Rect(
+            pix_square_size * target_location,
+            (pix_square_size, pix_square_size),
+        ),
+    )
+    # now we draw the traps
+    pygame.draw.rect(
+        canvas,
+        (0, 255, 0),
+        pygame.Rect(
+            pix_square_size * np.array([1, 4]),
+            (pix_square_size, pix_square_size),
+        ),
+    )
+    pygame.draw.rect(
+        canvas,
+        (0, 255, 0),
+        pygame.Rect(
+            pix_square_size * np.array([2, 3]),
+            (pix_square_size, pix_square_size),
+        ),
+    )
+    pygame.draw.rect(
+        canvas,
+        (0, 255, 0),
+        pygame.Rect(
+            pix_square_size * np.array([3, 2]),
+            (pix_square_size, pix_square_size),
+        ),
+    )
+    pygame.draw.rect(
+        canvas,
+        (0, 255, 0),
+        pygame.Rect(
+            pix_square_size * np.array([4, 1]),
+            (pix_square_size, pix_square_size),
+        ),
+    )
+    # Now we draw the agent
+    pygame.draw.circle(
+        canvas,
+        (0, 0, 255),
+        (agent_location + 0.5) * pix_square_size,
+        pix_square_size / 3,
+    )
+    if predicted_agent_location is not None and predicted_target_location is not None:
+        # First we draw the predicted target
+        target_location_1 = np.copy(predicted_target_location)
+        target_location_1[0] += 5
+        pygame.draw.rect(
+            canvas,
+            (100, 0, 0),
+            pygame.Rect(
+                pix_square_size * target_location_1,
+                (pix_square_size, pix_square_size),
+            ),
+        )
+        # now we draw the traps for the predicted env
+        pygame.draw.rect(
+            canvas,
+            (0, 100, 0),
+            pygame.Rect(
+                pix_square_size * np.array([6, 4]),
+                (pix_square_size, pix_square_size),
+            ),
+        )
+        pygame.draw.rect(
+            canvas,
+            (0, 100, 0),
+            pygame.Rect(
+                pix_square_size * np.array([7, 3]),
+                (pix_square_size, pix_square_size),
+            ),
+        )
+        pygame.draw.rect(
+            canvas,
+            (0, 100, 0),
+            pygame.Rect(
+                pix_square_size * np.array([8, 2]),
+                (pix_square_size, pix_square_size),
+            ),
+        )
+        pygame.draw.rect(
+            canvas,
+            (0, 100, 0),
+            pygame.Rect(
+                pix_square_size * np.array([9, 1]),
+                (pix_square_size, pix_square_size),
+            ),
+        )
+        # Now we draw the predicted agent
+        agent_1_location = np.copy(predicted_agent_location)
+        agent_1_location[0] += 5
+        pygame.draw.circle(
+            canvas,
+            (0, 0, 200),
+            (agent_1_location + 0.5) * pix_square_size,
+            pix_square_size / 3,
+        )
+    # Finally, add some gridlines
+    for x in range(range_of_grid + 1):
+        pygame.draw.line(
+            canvas,
+            0,
+            (0, pix_square_size * x),
+            (grid_window_size, pix_square_size * x),
+            width=3,
+        )
+        pygame.draw.line(
+            canvas,
+            0,
+            (pix_square_size * x, 0),
+            (pix_square_size * x, grid_window_size),
+            width=3,
+        )
+
+    if render_mode == "human":
+        # The following line copies our drawings from `canvas` to the visible window
+        window.blit(canvas, canvas.get_rect())
+        pygame.event.pump()
+        pygame.display.update()
+
+        # We need to ensure that human-rendering occurs at the predefined framerate.
+        # The following line will automatically add a delay to keep the framerate stable.
+        # FIXME: not hardcoded
+        clock.tick(4)
+    else:  # rgb_array
+        return np.transpose(
+            np.array(pygame.surfarray.pixels3d(canvas)), axes=(1, 0, 2)
+        )

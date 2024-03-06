@@ -442,8 +442,10 @@ class CLEANPPO:
                 ):
                     terminal_obs = infos[idx]["terminal_observation"]
                     with torch.no_grad():
-                        terminal_obs["agent_0"] = np.expand_dims(terminal_obs["agent_0"], axis=0)
-                        terminal_obs["agent_1"] = np.expand_dims(terminal_obs["agent_1"], axis=0)
+                        # terminal_obs["agent_0"] = np.expand_dims(terminal_obs["agent_0"], axis=0)
+                        # terminal_obs["agent_1"] = np.expand_dims(terminal_obs["agent_1"], axis=0)
+                        # terminal_obs["target"] = np.expand_dims(terminal_obs["target"], axis=0)
+                        terminal_obs["agent"] = np.expand_dims(terminal_obs["agent"], axis=0)
                         terminal_obs["target"] = np.expand_dims(terminal_obs["target"], axis=0)
                         terminal_value = self.policy.get_value(terminal_obs)[0]
                     rewards[idx] += self.gamma * terminal_value
@@ -496,7 +498,7 @@ class CLEANPPO:
     @classmethod
     def load(cls, path, env, **kwargs):
         model = cls(env=env, **kwargs)
-        loaded_dict = torch.load(path)
+        loaded_dict = torch.load(path, map_location=torch.device('cpu'))
         for k in loaded_dict:
             if k not in ["_policy"]:
                 model.__dict__[k] = loaded_dict[k]

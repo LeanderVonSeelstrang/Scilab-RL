@@ -17,6 +17,7 @@ from torch.distributions.normal import Normal
 from torch.nn import functional as F
 
 from custom_algorithms.cleansacmc.mc import MorphologicalNetworks
+from custom_envs.grid_world.grid_world_env import _render_frame
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -100,25 +101,23 @@ class Agent(nn.Module):
             if action is None:
                 if deterministic:
                     action = torch.argmax(action_mean)
-                    # forward_normal_action = action.unsqueeze(0).unsqueeze(0)
+                    forward_normal_action = action.unsqueeze(0).unsqueeze(0)
                 else:
                     action = distribution.sample()
-                    # forward_normal_action = action.unsqueeze(0)
-            # else:
-            # forward_normal_action = action.unsqueeze(1)
-            # forward_normal, _ = fm_network(x, forward_normal_action.float())
+                    forward_normal_action = action.unsqueeze(0)
+            else:
+                forward_normal_action = action.unsqueeze(1)
+            # predict selected action
             # formal_normal_action in form of tensor([[action]])
-            # simulate all actions instead of action mean
-            for i in range(self.env.action_space.n):
-                forward_normal, _ = fm_network(x, torch.full((x.size(dim=0), 1), i).float())
-                logger.record_mean(f"fm_{i}/loc", forward_normal.mean.mean().item())
-                logger.record_mean(f"fm_{i}/stddev", forward_normal.stddev.mean().item())
+            forward_normal, _ = fm_network(x, forward_normal_action.float())
 
             # TODO: put prediction of fm network into observation --> standard deviation or whole observation?
             # TODO: logging! mean or not?
             logger.record_mean("fm/loc", forward_normal.mean.mean().item())
+            # std describes the (un-)certainty of the prediction of each pixel
             logger.record_mean("fm/stddev", forward_normal.stddev.mean().item())
-            return action.unsqueeze(0), distribution.log_prob(action), distribution.entropy(), self.critic(x)
+            return action.unsqueeze(0), distribution.log_prob(action), distribution.entropy(), self.critic(
+                x), forward_normal
         else:
             action_mean = self.actor_mean(x)
             action_logstd = self.actor_logstd.expand_as(action_mean)
@@ -288,9 +287,10 @@ class CLEANPPOFM:
 
                 self.train_fm(observations, next_observations, actions)
 
-                _, log_prob, entropy, values = self.policy.get_action_and_value(fm_network=self.fm_network,
-                                                                                x=observations,
-                                                                                action=actions, logger=self.logger)
+                _, log_prob, entropy, values, _ = self.policy.get_action_and_value(fm_network=self.fm_network,
+                                                                                   x=observations,
+                                                                                   action=actions, logger=self.logger,
+                                                                                   )
                 values = values.flatten()
                 # Normalize advantage
                 advantages = rollout_data.advantages
@@ -417,8 +417,9 @@ class CLEANPPOFM:
 
         while n_steps < self.n_steps:
             with torch.no_grad():
-                actions, log_probs, _, values = self.policy.get_action_and_value(fm_network=self.fm_network,
-                                                                                 x=self._last_obs, logger=self.logger)
+                actions, log_probs, _, values, forward_normal = self.policy.get_action_and_value(
+                    fm_network=self.fm_network,
+                    x=self._last_obs, logger=self.logger)
             actions = actions.cpu().numpy()
             log_prob_float = float(np.mean(log_probs.cpu().numpy()))
             self.logger.record("train/rollout_logprob_step", float(log_prob_float))
@@ -432,12 +433,20 @@ class CLEANPPOFM:
                 clipped_actions = actions[0]
 
             new_obs, rewards, dones, infos = env.step(clipped_actions)
+            # FIXME: rendering for evaluation
+            # _render_frame(
+            #     agent_location=new_obs["agent"][0],
+            #     target_location=new_obs["target"][0],
+            #     predicted_agent_location=np.array(
+            #         [round(forward_normal.mean.numpy()[0][0]), round(forward_normal.mean.numpy()[0][1])]),
+            #     predicted_target_location=np.array(
+            #         [round(forward_normal.mean.numpy()[0][2]), round(forward_normal.mean.numpy()[0][3])]),
+            #     title="Forward Model Prediction")
             self.logger.record("train/rollout_rewards_step", float(rewards.mean()))
             self.logger.record_mean("train/rollout_rewards_mean", float(rewards.mean()))
             # this is only logged when no hyperparameter tuning is running?
             # dodge/collect env
             if "simple" in infos[0].keys():
-                print("infos[0]", infos[0])
                 self.logger.record("rollout_reward_simple", float(infos[0]["simple"]))
                 self.logger.record("rollout_reward_gaussian", float(infos[0]["gaussian"]))
                 self.logger.record("rollout_reward_pos_neg",
@@ -506,6 +515,9 @@ class CLEANPPOFM:
         observations = flatten_obs(observations)
         next_observations = flatten_obs(next_observations)
         forward_normal, _ = self.fm_network(observations, actions.float().unsqueeze(1))
+        # log probs is the logarithm of the maximum likelihood
+        # log because the deviation is easier (addition instead of multiplication)
+        # negative because likelihood normally maximizes
         fw_loss = -forward_normal.log_prob(next_observations)
         loss = fw_loss.mean()
 
@@ -522,8 +534,8 @@ class CLEANPPOFM:
             deterministic: bool = False,
     ) -> Tuple[np.ndarray, Optional[Tuple[np.ndarray, ...]]]:
         with torch.no_grad():
-            action, _, _, _ = self.policy.get_action_and_value(fm_network=self.fm_network, x=observation,
-                                                               deterministic=deterministic, logger=self.logger)
+            action, _, _, _, _ = self.policy.get_action_and_value(fm_network=self.fm_network, x=observation,
+                                                                  deterministic=deterministic, logger=self.logger)
         return action.cpu().numpy(), state
 
     def save(
