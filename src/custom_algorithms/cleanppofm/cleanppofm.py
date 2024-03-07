@@ -281,7 +281,7 @@ class CLEANPPOFM:
                 # FIXME: not hardcoded
                 # not needed for target because it is always the same
                 next_observations['agent'] = torch.cat((rollout_data.observations['agent'][1:],
-                                                        torch.tensor([[0, 0]], dtype=torch.float32)), dim=0)
+                                                        torch.tensor([[0, 0]], dtype=torch.float32).to(device)), dim=0)
                 next_observations["target"] = rollout_data.observations["target"]
 
                 if isinstance(self.action_space, spaces.Discrete):
