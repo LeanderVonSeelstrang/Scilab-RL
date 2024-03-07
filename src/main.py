@@ -20,7 +20,7 @@ from utils.util import get_git_label, set_global_seeds, get_train_render_schedul
     avoid_start_learn_before_first_episode_finishes
 from utils.mlflow_util import setup_mlflow, get_hyperopt_score, log_params_from_omegaconf_dict
 from utils.custom_logger import setup_logger
-from utils.custom_callbacks import EarlyStopCallback, EvalCallback
+from utils.custom_callbacks import EarlyStopCallback, EvalCallback, CustomEvalCallback
 from utils.custom_wrappers import DisplayWrapper, RecordVideo
 
 # make git_label available in hydra
@@ -116,8 +116,11 @@ def create_callbacks(cfg, logger, eval_env):
         checkpoint_callback = CheckpointCallback(save_freq=cfg.save_model_freq, save_path=logger.get_dir(), verbose=1)
         callback.append(checkpoint_callback)
 
-    eval_callback = EvalCallback(eval_env, n_eval_episodes=cfg.n_test_rollouts, eval_freq=cfg.eval_after_n_steps,
-                                 log_path=logger.get_dir(), best_model_save_path=logger.get_dir(), render=False, warn=False)
+    # eval_callback = EvalCallback(eval_env, n_eval_episodes=cfg.n_test_rollouts, eval_freq=cfg.eval_after_n_steps,
+    #                              log_path=logger.get_dir(), best_model_save_path=logger.get_dir(), render=False, warn=False)
+    eval_callback = CustomEvalCallback(eval_env, n_eval_episodes=cfg.n_test_rollouts, eval_freq=cfg.eval_after_n_steps,
+                                       log_path=logger.get_dir(), best_model_save_path=logger.get_dir(), render=False,
+                                       warn=False)
     callback.append(eval_callback)
     early_stop_callback = EarlyStopCallback(metric=cfg.early_stop_data_column, eval_freq=cfg.eval_after_n_steps,
                                             threshold=cfg.early_stop_threshold, n_episodes=cfg.early_stop_last_n)
@@ -146,7 +149,7 @@ def main(cfg: DictConfig) -> (float, int):
         log_params_from_omegaconf_dict(cfg)
         OmegaConf.save(config=cfg, f='params.yaml')
         if cfg['seed'] == 0:
-            cfg['seed'] = int(time.time_ns() % 2**32)
+            cfg['seed'] = int(time.time_ns() % 2 ** 32)
         set_global_seeds(cfg.seed)
 
         train_env, eval_env = get_env_instance(cfg, logger)

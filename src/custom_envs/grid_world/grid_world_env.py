@@ -92,10 +92,10 @@ class GridWorldEnv(gym.Env):
         observation = self._get_obs()
         info = self._get_info()
 
-        if self.render_mode == "human":
-            _render_frame(window=self.window, render_mode=self.render_mode, clock=self.clock,
-                          window_size=self.window_size, size=self.size, agent_location=self._agent_location,
-                          target_location=self._target_location)
+        # if self.render_mode == "human":
+        #     _render_frame(window=self.window, render_mode=self.render_mode, clock=self.clock,
+        #                   window_size=self.window_size, size=self.size, agent_location=self._agent_location,
+        #                   target_location=self._target_location)
 
         return observation, info
 
@@ -126,10 +126,10 @@ class GridWorldEnv(gym.Env):
         observation = self._get_obs()
         info = self._get_info()
 
-        if self.render_mode == "human":
-            _render_frame(window=self.window, render_mode=self.render_mode, clock=self.clock,
-                          window_size=self.window_size, size=self.size, agent_location=self._agent_location,
-                          target_location=self._target_location)
+        # if self.render_mode == "human":
+        #     _render_frame(window=self.window, render_mode=self.render_mode, clock=self.clock,
+        #                   window_size=self.window_size, size=self.size, agent_location=self._agent_location,
+        #                   target_location=self._target_location)
 
         return observation, reward, terminated, False, info
 

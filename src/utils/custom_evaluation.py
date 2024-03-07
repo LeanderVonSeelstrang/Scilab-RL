@@ -7,19 +7,21 @@ import numpy as np
 from stable_baselines3.common import base_class
 from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv, VecMonitor, is_vecenv_wrapped
 
+from custom_envs.grid_world.grid_world_env import _render_frame
+
 
 # modified copy from stable baselines
 def evaluate_policy(
-    model: "base_class.BaseAlgorithm",
-    env: Union[gym.Env, VecEnv],
-    n_eval_episodes: int = 10,
-    deterministic: bool = True,
-    render: bool = False,
-    callback: Optional[Callable[[Dict[str, Any], Dict[str, Any]], None]] = None,
-    reward_threshold: Optional[float] = None,
-    return_episode_rewards: bool = False,
-    warn: bool = True,
-    callback_metric_viz = None
+        model: "base_class.BaseAlgorithm",
+        env: Union[gym.Env, VecEnv],
+        n_eval_episodes: int = 10,
+        deterministic: bool = True,
+        render: bool = False,
+        callback: Optional[Callable[[Dict[str, Any], Dict[str, Any]], None]] = None,
+        reward_threshold: Optional[float] = None,
+        return_episode_rewards: bool = False,
+        warn: bool = True,
+        callback_metric_viz=None
 ) -> Union[Tuple[float, float], Tuple[List[float], List[int]]]:
     """
     Runs policy for ``n_eval_episodes`` episodes and returns average reward.
@@ -84,8 +86,16 @@ def evaluate_policy(
     observations = env.reset()
     states = None
     while (episode_counts < episode_count_targets).any():
-        actions, states = model.predict(observations, state=states, deterministic=deterministic)
+        actions, states, forward_normal = model.predict(observations, state=states, deterministic=deterministic)
         observations, rewards, dones, infos = env.step(actions)
+        _render_frame(
+            agent_location=observations["agent"][0],
+            target_location=observations["target"][0],
+            predicted_agent_location=np.array(
+                [round(forward_normal.mean.numpy()[0][0]), round(forward_normal.mean.numpy()[0][1])]),
+            predicted_target_location=np.array(
+                [round(forward_normal.mean.numpy()[0][2]), round(forward_normal.mean.numpy()[0][3])]),
+            title="Forward Model Prediction")
         # trigger metric visualization
         if callback_metric_viz:
             callback_metric_viz._on_step()

@@ -17,7 +17,6 @@ from torch.distributions.normal import Normal
 from torch.nn import functional as F
 
 from custom_algorithms.cleansacmc.mc import MorphologicalNetworks
-from custom_envs.grid_world.grid_world_env import _render_frame
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -436,15 +435,6 @@ class CLEANPPOFM:
                 clipped_actions = actions[0]
 
             new_obs, rewards, dones, infos = env.step(clipped_actions)
-            # FIXME: rendering for evaluation
-            # _render_frame(
-            #     agent_location=new_obs["agent"][0],
-            #     target_location=new_obs["target"][0],
-            #     predicted_agent_location=np.array(
-            #         [round(forward_normal.mean.numpy()[0][0]), round(forward_normal.mean.numpy()[0][1])]),
-            #     predicted_target_location=np.array(
-            #         [round(forward_normal.mean.numpy()[0][2]), round(forward_normal.mean.numpy()[0][3])]),
-            #     title="Forward Model Prediction")
             self.logger.record("train/rollout_rewards_step", float(rewards.mean()))
             self.logger.record_mean("train/rollout_rewards_mean", float(rewards.mean()))
             # this is only logged when no hyperparameter tuning is running?
@@ -537,9 +527,11 @@ class CLEANPPOFM:
             deterministic: bool = False,
     ) -> Tuple[np.ndarray, Optional[Tuple[np.ndarray, ...]]]:
         with torch.no_grad():
-            action, _, _, _, _ = self.policy.get_action_and_value(fm_network=self.fm_network, x=observation,
-                                                                  deterministic=deterministic, logger=self.logger)
-        return action.cpu().numpy(), state
+            action, _, _, _, forward_normal = self.policy.get_action_and_value(fm_network=self.fm_network,
+                                                                               x=observation,
+                                                                               deterministic=deterministic,
+                                                                               logger=self.logger)
+        return action.cpu().numpy(), state, forward_normal
 
     def save(
             self,
