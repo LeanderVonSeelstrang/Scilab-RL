@@ -9,11 +9,13 @@ from gymnasium import spaces
 class GridWorldEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
-    def __init__(self, render_mode=None, size=5, is_it_possible_that_input_noise_is_applied: bool = False):
+    def __init__(self, render_mode=None, size=5, is_it_possible_that_input_noise_is_applied: bool = False,
+                 scene_of_input_noise: bool = False):
         self.size = size  # The size of the square grid
         self.window_size = 512  # The size of the PyGame window
 
         self.is_it_possible_that_input_noise_is_applied = is_it_possible_that_input_noise_is_applied
+        self.scene_of_input_noise = scene_of_input_noise
         self.input_noise_is_applied_in_this_episode = False
         # is it in general possible that the agent can encounter input noise?
         if self.is_it_possible_that_input_noise_is_applied:
@@ -98,12 +100,14 @@ class GridWorldEnv(gym.Env):
         return observation, info
 
     def step(self, action):
-        # Map the action (element of {0,1,2,3,4,5,6,7}) to the direction we walk in
-        if self.input_noise_is_applied_in_this_episode:
+        # scene is a 3x3 grid in the upper left corner
+        if self.input_noise_is_applied_in_this_episode or (
+                self.scene_of_input_noise and self._agent_location[0] < 3 and self._agent_location[1] < 3):
             possible_actions = [0, 1, 2, 3, 4, 5, 6, 7]
             weights = [0.5 / 7 for _ in range(len(possible_actions))]
             weights[action] = 0.5
             action = random.choices(population=possible_actions, weights=weights, k=1)[0]
+        # Map the action (element of {0,1,2,3,4,5,6,7}) to the direction we walk in
         direction = self._action_to_direction[action]
         # We use `np.clip` to make sure we don't leave the grid
         self._agent_location = np.clip(

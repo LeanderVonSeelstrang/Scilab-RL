@@ -172,6 +172,10 @@ def register_custom_envs():
              entry_point="custom_envs.grid_world.grid_world_env:GridWorldEnv",
              kwargs={'is_it_possible_that_input_noise_is_applied': True},
              max_episode_steps=10)
+    register(id="GridworldEnv-v2",
+             entry_point="custom_envs.grid_world.grid_world_env:GridWorldEnv",
+             kwargs={'scene_of_input_noise': True},
+             max_episode_steps=10)
     register(id="GridworldMetaEnv-v0",
              entry_point="custom_envs.grid_world.meta_env_gridworld:MetaEnvGridworld",
              max_episode_steps=10)
