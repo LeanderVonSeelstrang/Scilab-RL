@@ -8,7 +8,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from gymnasium import spaces
-from stable_baselines3.common.buffers import DictRolloutBuffer, RolloutBuffer
+from stable_baselines3.common.buffers import RolloutBuffer
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback
 from stable_baselines3.common.vec_env import VecEnv
@@ -17,6 +17,7 @@ from torch.distributions.normal import Normal
 from torch.nn import functional as F
 
 from custom_algorithms.cleansacmc.mc import MorphologicalNetworks
+from src.utils.custom_buffer import CustomDictRolloutBuffer as DictRolloutBuffer
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -272,16 +273,12 @@ class CLEANPPOFM:
         # train for n_epochs epochs
         for epoch in range(self.n_epochs):
             # Do a complete pass on the rollout buffer
+            ##### PROBLEM: rollout_buffer.get(self.batch_size) returns a random sample of the buffer,
+            # it is not ordered anymore
             for rollout_data in self.rollout_buffer.get(self.batch_size):
                 actions = rollout_data.actions
                 observations = rollout_data.observations
-                # get next observations from rollout buffer: https://github.com/DLR-RM/stable-baselines3/issues/1273
-                next_observations = dict()
-                # FIXME: not hardcoded
-                # not needed for target because it is always the same
-                next_observations['agent'] = torch.cat((rollout_data.observations['agent'][1:],
-                                                        torch.tensor([[0, 0]], dtype=torch.float32).to(device)), dim=0)
-                next_observations["target"] = rollout_data.observations["target"]
+                next_observations = rollout_data.next_observations
 
                 if isinstance(self.action_space, spaces.Discrete):
                     # Convert discrete action from float to long
@@ -413,11 +410,12 @@ class CLEANPPOFM:
         assert self._last_obs is not None, "No previous observation was provided"
 
         n_steps = 0
+        elements_in_rollout_buffer = 0
         rollout_buffer.reset()
 
         callback.on_rollout_start()
 
-        while n_steps < self.n_steps:
+        while elements_in_rollout_buffer < self.n_steps:
             with torch.no_grad():
                 actions, log_probs, _, values, forward_normal = self.policy.get_action_and_value(
                     fm_network=self.fm_network,
@@ -482,14 +480,20 @@ class CLEANPPOFM:
                         terminal_value = self.policy.get_value(terminal_obs)[0]
                     rewards[idx] += self.gamma * terminal_value
 
-            rollout_buffer.add(
-                self._last_obs,
-                actions,
-                rewards,
-                self._last_episode_starts,
-                values,
-                log_probs,
-            )
+            # this is needed because otherwise the last observation and action does not match the new observation
+            if infos[0]["TimeLimit.truncated"]:
+                print("env was reset, observations are not included into the buffer")
+            else:
+                rollout_buffer.add(
+                    self._last_obs,
+                    new_obs,
+                    actions,
+                    rewards,
+                    self._last_episode_starts,
+                    values,
+                    log_probs,
+                )
+                elements_in_rollout_buffer += 1
             self._last_obs = new_obs
             self._last_episode_starts = dones
 
