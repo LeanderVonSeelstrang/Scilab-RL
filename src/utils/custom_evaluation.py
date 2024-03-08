@@ -92,9 +92,9 @@ def evaluate_policy(
             agent_location=observations["agent"][0],
             target_location=observations["target"][0],
             predicted_agent_location=np.array(
-                [round(forward_normal.mean.numpy()[0][0]), round(forward_normal.mean.numpy()[0][1])]),
+                [round(forward_normal.mean.cpu().numpy()[0][0]), round(forward_normal.mean.cpu().numpy()[0][1])]),
             predicted_target_location=np.array(
-                [round(forward_normal.mean.numpy()[0][2]), round(forward_normal.mean.numpy()[0][3])]),
+                [round(forward_normal.mean.cpu().numpy()[0][2]), round(forward_normal.mean.cpu().numpy()[0][3])]),
             title="Forward Model Prediction")
         # trigger metric visualization
         if callback_metric_viz:

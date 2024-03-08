@@ -481,9 +481,7 @@ class CLEANPPOFM:
                     rewards[idx] += self.gamma * terminal_value
 
             # this is needed because otherwise the last observation and action does not match the new observation
-            if infos[0]["TimeLimit.truncated"]:
-                print("env was reset, observations are not included into the buffer")
-            else:
+            if not infos[0]["TimeLimit.truncated"]:
                 rollout_buffer.add(
                     self._last_obs,
                     new_obs,
