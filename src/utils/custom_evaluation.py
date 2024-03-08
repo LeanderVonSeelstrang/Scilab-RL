@@ -7,7 +7,7 @@ import numpy as np
 from stable_baselines3.common import base_class
 from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv, VecMonitor, is_vecenv_wrapped
 
-from custom_envs.grid_world.grid_world_env import _render_frame
+from custom_envs.grid_world.grid_world_env import _render_frame, apply_action
 
 
 # modified copy from stable baselines
@@ -85,17 +85,36 @@ def evaluate_policy(
     current_lengths = np.zeros(n_envs, dtype="int")
     observations = env.reset()
     states = None
+    window = None
+    clock = None
+    action_to_direction = {
+        0: np.array([1, 0]),  # right
+        1: np.array([1, 1]),  # right down (diagonal)
+        2: np.array([0, 1]),  # down
+        3: np.array([-1, 1]),  # left down (diagonal)
+        4: np.array([-1, 0]),  # left
+        5: np.array([-1, -1]),  # left up
+        6: np.array([0, -1]),  # up
+        7: np.array([1, -1])  # right up
+    }
     while (episode_counts < episode_count_targets).any():
         actions, states, forward_normal = model.predict(observations, state=states, deterministic=deterministic)
+        # FIXME: this is for gridworld
+        agent_location = apply_action(action=actions[0], last_agent_location=observations["agent"],
+                                      action_to_direction=action_to_direction)
         observations, rewards, dones, infos = env.step(actions)
-        _render_frame(
+        window, clock = _render_frame(
             agent_location=observations["agent"][0],
             target_location=observations["target"][0],
             predicted_agent_location=np.array(
                 [round(forward_normal.mean.cpu().numpy()[0][0]), round(forward_normal.mean.cpu().numpy()[0][1])]),
             predicted_target_location=np.array(
                 [round(forward_normal.mean.cpu().numpy()[0][2]), round(forward_normal.mean.cpu().numpy()[0][3])]),
-            title="Forward Model Prediction")
+            title="Forward Model Prediction",
+            scene_of_input_noise=env.metadata["scene_of_input_noise"],
+            window=window,
+            clock=clock,
+            actual_agent_location=agent_location[0])
         # trigger metric visualization
         if callback_metric_viz:
             callback_metric_viz._on_step()

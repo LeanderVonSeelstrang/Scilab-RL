@@ -16,6 +16,7 @@ class GridWorldEnv(gym.Env):
 
         self.is_it_possible_that_input_noise_is_applied = is_it_possible_that_input_noise_is_applied
         self.scene_of_input_noise = scene_of_input_noise
+        self.metadata["scene_of_input_noise"] = self.scene_of_input_noise
         self.input_noise_is_applied_in_this_episode = False
         # is it in general possible that the agent can encounter input noise?
         if self.is_it_possible_that_input_noise_is_applied:
@@ -107,12 +108,8 @@ class GridWorldEnv(gym.Env):
             weights = [0.5 / 7 for _ in range(len(possible_actions))]
             weights[action] = 0.5
             action = random.choices(population=possible_actions, weights=weights, k=1)[0]
-        # Map the action (element of {0,1,2,3,4,5,6,7}) to the direction we walk in
-        direction = self._action_to_direction[action]
-        # We use `np.clip` to make sure we don't leave the grid
-        self._agent_location = np.clip(
-            self._agent_location + direction, 0, self.size - 1
-        )
+        self._agent_location = apply_action(action=action, last_agent_location=self._agent_location,
+                                            action_to_direction=self._action_to_direction)
         # An episode is done iff the agent has reached the target
         terminated = np.array_equal(self._agent_location, self._target_location)
         # reward
@@ -147,7 +144,7 @@ class GridWorldEnv(gym.Env):
 
 def _render_frame(agent_location, target_location, predicted_agent_location=None, predicted_target_location=None,
                   window=None, clock=None, window_size=512, render_mode="human",
-                  size=5, title="GridWorld"):
+                  size=5, title="GridWorld", scene_of_input_noise=False, actual_agent_location=None):
     if predicted_agent_location is not None and predicted_target_location is not None:
         range_of_grid = size * 2
         grid_window_size = window_size * 2
@@ -171,48 +168,34 @@ def _render_frame(agent_location, target_location, predicted_agent_location=None
             window_size / size
     )  # The size of a single grid square in pixels
 
+    # if scene is applied in this episode, draw the scene
+    if scene_of_input_noise:
+        render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[0, 0], color=(136, 136, 136))
+        render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[0, 1], color=(136, 136, 136))
+        render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[0, 2], color=(136, 136, 136))
+        render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[1, 0], color=(136, 136, 136))
+        render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[1, 1], color=(136, 136, 136))
+        render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[1, 2], color=(136, 136, 136))
+        render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[2, 0], color=(136, 136, 136))
+        render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[2, 1], color=(136, 136, 136))
+        render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[2, 2], color=(136, 136, 136))
+        render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[5, 0], color=(110, 110, 110))
+        render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[5, 1], color=(110, 110, 110))
+        render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[5, 2], color=(110, 110, 110))
+        render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[6, 0], color=(110, 110, 110))
+        render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[6, 1], color=(110, 110, 110))
+        render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[6, 2], color=(110, 110, 110))
+        render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[7, 0], color=(110, 110, 110))
+        render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[7, 1], color=(110, 110, 110))
+        render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[7, 2], color=(110, 110, 110))
     # First we draw the target
-    pygame.draw.rect(
-        canvas,
-        (255, 0, 0),
-        pygame.Rect(
-            pix_square_size * target_location,
-            (pix_square_size, pix_square_size),
-        ),
-    )
+    render_rect(canvas=canvas, pix_square_size=pix_square_size, position=target_location, color=(255, 0, 0))
     # now we draw the traps
-    pygame.draw.rect(
-        canvas,
-        (0, 255, 0),
-        pygame.Rect(
-            pix_square_size * np.array([1, 4]),
-            (pix_square_size, pix_square_size),
-        ),
-    )
-    pygame.draw.rect(
-        canvas,
-        (0, 255, 0),
-        pygame.Rect(
-            pix_square_size * np.array([2, 3]),
-            (pix_square_size, pix_square_size),
-        ),
-    )
-    pygame.draw.rect(
-        canvas,
-        (0, 255, 0),
-        pygame.Rect(
-            pix_square_size * np.array([3, 2]),
-            (pix_square_size, pix_square_size),
-        ),
-    )
-    pygame.draw.rect(
-        canvas,
-        (0, 255, 0),
-        pygame.Rect(
-            pix_square_size * np.array([4, 1]),
-            (pix_square_size, pix_square_size),
-        ),
-    )
+    render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[1, 4], color=(0, 255, 0))
+    render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[2, 3], color=(0, 255, 0))
+    render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[3, 2], color=(0, 255, 0))
+    render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[4, 1], color=(0, 255, 0))
+
     # Now we draw the agent
     pygame.draw.circle(
         canvas,
@@ -220,51 +203,25 @@ def _render_frame(agent_location, target_location, predicted_agent_location=None
         (agent_location + 0.5) * pix_square_size,
         pix_square_size / 3,
     )
+    if actual_agent_location is not None:
+        if actual_agent_location[0] != agent_location[0] or actual_agent_location[1] != agent_location[1]:
+            pygame.draw.circle(
+                canvas,
+                (255, 165, 0),
+                (actual_agent_location + 0.5) * pix_square_size,
+                pix_square_size / 3,
+            )
     if predicted_agent_location is not None and predicted_target_location is not None:
         # First we draw the predicted target
         target_location_1 = np.copy(predicted_target_location)
         target_location_1[0] += 5
-        pygame.draw.rect(
-            canvas,
-            (100, 0, 0),
-            pygame.Rect(
-                pix_square_size * target_location_1,
-                (pix_square_size, pix_square_size),
-            ),
-        )
+        render_rect(canvas=canvas, pix_square_size=pix_square_size, position=target_location_1, color=(100, 0, 0))
         # now we draw the traps for the predicted env
-        pygame.draw.rect(
-            canvas,
-            (0, 100, 0),
-            pygame.Rect(
-                pix_square_size * np.array([6, 4]),
-                (pix_square_size, pix_square_size),
-            ),
-        )
-        pygame.draw.rect(
-            canvas,
-            (0, 100, 0),
-            pygame.Rect(
-                pix_square_size * np.array([7, 3]),
-                (pix_square_size, pix_square_size),
-            ),
-        )
-        pygame.draw.rect(
-            canvas,
-            (0, 100, 0),
-            pygame.Rect(
-                pix_square_size * np.array([8, 2]),
-                (pix_square_size, pix_square_size),
-            ),
-        )
-        pygame.draw.rect(
-            canvas,
-            (0, 100, 0),
-            pygame.Rect(
-                pix_square_size * np.array([9, 1]),
-                (pix_square_size, pix_square_size),
-            ),
-        )
+        render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[6, 4], color=(0, 100, 0))
+        render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[7, 3], color=(0, 100, 0))
+        render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[8, 2], color=(0, 100, 0))
+        render_rect(canvas=canvas, pix_square_size=pix_square_size, position=[9, 1], color=(0, 100, 0))
+
         # Now we draw the predicted agent
         agent_1_location = np.copy(predicted_agent_location)
         agent_1_location[0] += 5
@@ -301,7 +258,29 @@ def _render_frame(agent_location, target_location, predicted_agent_location=None
         # The following line will automatically add a delay to keep the framerate stable.
         # FIXME: not hardcoded
         clock.tick(4)
+        return window, clock
     else:  # rgb_array
         return np.transpose(
             np.array(pygame.surfarray.pixels3d(canvas)), axes=(1, 0, 2)
         )
+
+
+def render_rect(canvas, pix_square_size, position, color):
+    pygame.draw.rect(
+        canvas,
+        color,
+        pygame.Rect(
+            pix_square_size * np.array(position),
+            (pix_square_size, pix_square_size),
+        ),
+    )
+
+
+def apply_action(action, last_agent_location, action_to_direction):
+    # Map the action (element of {0,1,2,3,4,5,6,7}) to the direction we walk in
+    direction = action_to_direction[action]
+    # We use `np.clip` to make sure we don't leave the grid
+    agent_location = np.clip(
+        last_agent_location + direction, 0, 4
+    )
+    return agent_location
