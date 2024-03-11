@@ -1,4 +1,5 @@
 import os
+import torch as th
 import subprocess
 import gymnasium as gym
 
@@ -128,6 +129,9 @@ class DisplayWrapper(gym.Wrapper):
             if self.display_metrics:
                 for i in range(self.num_metrics):
                     self.curr_recorded_value = self.logger.name_to_value[self.metric_keys[i]]
+                    # curr_recorded_value is sometimes a tensor loaded from the GPU
+                    if th.is_tensor(self.curr_recorded_value):
+                        self.curr_recorded_value = self.curr_recorded_value.cpu()
                     if len(self.animation.x_data[i]) > 0:
                         self.animation.x_data[i].append(self.animation.x_data[i][-1]+1)
                     else:
