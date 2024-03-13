@@ -232,6 +232,8 @@ class MoonlanderWorldEnv(Env):
         self.update_observation()
         self.update_observation()
         # for rendering
+        # FIXME: this opens windows even if display is none because during initialisation render_mode is always none
+        #  independently of the actual render mode later
         plt.ion()
         self.fig, self.ax = plt.subplots()
         eximg = np.zeros((self.state.shape))
@@ -862,13 +864,12 @@ class MoonlanderWorldEnv(Env):
         if self.forward_model_prediction is not None:
             forward_model_pred = copy.deepcopy(self.forward_model_prediction[0]).reshape(30, 42)
             plotted_image = np.concatenate((self.state, forward_model_pred), axis=1)
-            self.im_mb.set_data(plotted_image)
-        else:
-            self.im.set_data(self.state)
         if self.render_mode == "human":
             if self.forward_model_prediction is not None:
+                self.im_mb.set_data(plotted_image)
                 self.fig_mb.canvas.draw_idle()
             else:
+                self.im.set_data(self.state)
                 self.fig.canvas.draw_idle()
         elif self.render_mode == "rgb_array":
             # read ascii text from numpy array

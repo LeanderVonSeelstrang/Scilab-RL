@@ -16,8 +16,9 @@ from torch.distributions.normal import Normal
 from torch.nn import functional as F
 
 from custom_algorithms.cleansacmc.mc import MorphologicalNetworks
-from src.utils.custom_buffer import CustomDictRolloutBuffer as DictRolloutBuffer
-from src.utils.custom_buffer import CustomRolloutBuffer as RolloutBuffer
+from utils.custom_buffer import CustomDictRolloutBuffer as DictRolloutBuffer
+from utils.custom_buffer import CustomRolloutBuffer as RolloutBuffer
+from utils.custom_wrappers import DisplayWrapper
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -421,8 +422,13 @@ class CLEANPPOFM:
                     fm_network=self.fm_network,
                     x=self._last_obs, logger=self.logger)
             # FIXME: very ugly coding
-            self.env.envs[0].env.env.env.env.forward_model_prediction = forward_normal.mean.cpu()
-            self.env.envs[0].env.env.env.env.forward_model_stddev = forward_normal.stddev.cpu()
+            #  when display wrapper is included, one "env" more is needed
+            if isinstance(self.env.envs[0], DisplayWrapper):
+                self.env.envs[0].env.env.env.env.forward_model_prediction = forward_normal.mean.cpu()
+                self.env.envs[0].env.env.env.env.forward_model_stddev = forward_normal.stddev.cpu()
+            else:
+                self.env.envs[0].env.env.env.forward_model_prediction = forward_normal.mean.cpu()
+                self.env.envs[0].env.env.env.forward_model_stddev = forward_normal.stddev.cpu()
             actions = actions.cpu().numpy()
             log_prob_float = float(np.mean(log_probs.cpu().numpy()))
             self.logger.record("train/rollout_logprob_step", float(log_prob_float))
@@ -509,9 +515,9 @@ class CLEANPPOFM:
         return True
 
     def train_fm(self, observations, next_observations, actions):
-        # FIXME: not hardcoded
-        observations = flatten_obs(observations)
-        next_observations = flatten_obs(next_observations)
+        if self.policy.flatten:
+            observations = flatten_obs(observations)
+            next_observations = flatten_obs(next_observations)
         forward_normal, _ = self.fm_network(observations, actions.float().unsqueeze(1))
         # log probs is the logarithm of the maximum likelihood
         # log because the deviation is easier (addition instead of multiplication)
