@@ -116,11 +116,17 @@ def create_callbacks(cfg, logger, eval_env):
         checkpoint_callback = CheckpointCallback(save_freq=cfg.save_model_freq, save_path=logger.get_dir(), verbose=1)
         callback.append(checkpoint_callback)
 
-    # eval_callback = EvalCallback(eval_env, n_eval_episodes=cfg.n_test_rollouts, eval_freq=cfg.eval_after_n_steps,
-    #                              log_path=logger.get_dir(), best_model_save_path=logger.get_dir(), render=False, warn=False)
-    eval_callback = CustomEvalCallback(eval_env, n_eval_episodes=cfg.n_test_rollouts, eval_freq=cfg.eval_after_n_steps,
-                                       log_path=logger.get_dir(), best_model_save_path=logger.get_dir(), render=False,
-                                       warn=False)
+    if cfg['algorithm'].name == 'cleanppofm':
+        eval_callback = CustomEvalCallback(eval_env, n_eval_episodes=cfg.n_test_rollouts,
+                                           eval_freq=cfg.eval_after_n_steps,
+                                           log_path=logger.get_dir(), best_model_save_path=logger.get_dir(),
+                                           render=False,
+                                           warn=False)
+    else:
+        eval_callback = EvalCallback(eval_env, n_eval_episodes=cfg.n_test_rollouts, eval_freq=cfg.eval_after_n_steps,
+                                     log_path=logger.get_dir(), best_model_save_path=logger.get_dir(), render=False,
+                                     warn=False)
+
     callback.append(eval_callback)
     early_stop_callback = EarlyStopCallback(metric=cfg.early_stop_data_column, eval_freq=cfg.eval_after_n_steps,
                                             threshold=cfg.early_stop_threshold, n_episodes=cfg.early_stop_last_n)

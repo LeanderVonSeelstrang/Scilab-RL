@@ -538,11 +538,11 @@ class CLEANPPOFM:
             deterministic: bool = False,
     ) -> Tuple[np.ndarray, Optional[Tuple[np.ndarray, ...]]]:
         with torch.no_grad():
-            action, _, _, _, _ = self.policy.get_action_and_value(fm_network=self.fm_network,
-                                                                  x=observation,
-                                                                  deterministic=deterministic,
-                                                                  logger=self.logger)
-        return action.cpu().numpy(), state
+            action, _, _, _, forward_normal = self.policy.get_action_and_value(fm_network=self.fm_network,
+                                                                               x=observation,
+                                                                               deterministic=deterministic,
+                                                                               logger=self.logger)
+        return action.cpu().numpy(), state, forward_normal
 
     def save(
             self,
