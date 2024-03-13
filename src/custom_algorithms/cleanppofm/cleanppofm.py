@@ -420,6 +420,9 @@ class CLEANPPOFM:
                 actions, log_probs, _, values, forward_normal = self.policy.get_action_and_value(
                     fm_network=self.fm_network,
                     x=self._last_obs, logger=self.logger)
+            # FIXME: very ugly coding
+            self.env.envs[0].env.env.env.env.forward_model_prediction = forward_normal.mean.cpu()
+            self.env.envs[0].env.env.env.env.forward_model_stddev = forward_normal.stddev.cpu()
             actions = actions.cpu().numpy()
             log_prob_float = float(np.mean(log_probs.cpu().numpy()))
             self.logger.record("train/rollout_logprob_step", float(log_prob_float))
@@ -529,11 +532,11 @@ class CLEANPPOFM:
             deterministic: bool = False,
     ) -> Tuple[np.ndarray, Optional[Tuple[np.ndarray, ...]]]:
         with torch.no_grad():
-            action, _, _, _, forward_normal = self.policy.get_action_and_value(fm_network=self.fm_network,
-                                                                               x=observation,
-                                                                               deterministic=deterministic,
-                                                                               logger=self.logger)
-        return action.cpu().numpy(), state, forward_normal
+            action, _, _, _, _ = self.policy.get_action_and_value(fm_network=self.fm_network,
+                                                                  x=observation,
+                                                                  deterministic=deterministic,
+                                                                  logger=self.logger)
+        return action.cpu().numpy(), state
 
     def save(
             self,

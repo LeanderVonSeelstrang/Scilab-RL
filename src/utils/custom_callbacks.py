@@ -4,11 +4,11 @@ import numpy as np
 from typing import Dict, Any
 
 from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
-# from stable_baselines3.common.evaluation import evaluate_policy
+from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.vec_env import sync_envs_normalization
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-from src.utils.custom_evaluation import evaluate_policy
+from src.utils.custom_evaluation import evaluate_policy as custom_evaluate_policy
 
 
 class EarlyStopCallback(BaseCallback):
@@ -226,7 +226,7 @@ class CustomEvalCallback(EvalCallback):
             # Sync training and eval env if there is VecNormalize
             sync_envs_normalization(self.training_env, self.eval_env)
 
-            episode_rewards, episode_lengths = evaluate_policy(
+            episode_rewards, episode_lengths = custom_evaluate_policy(
                 self.model,
                 self.eval_env,
                 n_eval_episodes=self.n_eval_episodes,

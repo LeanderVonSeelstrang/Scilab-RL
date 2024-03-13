@@ -4,6 +4,7 @@ import datetime
 import logging
 import math
 import os
+import sys
 import random as rnd
 from typing import List, Dict
 
@@ -14,8 +15,11 @@ import yaml
 from PIL import Image, ImageDraw
 from gymnasium import Env
 from gymnasium import spaces
-from hydra.utils import get_original_cwd
 from matplotlib import pyplot as plt
+
+# FIXME: needed for rendering rgb array
+# print with two decimals
+np.set_printoptions(threshold=sys.maxsize, formatter={'float': lambda x: "{0:0.2f}".format(x)})
 
 
 class MoonlanderWorldEnv(Env):
@@ -226,6 +230,7 @@ class MoonlanderWorldEnv(Env):
         )
 
         self.update_observation()
+        self.update_observation()
         # for rendering
         plt.ion()
         self.fig, self.ax = plt.subplots()
@@ -233,6 +238,12 @@ class MoonlanderWorldEnv(Env):
         eximg[0] = -10
         eximg[1] = 3
         self.im = self.ax.imshow(eximg)
+        # or model-based rendering
+        self.fig_mb, self.ax_mb = plt.subplots()
+        eximg_mb = np.zeros((self.state.shape[0], self.state.shape[1] * 2))
+        eximg_mb[0] = -10
+        eximg_mb[1] = 3
+        self.im_mb = self.ax_mb.imshow(eximg_mb)
 
         # INITIAL STATE
         self.observation_space = spaces.Box(
@@ -247,6 +258,10 @@ class MoonlanderWorldEnv(Env):
         self.positions_and_action = [
             [int(self.x_position_of_agent), int(self.y_position_of_agent), 1]
         ]
+
+        # forward model prediction
+        self.forward_model_prediction = None
+        self.forward_model_stddev = 0
 
         ### LOGGING
         if verbose_level > 0:
@@ -844,16 +859,35 @@ class MoonlanderWorldEnv(Env):
         return self.state.flatten(), reward, self.is_done(), truncated, info
 
     def render(self):
-        self.im.set_data(self.state)
+        if self.forward_model_prediction is not None:
+            forward_model_pred = copy.deepcopy(self.forward_model_prediction[0]).reshape(30, 42)
+            plotted_image = np.concatenate((self.state, forward_model_pred), axis=1)
+            self.im_mb.set_data(plotted_image)
+        else:
+            self.im.set_data(self.state)
         if self.render_mode == "human":
-            self.fig.canvas.draw_idle()
+            if self.forward_model_prediction is not None:
+                self.fig_mb.canvas.draw_idle()
+            else:
+                self.fig.canvas.draw_idle()
         elif self.render_mode == "rgb_array":
             # read ascii text from numpy array
-            img_state = self.state.copy()
+            if self.forward_model_prediction is not None:
+                img_state = plotted_image.copy()
+            else:
+                img_state = self.state.copy()
             ascii_text = str(img_state)
+            ascii_text = ascii_text.replace("\n", "")
+            ascii_text = ascii_text.replace("   ", "  ")
+            ascii_text = ascii_text.replace("  ", " ")
+            ascii_text = ascii_text.replace("]", "]\n")
+
             # Create a new Image
             # make sure the dimensions (W and H) are big enough for the ascii art
-            W, H = (550, 500)
+            if self.forward_model_prediction is not None:
+                W, H = (2750, 500)
+            else:
+                W, H = (550, 500)
             im = Image.new("RGBA", (W, H), "white")
 
             # Draw text to image
@@ -952,6 +986,10 @@ class MoonlanderWorldEnv(Env):
             [int(self.x_position_of_agent), int(self.y_position_of_agent), 1]
         ]
         self.information_for_each_step = [[self.state, "Nan", "Nan"]]
+
+        # forward model prediction
+        self.forward_model_prediction = None
+        self.forward_model_stddev = 0
 
         if self.config["verbose_level"] > 0:
             ### OBJECTS
