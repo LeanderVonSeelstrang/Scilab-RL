@@ -7,6 +7,8 @@ import numpy as np
 from stable_baselines3.common import base_class
 from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv, VecMonitor, is_vecenv_wrapped
 
+from utils.custom_wrappers import DisplayWrapper
+
 
 # modified copy from stable baselines
 def evaluate_policy(
@@ -85,9 +87,15 @@ def evaluate_policy(
     states = None
     while (episode_counts < episode_count_targets).any():
         actions, states, forward_normal = model.predict(observations, state=states, deterministic=deterministic)
-        # FIXME: very ugly coding style
-        env.envs[0].env.env.env.env.forward_model_prediction = forward_normal.mean.cpu()
-        env.envs[0].env.env.env.env.forward_model_stddev = forward_normal.stddev.cpu()
+        # FIXME: very ugly coding
+        #  when display wrapper is included, one "env" more is needed
+        if isinstance(env.envs[0], DisplayWrapper):
+            env.envs[0].env.env.env.env.forward_model_prediction = forward_normal.mean.cpu()
+            env.envs[0].env.env.env.env.forward_model_stddev = forward_normal.stddev.cpu()
+        else:
+            env.envs[0].env.env.env.forward_model_prediction = forward_normal.mean.cpu()
+            env.envs[0].env.env.env.forward_model_stddev = forward_normal.stddev.cpu()
+
         observations, rewards, dones, infos = env.step(actions)
         # trigger metric visualization
         if callback_metric_viz:
