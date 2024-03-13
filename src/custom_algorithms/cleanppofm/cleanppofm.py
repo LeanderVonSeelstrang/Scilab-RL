@@ -8,7 +8,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 from gymnasium import spaces
-from stable_baselines3.common.buffers import RolloutBuffer
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback
 from stable_baselines3.common.vec_env import VecEnv
@@ -18,6 +17,7 @@ from torch.nn import functional as F
 
 from custom_algorithms.cleansacmc.mc import MorphologicalNetworks
 from src.utils.custom_buffer import CustomDictRolloutBuffer as DictRolloutBuffer
+from src.utils.custom_buffer import CustomRolloutBuffer as RolloutBuffer
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
