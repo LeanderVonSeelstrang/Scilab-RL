@@ -108,6 +108,7 @@ class GridWorldEnv(gym.Env):
 
     def step(self, action):
         # needed for displaying possible input noise
+        self.last_action = action
         self.agent_location_one_step_before = self._agent_location
         # scene is a 3x3 grid in the upper left corner
         if self.input_noise_is_applied_in_this_episode or (
@@ -116,7 +117,6 @@ class GridWorldEnv(gym.Env):
             weights = [0.5 / 7 for _ in range(len(possible_actions))]
             weights[action] = 0.5
             action = random.choices(population=possible_actions, weights=weights, k=1)[0]
-        self.last_action = action
         direction = self._action_to_direction[action]
         # We use `np.clip` to make sure we don't leave the grid
         self._agent_location = np.clip(
