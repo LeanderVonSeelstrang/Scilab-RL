@@ -7,7 +7,7 @@ import numpy as np
 from stable_baselines3.common import base_class
 from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv, VecMonitor, is_vecenv_wrapped
 
-from utils.custom_wrappers import DisplayWrapper
+from utils.custom_wrappers import DisplayWrapper, RecordVideo
 
 
 # modified copy from stable baselines
@@ -89,7 +89,7 @@ def evaluate_policy(
         actions, states, forward_normal = model.predict(observations, state=states, deterministic=deterministic)
         # FIXME: very ugly coding
         #  when display wrapper is included, one "env" more is needed
-        if isinstance(env.envs[0], DisplayWrapper):
+        if isinstance(env.envs[0], DisplayWrapper) or isinstance(env.envs[0], RecordVideo):
             env.envs[0].env.env.env.env.forward_model_prediction = forward_normal.mean.cpu()
             env.envs[0].env.env.env.env.forward_model_stddev = forward_normal.stddev.cpu()
         else:

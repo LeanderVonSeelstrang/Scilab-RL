@@ -230,7 +230,6 @@ class MoonlanderWorldEnv(Env):
         )
 
         self.update_observation()
-        self.update_observation()
         # for rendering
         # FIXME: this opens windows even if display is none because during initialisation render_mode is always none
         #  independently of the actual render mode later
@@ -453,7 +452,10 @@ class MoonlanderWorldEnv(Env):
         """
         actual_reward = 0
         collected_objects = self.find_intersections(self.object_dict_list)
-        number_of_crashed_or_collected_objects = len(collected_objects)
+        number_of_crashed_or_collected_objects = 0
+        for obj in collected_objects:
+            if obj not in self.already_crashed_objects:
+                number_of_crashed_or_collected_objects += 1
         # state is current observation
         # agent is in obstacle or wall = crash and crashes are lead to end the episode --> same reward for both tasks
         if (((self.config["world"]["objects"]["type"] == "obstacle" and
@@ -864,39 +866,19 @@ class MoonlanderWorldEnv(Env):
         if self.forward_model_prediction is not None:
             forward_model_pred = copy.deepcopy(self.forward_model_prediction[0]).reshape(30, 42)
             plotted_image = np.concatenate((self.state, forward_model_pred), axis=1)
-        if self.render_mode == "human":
+        if self.forward_model_prediction is not None:
+            self.im_mb.set_data(plotted_image)
+            self.fig_mb.canvas.draw()
+        else:
+            self.im.set_data(self.state)
+            self.fig.canvas.draw()
+        if self.render_mode == "rgb_array":
             if self.forward_model_prediction is not None:
-                self.im_mb.set_data(plotted_image)
-                self.fig_mb.canvas.draw_idle()
+                return np.frombuffer(self.fig_mb.canvas.tostring_rgb(), dtype=np.uint8).reshape(
+                    self.fig_mb.canvas.get_width_height()[::-1] + (3,))
             else:
-                self.im.set_data(self.state)
-                self.fig.canvas.draw_idle()
-        elif self.render_mode == "rgb_array":
-            # read ascii text from numpy array
-            if self.forward_model_prediction is not None:
-                img_state = plotted_image.copy()
-            else:
-                img_state = self.state.copy()
-            ascii_text = str(img_state)
-            ascii_text = ascii_text.replace("\n", "")
-            ascii_text = ascii_text.replace("   ", "  ")
-            ascii_text = ascii_text.replace("  ", " ")
-            ascii_text = ascii_text.replace("]", "]\n")
-
-            # Create a new Image
-            # make sure the dimensions (W and H) are big enough for the ascii art
-            if self.forward_model_prediction is not None:
-                W, H = (2750, 500)
-            else:
-                W, H = (550, 500)
-            im = Image.new("RGBA", (W, H), "white")
-
-            # Draw text to image
-            draw = ImageDraw.Draw(im)
-            _, _, w, h = draw.textbbox((0, 0), ascii_text)
-            # draws the text in the center of the image
-            draw.text(((W - w) / 2, (H - h) / 2), ascii_text, fill="black")
-            return np.array(im)
+                return np.frombuffer(self.fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(
+                    self.fig.canvas.get_width_height()[::-1] + (3,))
 
     def reset(self, seed=None, options=None):
         """
