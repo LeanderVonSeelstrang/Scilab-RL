@@ -21,8 +21,9 @@ def evaluate_policy(
         reward_threshold: Optional[float] = None,
         return_episode_rewards: bool = False,
         warn: bool = True,
-        callback_metric_viz=None
-) -> Union[Tuple[float, float], Tuple[List[float], List[int]]]:
+        callback_metric_viz=None,
+        logger=None,
+) -> Union[Tuple[float, float], Tuple[List[float], List[int], List[int]]]:
     """
     Runs policy for ``n_eval_episodes`` episodes and returns average reward.
     If a vector env is passed in, this divides the episodes to evaluate onto the
@@ -76,6 +77,7 @@ def evaluate_policy(
     n_envs = env.num_envs
     episode_rewards = []
     episode_lengths = []
+    episode_number_of_crashed_or_collected_objects = []
 
     episode_counts = np.zeros(n_envs, dtype="int")
     # Divides episodes among different sub environments in the vector as evenly as possible
@@ -83,6 +85,7 @@ def evaluate_policy(
 
     current_rewards = np.zeros(n_envs)
     current_lengths = np.zeros(n_envs, dtype="int")
+    current_number_of_crashed_or_collected_objects = np.zeros(n_envs, dtype="int")
     observations = env.reset()
     states = None
     while (episode_counts < episode_count_targets).any():
@@ -97,11 +100,18 @@ def evaluate_policy(
             env.envs[0].env.env.env.forward_model_stddev = forward_normal.stddev.cpu()
 
         observations, rewards, dones, infos = env.step(actions)
+        logger.record("eval/reward", rewards)
+        # dodge/collect env
+        if "simple" in infos[0].keys():
+            logger.record("rollout_number_of_crashed_or_collected_objects",
+                          float(infos[0]["number_of_crashed_or_collected_objects"]))
         # trigger metric visualization
         if callback_metric_viz:
             callback_metric_viz._on_step()
         current_rewards += rewards
         current_lengths += 1
+        if "simple" in infos[0].keys():
+            current_number_of_crashed_or_collected_objects += infos[0]["number_of_crashed_or_collected_objects"]
         for i in range(n_envs):
             if episode_counts[i] < episode_count_targets[i]:
 
@@ -129,9 +139,12 @@ def evaluate_policy(
                     else:
                         episode_rewards.append(current_rewards[i])
                         episode_lengths.append(current_lengths[i])
+                        episode_number_of_crashed_or_collected_objects.append(
+                            current_number_of_crashed_or_collected_objects[i])
                         episode_counts[i] += 1
                     current_rewards[i] = 0
                     current_lengths[i] = 0
+                    current_number_of_crashed_or_collected_objects[i] = 0
                     if states is not None:
                         states[i] *= 0
 
@@ -143,5 +156,5 @@ def evaluate_policy(
     if reward_threshold is not None:
         assert mean_reward > reward_threshold, "Mean reward below threshold: " f"{mean_reward:.2f} < {reward_threshold:.2f}"
     if return_episode_rewards:
-        return episode_rewards, episode_lengths
+        return episode_rewards, episode_lengths, episode_number_of_crashed_or_collected_objects
     return mean_reward, std_reward

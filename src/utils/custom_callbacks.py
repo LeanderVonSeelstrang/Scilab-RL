@@ -226,7 +226,7 @@ class CustomEvalCallback(EvalCallback):
             # Sync training and eval env if there is VecNormalize
             sync_envs_normalization(self.training_env, self.eval_env)
 
-            episode_rewards, episode_lengths = custom_evaluate_policy(
+            episode_rewards, episode_lengths, episode_number_of_crashed_or_collected_objects = custom_evaluate_policy(
                 self.model,
                 self.eval_env,
                 n_eval_episodes=self.n_eval_episodes,
@@ -234,6 +234,7 @@ class CustomEvalCallback(EvalCallback):
                 deterministic=self.deterministic,
                 return_episode_rewards=True,
                 warn=self.warn,
+                logger=self.logger,
             )
 
             if self.log_path is not None:
@@ -246,19 +247,26 @@ class CustomEvalCallback(EvalCallback):
                     timesteps=self.evaluations_timesteps,
                     results=self.evaluations_results,
                     ep_lengths=self.evaluations_length,
+                    number_of_crashed_or_collected_objects=[episode_number_of_crashed_or_collected_objects],
                 )
 
             mean_reward, std_reward = np.mean(episode_rewards), np.std(episode_rewards)
             mean_ep_length, std_ep_length = np.mean(episode_lengths), np.std(episode_lengths)
+            mean_number_of_crashed_or_collected_objects, std_number_of_crashed_or_collected_objects = np.mean(
+                episode_number_of_crashed_or_collected_objects), np.std(episode_number_of_crashed_or_collected_objects)
             self.last_mean_reward = mean_reward
 
             if self.verbose > 0:
                 print(
                     f"Eval num_timesteps={self.num_timesteps}, " f"episode_reward={mean_reward:.2f} +/- {std_reward:.2f}")
                 print(f"Episode length: {mean_ep_length:.2f} +/- {std_ep_length:.2f}")
+                print(
+                    f"Number of crashed or collected objects: {mean_number_of_crashed_or_collected_objects:.2f} +/- {std_number_of_crashed_or_collected_objects:.2f}")
             # Add to current Logger
             self.logger.record("eval/mean_reward", float(mean_reward))
             self.logger.record("eval/mean_ep_length", mean_ep_length)
+            self.logger.record("eval/mean_number_of_crashed_or_collected_objects",
+                               mean_number_of_crashed_or_collected_objects)
 
             # Dump log so the evaluation results are printed with the correct timestep
             self.logger.record("time/total timesteps", self.num_timesteps, exclude="tensorboard")
