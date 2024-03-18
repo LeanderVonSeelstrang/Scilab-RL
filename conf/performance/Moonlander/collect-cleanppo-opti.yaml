@@ -1,11 +1,11 @@
 # @package _global_
 # Changes specified in this config should be interpreted as relative to the _global_ package.
 defaults:
-  - override /algorithm: cleanppo
+  - override /algorithm: cleanppofm
 
-eval_after_n_steps: 20000
+eval_after_n_steps: 2000
 # The max. number of training epochs to run. One epoch consists of 'eval_after_n_steps' actions.
-n_epochs: 30
+n_epochs: 100
 hyperopt_criterion: 'eval/mean_reward'
 
 algorithm:
@@ -39,9 +39,3 @@ hydra:
         type: float
         low: 0.005
         high: 0.05
-      ++env:
-        type: categorical
-        choices:
-          - MoonlanderWorld-collect-simple-v0
-          - MoonlanderWorld-collect-gaussian-v0
-          - MoonlanderWorld-collect-pos_neg-v0
