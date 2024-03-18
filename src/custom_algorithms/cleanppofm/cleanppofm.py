@@ -15,7 +15,7 @@ from torch.distributions.categorical import Categorical
 from torch.distributions.normal import Normal
 from torch.nn import functional as F
 
-from custom_algorithms.cleansacmc.mc import MorphologicalNetworks
+from custom_algorithms.cleanppofm.forward_model import ProbabilisticSimpleForwardNet
 from utils.custom_buffer import CustomDictRolloutBuffer as DictRolloutBuffer
 from utils.custom_buffer import CustomRolloutBuffer as RolloutBuffer
 from utils.custom_wrappers import DisplayWrapper
@@ -110,7 +110,7 @@ class Agent(nn.Module):
                 forward_normal_action = action.unsqueeze(1)
             # predict selected action
             # formal_normal_action in form of tensor([[action]])
-            forward_normal, _ = fm_network(x, forward_normal_action.float())
+            forward_normal = fm_network(x, forward_normal_action.float())
 
             # TODO: put prediction of fm network into observation --> standard deviation or whole observation?
             # std describes the (un-)certainty of the prediction of each pixel
@@ -210,7 +210,7 @@ class CLEANPPOFM:
         self.max_grad_norm = max_grad_norm
 
         self.fm = fm
-        self.fm_network = MorphologicalNetworks(self.env, self.fm).to(device)
+        self.fm_network = ProbabilisticSimpleForwardNet(self.env, self.fm).to(device)
         self.fm_optimizer = torch.optim.Adam(
             self.fm_network.parameters(), lr=self.fm["learning_rate"]
         )
@@ -518,7 +518,7 @@ class CLEANPPOFM:
         if self.policy.flatten:
             observations = flatten_obs(observations)
             next_observations = flatten_obs(next_observations)
-        forward_normal, _ = self.fm_network(observations, actions.float().unsqueeze(1))
+        forward_normal = self.fm_network(observations, actions.float().unsqueeze(1))
         # log probs is the logarithm of the maximum likelihood
         # log because the deviation is easier (addition instead of multiplication)
         # negative because likelihood normally maximizes
