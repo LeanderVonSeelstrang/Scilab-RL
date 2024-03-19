@@ -115,7 +115,7 @@ class Agent(nn.Module):
             if position_predicting:
                 positions = []
                 for obs_element in x:
-                    first_index_with_one = np.where(obs_element == 1)[0][0] + 1
+                    first_index_with_one = np.where(obs_element.cpu() == 1)[0][0] + 1
                     positions.append(first_index_with_one)
                 positions = torch.tensor(positions, device=device).unsqueeze(1)
                 forward_normal = fm_network(positions, forward_normal_action.float())
@@ -544,13 +544,13 @@ class CLEANPPOFM:
             # FIXME: this is hardcoded for the moonlander env
             positions = []
             for obs_element in observations:
-                first_index_with_one = np.where(obs_element == 1)[0][0] + 1
+                first_index_with_one = np.where(obs_element.cpu() == 1)[0][0] + 1
                 positions.append(first_index_with_one)
             positions = torch.tensor(positions, device=device).unsqueeze(1)
 
             next_positions = []
             for next_obs_element in next_observations:
-                first_index_with_one = np.where(next_obs_element == 1)[0][0] + 1
+                first_index_with_one = np.where(next_obs_element.cpu() == 1)[0][0] + 1
                 next_positions.append(first_index_with_one)
             next_positions = torch.tensor(next_positions, device=device).unsqueeze(1)
 
