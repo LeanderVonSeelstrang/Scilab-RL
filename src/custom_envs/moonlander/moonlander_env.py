@@ -873,9 +873,9 @@ class MoonlanderWorldEnv(Env):
                     matrix[index, 0] = -1
                     matrix[index, -1] = -1
                     if index == 0 or index == 1 or index == 2:
-                        matrix[index, max(0, min(position - 1, 41))] = 1
-                        matrix[index, max(0, min(position, 41))] = 1
-                        matrix[index, max(0, min(position + 1, 41))] = 1
+                        matrix[index, max(1, min(position - 1, 40))] = 1
+                        matrix[index, max(1, min(position, 40))] = 1
+                        matrix[index, max(1, min(position + 1, 40))] = 1
                 forward_model_pred = matrix
             else:
                 forward_model_pred = copy.deepcopy(self.forward_model_prediction[0]).reshape(30, 42)
