@@ -438,12 +438,12 @@ class CLEANPPOFM:
                     x=self._last_obs, logger=self.logger, position_predicting=self.position_predicting)
             # FIXME: very ugly coding
             #  when display wrapper is included, one "env" more is needed
-            # if isinstance(self.env.envs[0], DisplayWrapper):
-            #     self.env.envs[0].env.env.env.env.forward_model_prediction = forward_normal.mean.cpu()
-            #     self.env.envs[0].env.env.env.env.forward_model_stddev = forward_normal.stddev.cpu()
-            # else:
-            #     self.env.envs[0].env.env.env.forward_model_prediction = forward_normal.mean.cpu()
-            #     self.env.envs[0].env.env.env.forward_model_stddev = forward_normal.stddev.cpu()
+            if isinstance(self.env.envs[0], DisplayWrapper):
+                self.env.envs[0].env.env.env.env.forward_model_prediction = forward_normal.mean.cpu()
+                self.env.envs[0].env.env.env.env.forward_model_stddev = forward_normal.stddev.cpu()
+            else:
+                self.env.envs[0].env.env.env.forward_model_prediction = forward_normal.mean.cpu()
+                self.env.envs[0].env.env.env.forward_model_stddev = forward_normal.stddev.cpu()
             actions = actions.cpu().numpy()
             log_prob_float = float(np.mean(log_probs.cpu().numpy()))
             self.logger.record("train/rollout_logprob_step", float(log_prob_float))

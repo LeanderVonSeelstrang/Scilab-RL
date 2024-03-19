@@ -863,10 +863,23 @@ class MoonlanderWorldEnv(Env):
         return self.state.flatten(), reward, self.is_done(), truncated, info
 
     def render(self):
+        # FIXME: this is hardcoded for our custom moonlander env
         if self.forward_model_prediction is not None:
-            forward_model_pred = copy.deepcopy(self.forward_model_prediction[0]).reshape(30, 42)
+            if self.forward_model_prediction.size(dim=1) == 1:
+                position = int(copy.deepcopy(self.forward_model_prediction[0][0]))
+                # build empty obs
+                matrix = np.zeros(shape=(30, 40 + 2), dtype=np.int16)
+                for index in range(30):
+                    matrix[index, 0] = -1
+                    matrix[index, -1] = -1
+                    if index == 0 or index == 1 or index == 2:
+                        matrix[index, max(0, min(position - 1, 41))] = 1
+                        matrix[index, max(0, min(position, 41))] = 1
+                        matrix[index, max(0, min(position + 1, 41))] = 1
+                forward_model_pred = matrix
+            else:
+                forward_model_pred = copy.deepcopy(self.forward_model_prediction[0]).reshape(30, 42)
             plotted_image = np.concatenate((self.state, forward_model_pred), axis=1)
-        if self.forward_model_prediction is not None:
             self.im_mb.set_data(plotted_image)
             self.fig_mb.canvas.draw()
         else:
