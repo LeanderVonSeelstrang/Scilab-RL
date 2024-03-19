@@ -457,6 +457,12 @@ class CLEANPPOFM:
                 clipped_actions = actions[0]
 
             new_obs, rewards, dones, infos = env.step(clipped_actions)
+            # reduce reward when prediction is bad
+            flatten_new_obs = new_obs
+            if isinstance(env.observation_space, spaces.Dict):
+                flatten_new_obs = flatten_obs(new_obs)
+            forward_normal = self.fm_network(flatten_new_obs, torch.from_numpy(actions))
+            rewards += forward_normal.stddev.mean().item()
             self.logger.record("train/rollout_rewards_step", float(rewards.mean()))
             self.logger.record_mean("train/rollout_rewards_mean", float(rewards.mean()))
             # this is only logged when no hyperparameter tuning is running?
