@@ -15,7 +15,8 @@ from torch.distributions.categorical import Categorical
 from torch.distributions.normal import Normal
 from torch.nn import functional as F
 
-from custom_algorithms.cleanppofm.forward_model import ProbabilisticSimpleForwardNet
+from custom_algorithms.cleanppofm.forward_model import ProbabilisticSimpleForwardNet, \
+    ProbabilisticForwardNetPositionPrediction
 from utils.custom_buffer import CustomDictRolloutBuffer as DictRolloutBuffer
 from utils.custom_buffer import CustomRolloutBuffer as RolloutBuffer
 from utils.custom_wrappers import DisplayWrapper
@@ -90,7 +91,8 @@ class Agent(nn.Module):
             x = torch.tensor(x, device=device, dtype=torch.float32).detach().clone()
         return self.critic(x)
 
-    def get_action_and_value(self, fm_network, x, action=None, deterministic=False, logger=None):
+    def get_action_and_value(self, fm_network, x, action=None, deterministic=False, logger=None,
+                             position_predicting=False):
         if self.flatten:
             x = flatten_obs(x)
         else:
@@ -110,7 +112,15 @@ class Agent(nn.Module):
                 forward_normal_action = action.unsqueeze(1)
             # predict selected action
             # formal_normal_action in form of tensor([[action]])
-            forward_normal = fm_network(x, forward_normal_action.float())
+            if position_predicting:
+                positions = []
+                for obs_element in x:
+                    first_index_with_one = np.where(obs_element == 1)[0][0] + 1
+                    positions.append(first_index_with_one)
+                positions = torch.tensor(positions, device=device).unsqueeze(1)
+                forward_normal = fm_network(positions, forward_normal_action.float())
+            else:
+                forward_normal = fm_network(x, forward_normal_action.float())
 
             # TODO: put prediction of fm network into observation --> standard deviation or whole observation?
             # std describes the (un-)certainty of the prediction of each pixel
@@ -183,7 +193,8 @@ class CLEANPPOFM:
             ent_coef: float = 0.0,
             vf_coef: float = 0.5,
             max_grad_norm: float = 0.5,
-            fm: dict = {}
+            fm: dict = {},
+            position_predicting: bool = False,
     ):
         self.num_timesteps = 0
         self.learning_rate = learning_rate
@@ -210,7 +221,11 @@ class CLEANPPOFM:
         self.max_grad_norm = max_grad_norm
 
         self.fm = fm
-        self.fm_network = ProbabilisticSimpleForwardNet(self.env, self.fm).to(device)
+        self.position_predicting = position_predicting
+        if self.position_predicting:
+            self.fm_network = ProbabilisticForwardNetPositionPrediction(self.env, self.fm).to(device)
+        else:
+            self.fm_network = ProbabilisticSimpleForwardNet(self.env, self.fm).to(device)
         self.fm_optimizer = torch.optim.Adam(
             self.fm_network.parameters(), lr=self.fm["learning_rate"]
         )
@@ -290,7 +305,7 @@ class CLEANPPOFM:
                 _, log_prob, entropy, values, _ = self.policy.get_action_and_value(fm_network=self.fm_network,
                                                                                    x=observations,
                                                                                    action=actions, logger=self.logger,
-                                                                                   )
+                                                                                   position_predicting=self.position_predicting)
                 values = values.flatten()
                 # Normalize advantage
                 advantages = rollout_data.advantages
@@ -420,15 +435,15 @@ class CLEANPPOFM:
             with torch.no_grad():
                 actions, log_probs, _, values, forward_normal = self.policy.get_action_and_value(
                     fm_network=self.fm_network,
-                    x=self._last_obs, logger=self.logger)
+                    x=self._last_obs, logger=self.logger, position_predicting=self.position_predicting)
             # FIXME: very ugly coding
             #  when display wrapper is included, one "env" more is needed
-            if isinstance(self.env.envs[0], DisplayWrapper):
-                self.env.envs[0].env.env.env.env.forward_model_prediction = forward_normal.mean.cpu()
-                self.env.envs[0].env.env.env.env.forward_model_stddev = forward_normal.stddev.cpu()
-            else:
-                self.env.envs[0].env.env.env.forward_model_prediction = forward_normal.mean.cpu()
-                self.env.envs[0].env.env.env.forward_model_stddev = forward_normal.stddev.cpu()
+            # if isinstance(self.env.envs[0], DisplayWrapper):
+            #     self.env.envs[0].env.env.env.env.forward_model_prediction = forward_normal.mean.cpu()
+            #     self.env.envs[0].env.env.env.env.forward_model_stddev = forward_normal.stddev.cpu()
+            # else:
+            #     self.env.envs[0].env.env.env.forward_model_prediction = forward_normal.mean.cpu()
+            #     self.env.envs[0].env.env.env.forward_model_stddev = forward_normal.stddev.cpu()
             actions = actions.cpu().numpy()
             log_prob_float = float(np.mean(log_probs.cpu().numpy()))
             self.logger.record("train/rollout_logprob_step", float(log_prob_float))
@@ -515,14 +530,35 @@ class CLEANPPOFM:
         return True
 
     def train_fm(self, observations, next_observations, actions):
-        if self.policy.flatten:
-            observations = flatten_obs(observations)
-            next_observations = flatten_obs(next_observations)
-        forward_normal = self.fm_network(observations, actions.float().unsqueeze(1))
-        # log probs is the logarithm of the maximum likelihood
-        # log because the deviation is easier (addition instead of multiplication)
-        # negative because likelihood normally maximizes
-        fw_loss = -forward_normal.log_prob(next_observations)
+        if not self.position_predicting:
+            if self.policy.flatten:
+                observations = flatten_obs(observations)
+                next_observations = flatten_obs(next_observations)
+            forward_normal = self.fm_network(observations, actions.float().unsqueeze(1))
+            # log probs is the logarithm of the maximum likelihood
+            # log because the deviation is easier (addition instead of multiplication)
+            # negative because likelihood normally maximizes
+            fw_loss = -forward_normal.log_prob(next_observations)
+        else:
+            # get position out of observation
+            # FIXME: this is hardcoded for the moonlander env
+            positions = []
+            for obs_element in observations:
+                first_index_with_one = np.where(obs_element == 1)[0][0] + 1
+                positions.append(first_index_with_one)
+            positions = torch.tensor(positions, device=device).unsqueeze(1)
+
+            next_positions = []
+            for next_obs_element in next_observations:
+                first_index_with_one = np.where(next_obs_element == 1)[0][0] + 1
+                next_positions.append(first_index_with_one)
+            next_positions = torch.tensor(next_positions, device=device).unsqueeze(1)
+
+            forward_normal = self.fm_network(positions, actions.float().unsqueeze(1))
+            # log probs is the logarithm of the maximum likelihood
+            # log because the deviation is easier (addition instead of multiplication)
+            # negative because likelihood normally maximizes
+            fw_loss = -forward_normal.log_prob(next_positions)
         loss = fw_loss.mean()
 
         self.logger.record("fm/fw_loss", loss.item())
@@ -541,7 +577,8 @@ class CLEANPPOFM:
             action, _, _, _, forward_normal = self.policy.get_action_and_value(fm_network=self.fm_network,
                                                                                x=observation,
                                                                                deterministic=deterministic,
-                                                                               logger=self.logger)
+                                                                               logger=self.logger,
+                                                                               position_predicting=self.position_predicting)
         return action.cpu().numpy(), state, forward_normal
 
     def save(
