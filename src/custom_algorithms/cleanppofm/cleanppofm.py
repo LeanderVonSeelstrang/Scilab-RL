@@ -534,11 +534,32 @@ class CLEANPPOFM:
             if self.policy.flatten:
                 observations = flatten_obs(observations)
                 next_observations = flatten_obs(next_observations)
+            ##### WHILE THE AGENT IS TRAINED WITH INPUT NOISE, THE FM IS TRAINED WITHOUT INPUT NOISE
+            action_to_direction = {
+                0: np.array([1, 0]),  # right
+                1: np.array([1, 1]),  # right down (diagonal)
+                2: np.array([0, 1]),  # down
+                3: np.array([-1, 1]),  # left down (diagonal)
+                4: np.array([-1, 0]),  # left
+                5: np.array([-1, -1]),  # left up
+                6: np.array([0, -1]),  # up
+                7: np.array([1, -1])  # right up
+            }
+            agent_location_without_input_noise = torch.empty(size=(observations.shape[0], 4), device=device)
+            for index, action in enumerate(actions):
+                direction = action_to_direction[int(action)]
+                # We use `np.clip` to make sure we don't leave the grid
+                standard_agent_location = np.clip(
+                    np.array(observations[index][0:2]) + direction, 0, 4
+                )
+                agent_location_without_input_noise[index] = torch.tensor(
+                    np.concatenate((standard_agent_location, observations[index][2:4])), device=device
+                )
             forward_normal = self.fm_network(observations, actions.float().unsqueeze(1))
             # log probs is the logarithm of the maximum likelihood
             # log because the deviation is easier (addition instead of multiplication)
             # negative because likelihood normally maximizes
-            fw_loss = -forward_normal.log_prob(next_observations)
+            fw_loss = -forward_normal.log_prob(agent_location_without_input_noise)
         else:
             # get position out of observation
             # FIXME: this is hardcoded for the moonlander env
