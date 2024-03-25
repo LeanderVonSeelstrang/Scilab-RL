@@ -461,8 +461,21 @@ class CLEANPPOFM:
             flatten_new_obs = new_obs
             if isinstance(env.observation_space, spaces.Dict):
                 flatten_new_obs = flatten_obs(new_obs)
-            forward_normal = self.fm_network(flatten_new_obs, torch.from_numpy(actions))
+            if not self.position_predicting:
+                forward_normal = self.fm_network(flatten_new_obs, torch.from_numpy(actions))
+            else:
+                # get position out of observation
+                # FIXME: this is hardcoded for the moonlander env
+                positions = []
+                for obs_element in new_obs:
+                    first_index_with_one = np.where(obs_element == 1)[0][0] + 1
+                    positions.append(first_index_with_one)
+                # dtype = torch.float32 because action above (torch.from_numpy(actions)) is this type
+                positions = torch.tensor(positions, device=device, dtype=torch.float32).unsqueeze(1)
+                forward_normal = self.fm_network(positions, torch.from_numpy(actions))
+
             rewards += forward_normal.stddev.mean().item()
+
             self.logger.record("train/rollout_rewards_step", float(rewards.mean()))
             self.logger.record_mean("train/rollout_rewards_mean", float(rewards.mean()))
             # this is only logged when no hyperparameter tuning is running?
