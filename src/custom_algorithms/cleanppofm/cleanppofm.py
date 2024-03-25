@@ -474,7 +474,8 @@ class CLEANPPOFM:
                 positions = torch.tensor(positions, device=device, dtype=torch.float32).unsqueeze(1)
                 forward_normal = self.fm_network(positions, torch.from_numpy(actions))
 
-            rewards += forward_normal.stddev.mean().item()
+            self.logger.record("train/rewards_without_stddev", rewards)
+            rewards -= forward_normal.stddev.mean().item() * 10
 
             self.logger.record("train/rollout_rewards_step", float(rewards.mean()))
             self.logger.record_mean("train/rollout_rewards_mean", float(rewards.mean()))
@@ -488,8 +489,8 @@ class CLEANPPOFM:
                 self.logger.record("rollout_number_of_crashed_or_collected_objects",
                                    float(infos[0]["number_of_crashed_or_collected_objects"]))
             # gridworld env
-            if "input_noise_is_applied_in_this_episode" in infos[0].keys():
-                self.logger.record("input_noise_applied", infos[0]["input_noise_is_applied_in_this_episode"])
+            if "self.input_noise_is_applied_in_this_episode" in infos[0].keys():
+                self.logger.record("input_noise_applied", infos[0]["self.input_noise_is_applied_in_this_episode"])
             # meta env
             if "dodge" in infos[0].keys():
                 self.logger.record("dodge_gaussian_reward", infos[0]["dodge"]["gaussian"])
