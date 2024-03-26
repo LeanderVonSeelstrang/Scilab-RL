@@ -1,5 +1,5 @@
 import random
-
+import math
 import gymnasium as gym
 import numpy as np
 import pygame
@@ -132,6 +132,14 @@ class GridWorldEnv(gym.Env):
             reward = -100
         else:
             reward = 1 if terminated else -1
+            if self.forward_model_prediction is not None:
+                predicted_location = np.array([round(self.forward_model_prediction.numpy()[0][0]),
+                                               round(self.forward_model_prediction.numpy()[0][1]),
+                                               round(self.forward_model_prediction.numpy()[0][2]),
+                                               round(self.forward_model_prediction.numpy()[0][3])])
+                reward -= math.sqrt(
+                    np.sum(
+                        (predicted_location - np.concatenate((self._agent_location, self._target_location))) ** 2)) * 10
         observation = self._get_obs()
         info = self._get_info()
 

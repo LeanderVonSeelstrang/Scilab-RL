@@ -481,8 +481,8 @@ class CLEANPPOFM:
             self.logger.record("train/rewards_without_stddev", rewards)
             # THIS DOESN'T WORK BECAUSE THE STDDEV IS WAY TOO LOW BECAUSE THE FM IS TRAINED WITHOUT INPUT NOISE
             # rewards -= forward_normal.stddev.mean().item() * 10
-            # calculate manually prediction error (Euclidean distance)
-            rewards -= math.sqrt(torch.sum((forward_normal.mean - flatten_new_obs) ** 2)) * 10
+            # calculate manually prediction error (Euclidean distance) --> done in environment!
+            # rewards -= math.sqrt(torch.sum((forward_normal.mean - flatten_new_obs) ** 2)) * 10
 
             self.logger.record("train/rollout_rewards_step", float(rewards.mean()))
             self.logger.record_mean("train/rollout_rewards_mean", float(rewards.mean()))
