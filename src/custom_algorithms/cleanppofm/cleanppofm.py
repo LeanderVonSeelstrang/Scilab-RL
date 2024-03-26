@@ -3,6 +3,7 @@ import pathlib
 import warnings
 from collections import deque
 from typing import Dict, Optional, Tuple, Union
+import math
 
 import numpy as np
 import torch
@@ -457,12 +458,15 @@ class CLEANPPOFM:
                 clipped_actions = actions[0]
 
             new_obs, rewards, dones, infos = env.step(clipped_actions)
+
             # reduce reward when prediction is bad
+            flatten_last_obs = self._last_obs
             flatten_new_obs = new_obs
             if isinstance(env.observation_space, spaces.Dict):
-                flatten_new_obs = flatten_obs(new_obs)
+                flatten_last_obs = flatten_obs(flatten_last_obs)
+                flatten_new_obs = flatten_obs(flatten_new_obs)
             if not self.position_predicting:
-                forward_normal = self.fm_network(flatten_new_obs, torch.from_numpy(actions))
+                forward_normal = self.fm_network(flatten_last_obs, torch.from_numpy(actions))
             else:
                 # get position out of observation
                 # FIXME: this is hardcoded for the moonlander env
@@ -475,7 +479,10 @@ class CLEANPPOFM:
                 forward_normal = self.fm_network(positions, torch.from_numpy(actions))
 
             self.logger.record("train/rewards_without_stddev", rewards)
-            rewards -= forward_normal.stddev.mean().item() * 10
+            # THIS DOESN'T WORK BECAUSE THE STDDEV IS WAY TOO LOW BECAUSE THE FM IS TRAINED WITHOUT INPUT NOISE
+            # rewards -= forward_normal.stddev.mean().item() * 10
+            # calculate manually prediction error (Euclidean distance)
+            rewards -= math.sqrt(torch.sum((forward_normal.mean - flatten_new_obs) ** 2)) * 10
 
             self.logger.record("train/rollout_rewards_step", float(rewards.mean()))
             self.logger.record_mean("train/rollout_rewards_mean", float(rewards.mean()))

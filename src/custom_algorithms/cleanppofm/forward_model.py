@@ -30,7 +30,7 @@ class ProbabilisticSimpleForwardNet(nn.Module):
         self.fw_std = nn.Linear(hidden_size, self.obs_shape)
 
     def forward(self, obs, action):
-        # foward model: p(w' | w, a)
+        # forward model: p(w' | w, a)
         hx = torch.cat([obs, action], dim=-1)
         hx = self.state_action_encoder(hx)
         hx = F.relu(hx)
