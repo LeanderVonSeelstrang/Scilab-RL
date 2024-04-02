@@ -242,25 +242,9 @@ class MetaEnv(gym.Env):
         if self.render_mode == "human":
             self.fig.canvas.draw_idle()
         elif self.render_mode == "rgb_array":
-            # read ascii text from numpy array
-            ascii_text = str(observation)
-            ascii_text = ascii_text.replace("\n", "")
-            ascii_text = ascii_text.replace("   ", "  ")
-            ascii_text = ascii_text.replace("  ", " ")
-            ascii_text = ascii_text.replace("]", "]\n")
-
-            # Create a new Image
-            # make sure the dimensions (W and H) are big enough for the ascii art
-            W, H = (1100, 500)
-            im = Image.new("RGBA", (W, H), "white")
-
-            # Draw text to image
-            draw = ImageDraw.Draw(im)
-            _, _, w, h = draw.textbbox((0, 0), ascii_text)
-            # draws the text
-            draw.text(((W - w) / 2, (H - h) / 2), ascii_text, fill="black")
-
-            return np.array(im)
+            self.fig.canvas.draw()
+            return np.frombuffer(self.fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(
+                self.fig.canvas.get_width_height()[::-1] + (3,))
 
     def reset(self, seed=None, options=None):
         self.state_of_dodge_asteroids, _ = self.dodge_asteroids.reset()
