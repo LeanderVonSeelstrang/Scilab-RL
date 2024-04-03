@@ -131,7 +131,9 @@ class GridWorldEnv(gym.Env):
                                                                       np.array([4, 1])):
             reward = -100
         else:
-            reward = 1 if terminated else -1
+            # much higher reward when reaching the target
+            # otherwise does the agent learn to stay at the starting position, because stddev is low (no input noise)
+            reward = 100 if terminated else -1
             if self.forward_model_prediction is not None:
                 reward -= self.forward_model_stddev.mean().item() * 10
             #     predicted_location = np.array([round(self.forward_model_prediction.numpy()[0][0]),
