@@ -12,7 +12,6 @@ import custom_envs.moonlander.helper_functions as hlp
 import cv2
 import numpy as np
 import yaml
-from PIL import Image, ImageDraw
 from gymnasium import Env
 from gymnasium import spaces
 from matplotlib import pyplot as plt
@@ -108,6 +107,11 @@ class MoonlanderWorldEnv(Env):
         else:
             self.no_crashes = False
 
+        if "funnel_ranges" in config["world"]:
+            self.funnel_ranges = config["world"]["funnel_ranges"]
+        else:
+            self.funnel_ranges = True
+
         # Actions we can take: left, stay, right
         self.action_space = spaces.Discrete(3)
 
@@ -165,6 +169,7 @@ class MoonlanderWorldEnv(Env):
             use_variable_drift_intensity=drift_config["variable_intensity"],
             invisible_drift_probability=drift_config["invisible_drift_probability"],
             fake_drift_probability=drift_config["fake_drift_probability"],
+            funnel_range=self.funnel_ranges,
         )
 
         drift_at_whole_level = drift_config["drift_at_whole_level"]
@@ -557,8 +562,8 @@ class MoonlanderWorldEnv(Env):
         blurred_state[blurred_state == -1] = 255
 
         range_of_agent = range(
-            -(math.floor(self.config["agent"]["size"] / 2)),
-            (math.floor(self.config["agent"]["size"] / 2)) + 1,
+            -(self.config["agent"]["size"] - 1),
+            self.config["agent"]["size"]
         )
 
         if len(collected_objects) > 0:
@@ -646,20 +651,80 @@ class MoonlanderWorldEnv(Env):
             current_reward_gaussian += abs(value - 255)
         # normalize reward
         if self.config["world"]["objects"]["type"] == "coin":
-            # the reward when no coin is near is 128*9=1152 for a 2-sized agent --> this should be 0
-            # the lowest reward possible when collecting a coin for is 1275 a 2-sized agent --> this should be 500
-            # the function for this is: f(x) = 0.246x + 1152
+            # agent size 1 (1x1)
+            # reward when no coin is near: 128 --> should be 0
+            # lowest reward possible when collecting a coin: 146 --> should be 500
+            if self.config["agent"]["size"] == 1:
+                normalized_reward = ((current_reward_gaussian - 128) / 0.036) / 10
+            # agent size 2 (3x3)
+            # reward when no coin is near: 128*9=1152 --> should be 0
+            # lowest reward possible when collecting a coin: 1309 --> should be 500
+            # the function for this is: f(x) = 0.314x + 1152
             # we calculate the corresponding normalized reward x for the current reward f(x)
             # for reward of 10 when no coin is near:
-            # normalized_reward = (reward - 1149.5) / 0.25
-            normalized_reward = ((current_reward_gaussian - 1152) / 0.246) / 10
+            # normalized_reward = ((reward - 1152) / 0.314)/10
+            elif self.config["agent"]["size"] == 2:
+                normalized_reward = ((current_reward_gaussian - 1152) / 0.314) / 10
+            # agent size 3 (5x5)
+            # reward when no coin is near: 3200 -->  shouldbe 0
+            # lowest reward possible when collecting a coin: 3373 --> should be 500
+            elif self.config["agent"]["size"] == 3:
+                normalized_reward = ((current_reward_gaussian - 3200) / 0.346) / 10
+            # agent size 4 (7x7)
+            # reward when no coin is near: 6272 --> should be 0
+            # lowest reward possible when collecting a coin: 6445 --> should be 500
+            elif self.config["agent"]["size"] == 4:
+                normalized_reward = ((current_reward_gaussian - 6272) / 0.346) / 10
+            # agent size 5 (9x9)
+            # reward when no coin is near: 10368 --> should be 0
+            # lowest reward possible when collecting a coin: 10541 --> should be 500
+            elif self.config["agent"]["size"] == 5:
+                normalized_reward = ((current_reward_gaussian - 10368) / 0.346) / 10
+            # other sizes:
+            # when an agent "collides" with the coin on just one corner the reward is always 127, 126, 126, 124,
+            #                                                                                126, 124, 121, 116,
+            #                                                                                126, 121, 111, 98,
+            #                                                                                124, 116, 98, 75
+            # in the colliding corner, while the other values in the agent position are 127
+            else:
+                agent_size = self.config["agent"]["size"]
+                reward_no_coin = agent_size * 128  # reward when no coin is near
+                normalized_reward = ((current_reward_gaussian - reward_no_coin) / 0.346) / 10
         else:
+            # agent size 1 (1x1)
+            # biggest reward possible when near an obstacle: 231 --> should be 0
+            # biggest reward possible when not near an obstacle: 255 --> should be 10
+            if self.config["agent"]["size"] == 1:
+                normalized_reward = (current_reward_gaussian - 231) / 2.4
+            # agent size 2 (3x3)
             # we want the same distance as before 10 for successful step, 0 if near an obstacle (obstacle task)
-            # the biggest reward possible when near an obstacle is 2219 for a 2-sized agent --> this should be 0
-            # the highest reward possible when not near an obstacle is 255 for a 2-sized agent --> this should be 10
+            # the biggest reward possible when near an obstacle is 2219 --> this should be 0
+            # the highest reward possible when not near an obstacle is 255*9=2295 --> this should be 10
             # the function for this is: f(x) = 7.6x + 2219
             # we calculate the corresponding normalized reward x for the current reward f(x)
-            normalized_reward = (current_reward_gaussian - 2219) / 7.6
+            elif self.config["agent"]["size"] == 2:
+                normalized_reward = (current_reward_gaussian - 2219) / 7.6
+            # agent size 3 (5x5)
+            # biggest reward possible when near an obstacle: 6303 --> should be 0
+            # biggest reward possible when not near an obstacle: 255*25=6375 --> should be 10
+            elif self.config["agent"]["size"] == 3:
+                normalized_reward = (current_reward_gaussian - 6303) / 7.2
+            # agent size 4 (7x7)
+            # biggest reward possible when near an obstacle: 12423 --> should be 0
+            # biggest reward possible when not near an obstacle: 255*49=12495 --> should be 10
+            elif self.config["agent"]["size"] == 4:
+                normalized_reward = (current_reward_gaussian - 12423) / 7.2
+            # agent size 5 (9x9)
+            # biggest reward possible when near an obstacle: 20583 --> should be 0
+            # biggest reward possible when not near an obstacle: 255*81=20655 --> should be 10
+            elif self.config["agent"]["size"] == 5:
+                normalized_reward = (current_reward_gaussian - 20583) / 7.2
+            # other sizes
+            else:
+                agent_size = self.config["agent"]["size"]
+                agent_size_matrix = (agent_size * 2 - 1) * (agent_size * 2 - 1)  # e.g. agent size = 4 --> 7x7=49
+                smallest_reward_obstacle = 2223 + (agent_size_matrix - 9) * 255  # reward when near an obstacle
+                normalized_reward = (current_reward_gaussian - smallest_reward_obstacle) / 7.2
         self.gaussian_reward_info_per_step = int(normalized_reward)
         return int(normalized_reward)
 
@@ -931,7 +996,7 @@ class MoonlanderWorldEnv(Env):
             use_variable_drift_intensity=drift_config["variable_intensity"],
             invisible_drift_probability=drift_config["invisible_drift_probability"],
             fake_drift_probability=drift_config["fake_drift_probability"],
-            funnel_range=False
+            funnel_range=self.funnel_ranges,
         )
         drift_at_whole_level = drift_config["drift_at_whole_level"]
         if drift_at_whole_level == "ranges":
