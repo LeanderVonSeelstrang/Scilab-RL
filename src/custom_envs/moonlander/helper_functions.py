@@ -15,6 +15,7 @@ def create_ranges_of_objects_funnels_and_drifts(
         use_variable_drift_intensity: bool = False,
         invisible_drift_probability: float = 0.0,
         fake_drift_probability: float = 0.0,
+        funnel_range: bool = True,
 ) -> Tuple[List[List[int]], List[List[int]], List[List[int]]]:
     """
     creates a list of ranges where objects occur
@@ -32,6 +33,7 @@ def create_ranges_of_objects_funnels_and_drifts(
         invisible_drift_probability: The probability with which drifts should be marked as invisible to the agent.
         fake_drift_probability: Probability of a given drift being fake (displayed but zero intensity). The sum with
                         invisible_drift_probability must be <= 1.
+        funnel_range: Whether to create funnel ranges
     Returns:
         list of dicts of objects, list of free ranges, list of drifts
     """
@@ -59,84 +61,91 @@ def create_ranges_of_objects_funnels_and_drifts(
             'is not defined. Please use a leveldifficulty out of ["no", "easy", "middle", "hard"]',
         )
 
-    # divide world in four parts --> 1. funnel, 1. obstacles phase , 2. funnel, 2. obstacles phase
-    section_length = y_height_without_padding_area / 4
+    if funnel_range:
+        # divide world in four parts --> 1. funnel, 1. obstacles phase , 2. funnel, 2. obstacles phase
+        section_length = y_height_without_padding_area / 4
 
-    # we define the minimum x width as two times the agent size + two additional spaces
-    # the funnel can not be more tight than this in the middle of the funnel
-    minimum_x_width = 2 * agent_size + 2
+        # we define the minimum x width as two times the agent size + two additional spaces
+        # the funnel can not be more tight than this in the middle of the funnel
+        minimum_x_width = 2 * agent_size + 2
 
-    # these are the maximum number of y values (range) the funnel can have without getting too tight
-    # for example, we have a x width of size 9 and an agent size of 1, then the minimum_x_width is 4
-    # this means the funnels range only has to be up to 5 because it cannot tight the funnel more
-    # than in the 3 spaces building up and 2 building down
-    # 1  2  3  4  5  6  7  8  9
-    # -1 0  0  0  0  0  0  0 -1
-    # -1 -1 0  0  0  0  0 -1 -1
-    # -1 -1 0  0  0  0  0 -1 -1
-    # -1 -1 -1 0  0  0 -1 -1 -1
-    # -1 0  0  0  0  0  0  0 -1
-    # it is not possible to make the funnel more tight than this
-    maximum_needed_range_for_funnel = world_x_width - minimum_x_width
+        # these are the maximum number of y values (range) the funnel can have without getting too tight
+        # for example, we have a x width of size 9 and an agent size of 1, then the minimum_x_width is 4
+        # this means the funnels range only has to be up to 5 because it cannot tight the funnel more
+        # than in the 3 spaces building up and 2 building down
+        # 1  2  3  4  5  6  7  8  9
+        # -1 0  0  0  0  0  0  0 -1
+        # -1 -1 0  0  0  0  0 -1 -1
+        # -1 -1 0  0  0  0  0 -1 -1
+        # -1 -1 -1 0  0  0 -1 -1 -1
+        # -1 0  0  0  0  0  0  0 -1
+        # it is not possible to make the funnel more tight than this
+        maximum_needed_range_for_funnel = world_x_width - minimum_x_width
 
-    # when the range of the funnel for getting to the tightest point is too big for fitting into the world
-    # then just divide the world into 4 equal parts
-    # for the example above, all y height without starting area that is below or equal to 20 will
-    # divide the world into 4 equal parts, because each part is less or equal to 5 (which is the maximum needed range)
-    # but if the world is bigger than 20, then the world will be divided into 4 parts but the range of the funnel parts
-    # is only 5 because it doesn't need to be longer
-    if maximum_needed_range_for_funnel >= section_length:
-        ### OBJECTS
-        object_range_list = [
-            [
-                section_length + 1,
-                section_length * 2,
-            ],
-            [
-                section_length * 3 + 1,
-                y_height_without_padding_area,
-            ],
-        ]
-        ### WALLS
-        free_range_list = [
-            [1, section_length],
-            [
-                section_length * 2 + 1,
-                section_length * 3,
-            ],
-        ]
-    # but when the funnel can get to the tightest point
-    # then we want to make sure that the range of the funnel is only that long how it needs to be
+        # when the range of the funnel for getting to the tightest point is too big for fitting into the world
+        # then just divide the world into 4 equal parts
+        # for the example above, all y height without starting area that is below or equal to 20 will
+        # divide the world into 4 equal parts, because each part is less or equal to 5 (which is the maximum needed range)
+        # but if the world is bigger than 20, then the world will be divided into 4 parts but the range of the funnel parts
+        # is only 5 because it doesn't need to be longer
+        if maximum_needed_range_for_funnel >= section_length:
+            ### OBJECTS
+            object_range_list = [
+                [
+                    section_length + 1,
+                    section_length * 2,
+                ],
+                [
+                    section_length * 3 + 1,
+                    y_height_without_padding_area,
+                ],
+            ]
+            ### WALLS
+            free_range_list = [
+                [1, section_length],
+                [
+                    section_length * 2 + 1,
+                    section_length * 3,
+                ],
+            ]
+        # but when the funnel can get to the tightest point
+        # then we want to make sure that the range of the funnel is only that long how it needs to be
+        else:
+            # If the funnel section is longer than the funnel needs, the obstacle range gets extended into
+            # the empty space.
+            # the remaining part of the world can be used for the obstacles phase
+            # we need two times the funnel (2*maximum_needed_range_for_funnel)
+            # the remaining is for obstacles (y_height_without_starting_area - 2*maximum_needed_range_for_funnel)
+            # we divide this by 2 because we have two phases of obstacles
+            remaining_range_for_objects = int(
+                (y_height_without_padding_area - (2 * maximum_needed_range_for_funnel)) / 2
+            )
+
+            ### OBJECTS
+            object_range_list = [
+                [
+                    maximum_needed_range_for_funnel + 1,
+                    maximum_needed_range_for_funnel + remaining_range_for_objects,
+                ],
+                [
+                    (2 * maximum_needed_range_for_funnel) + remaining_range_for_objects + 1,
+                    y_height_without_padding_area,
+                ],
+            ]
+            ### WALLS
+            free_range_list = [
+                [1, maximum_needed_range_for_funnel],
+                [
+                    maximum_needed_range_for_funnel + remaining_range_for_objects + 1,
+                    (2 * maximum_needed_range_for_funnel) + remaining_range_for_objects,
+                ],
+            ]
     else:
-        # If the funnel section is longer than the funnel needs, the obstacle range gets extended into
-        # the empty space.
-        # the remaining part of the world can be used for the obstacles phase
-        # we need two times the funnel (2*maximum_needed_range_for_funnel)
-        # the remaining is for obstacles (y_height_without_starting_area - 2*maximum_needed_range_for_funnel)
-        # we divide this by 2 because we have two phases of obstacles
-        remaining_range_for_objects = int(
-            (y_height_without_padding_area - (2 * maximum_needed_range_for_funnel)) / 2
-        )
-
-        ### OBJECTS
+        # If there are no funnels, objects can be placed everywhere
         object_range_list = [
-            [
-                maximum_needed_range_for_funnel + 1,
-                maximum_needed_range_for_funnel + remaining_range_for_objects,
-            ],
-            [
-                (2 * maximum_needed_range_for_funnel) + remaining_range_for_objects + 1,
-                y_height_without_padding_area,
-            ],
+            [agent_size * 3, y_height_without_padding_area],
         ]
-        ### WALLS
-        free_range_list = [
-            [1, maximum_needed_range_for_funnel],
-            [
-                maximum_needed_range_for_funnel + remaining_range_for_objects + 1,
-                (2 * maximum_needed_range_for_funnel) + remaining_range_for_objects,
-            ],
-        ]
+        free_range_list = []
 
     ### DRIFT
     drift_range_list = create_drift_ranges(

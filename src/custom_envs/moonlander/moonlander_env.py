@@ -868,17 +868,17 @@ class MoonlanderWorldEnv(Env):
             if self.forward_model_prediction.size(dim=1) == 1:
                 position = int(copy.deepcopy(self.forward_model_prediction[0][0]))
                 # build empty obs
-                matrix = np.zeros(shape=(30, 40 + 2), dtype=np.int16)
-                for index in range(30):
+                matrix = np.zeros(shape=(10, 10 + 2), dtype=np.int16)
+                for index in range(10):
                     matrix[index, 0] = -1
                     matrix[index, -1] = -1
                     if index == 0 or index == 1 or index == 2:
-                        matrix[index, max(1, min(position - 1, 40))] = 1
-                        matrix[index, max(1, min(position, 40))] = 1
-                        matrix[index, max(1, min(position + 1, 40))] = 1
+                        matrix[index, max(1, min(position - 1, 10))] = 1
+                        matrix[index, max(1, min(position, 10))] = 1
+                        matrix[index, max(1, min(position + 1, 10))] = 1
                 forward_model_pred = matrix
             else:
-                forward_model_pred = copy.deepcopy(self.forward_model_prediction[0]).reshape(30, 42)
+                forward_model_pred = copy.deepcopy(self.forward_model_prediction[0]).reshape(10, 12)
             plotted_image = np.concatenate((self.state, forward_model_pred), axis=1)
             self.im_mb.set_data(plotted_image)
             self.fig_mb.canvas.draw()
@@ -931,6 +931,7 @@ class MoonlanderWorldEnv(Env):
             use_variable_drift_intensity=drift_config["variable_intensity"],
             invisible_drift_probability=drift_config["invisible_drift_probability"],
             fake_drift_probability=drift_config["fake_drift_probability"],
+            funnel_range=False
         )
         drift_at_whole_level = drift_config["drift_at_whole_level"]
         if drift_at_whole_level == "ranges":

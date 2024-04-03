@@ -1,9 +1,9 @@
 world:
   # Dimensions of the world (width excludes walls)
-  x_width: 40
-  y_height: 500
+  x_width: 10
+  y_height: 100
   # Difficulty (empty, easy, middle, hard) scaling the number of objects and drifts
-  difficulty: easy
+  difficulty: hard
   drift:
     # Length of a drift range
     length: 15
@@ -31,9 +31,9 @@ agent:
   # Size of the agent. A size of 1 corresponds to the agent taking up one cell,
   # a size of 2 corresponds to the agent taking up a 3x3 square, etc.
   # Note: Size also affects objects
-  size: 2
+  size: 1
   # Number of cells that the observation contains
-  observation_height: 30
+  observation_height: 10
   # Fixed initial position for testing
   initial_x_position:
 
