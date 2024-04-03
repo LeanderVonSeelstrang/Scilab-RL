@@ -466,7 +466,7 @@ class CLEANPPOFM:
                 flatten_last_obs = flatten_obs(flatten_last_obs)
                 flatten_new_obs = flatten_obs(flatten_new_obs)
             if not self.position_predicting:
-                forward_normal = self.fm_network(flatten_last_obs, torch.from_numpy(actions))
+                forward_normal = self.fm_network(flatten_last_obs, torch.from_numpy(actions).to(device))
             else:
                 # get position out of observation
                 # FIXME: this is hardcoded for the moonlander env
@@ -577,10 +577,10 @@ class CLEANPPOFM:
                 direction = action_to_direction[int(action)]
                 # We use `np.clip` to make sure we don't leave the grid
                 standard_agent_location = np.clip(
-                    np.array(observations[index][0:2]) + direction, 0, 4
+                    np.array(observations[index][0:2].cpu()) + direction, 0, 4
                 )
                 agent_location_without_input_noise[index] = torch.tensor(
-                    np.concatenate((standard_agent_location, observations[index][2:4])), device=device
+                    np.concatenate((standard_agent_location, observations[index][2:4].cpu())), device=device
                 )
             forward_normal = self.fm_network(observations, actions.float().unsqueeze(1))
             # log probs is the logarithm of the maximum likelihood
