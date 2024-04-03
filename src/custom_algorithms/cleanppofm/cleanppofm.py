@@ -559,20 +559,19 @@ class CLEANPPOFM:
         return True
 
     def train_fm(self, observations, next_observations, actions):
-        if self.fm_trained_with_input_noise:
+        # gridworld
+        if not self.position_predicting:
             if self.policy.flatten:
                 observations = flatten_obs(observations)
                 next_observations = flatten_obs(next_observations)
-            forward_normal = self.fm_network(observations, actions.float().unsqueeze(1))
-            # log probs is the logarithm of the maximum likelihood
-            # log because the deviation is easier (addition instead of multiplication)
-            # negative because likelihood normally maximizes
-            fw_loss = -forward_normal.log_prob(next_observations)
-        else:
-            if not self.position_predicting:
-                if self.policy.flatten:
-                    observations = flatten_obs(observations)
-                    next_observations = flatten_obs(next_observations)
+            if self.fm_trained_with_input_noise:
+                forward_normal = self.fm_network(observations, actions.float().unsqueeze(1))
+                # log probs is the logarithm of the maximum likelihood
+                # log because the deviation is easier (addition instead of multiplication)
+                # negative because likelihood normally maximizes
+                fw_loss = -forward_normal.log_prob(next_observations)
+            else:
+                # FIXME: this is hardcoded for the gridworld env
                 ##### WHILE THE AGENT IS TRAINED WITH INPUT NOISE, THE FM IS TRAINED WITHOUT INPUT NOISE
                 action_to_direction = {
                     0: np.array([1, 0]),  # right
@@ -599,26 +598,27 @@ class CLEANPPOFM:
                 # log because the deviation is easier (addition instead of multiplication)
                 # negative because likelihood normally maximizes
                 fw_loss = -forward_normal.log_prob(agent_location_without_input_noise)
-            else:
-                # get position out of observation
-                # FIXME: this is hardcoded for the moonlander env
-                positions = []
-                for obs_element in observations:
-                    first_index_with_one = np.where(obs_element.cpu() == 1)[0][0] + 1
-                    positions.append(first_index_with_one)
-                positions = torch.tensor(positions, device=device).unsqueeze(1)
+        # moonlander
+        else:
+            # get position out of observation
+            # FIXME: this is hardcoded for the moonlander env
+            positions = []
+            for obs_element in observations:
+                first_index_with_one = np.where(obs_element.cpu() == 1)[0][0] + 1
+                positions.append(first_index_with_one)
+            positions = torch.tensor(positions, device=device).unsqueeze(1)
 
-                next_positions = []
-                for next_obs_element in next_observations:
-                    first_index_with_one = np.where(next_obs_element.cpu() == 1)[0][0] + 1
-                    next_positions.append(first_index_with_one)
-                next_positions = torch.tensor(next_positions, device=device).unsqueeze(1)
+            next_positions = []
+            for next_obs_element in next_observations:
+                first_index_with_one = np.where(next_obs_element.cpu() == 1)[0][0] + 1
+                next_positions.append(first_index_with_one)
+            next_positions = torch.tensor(next_positions, device=device).unsqueeze(1)
 
-                forward_normal = self.fm_network(positions, actions.float().unsqueeze(1))
-                # log probs is the logarithm of the maximum likelihood
-                # log because the deviation is easier (addition instead of multiplication)
-                # negative because likelihood normally maximizes
-                fw_loss = -forward_normal.log_prob(next_positions)
+            forward_normal = self.fm_network(positions, actions.float().unsqueeze(1))
+            # log probs is the logarithm of the maximum likelihood
+            # log because the deviation is easier (addition instead of multiplication)
+            # negative because likelihood normally maximizes
+            fw_loss = -forward_normal.log_prob(next_positions)
         loss = fw_loss.mean()
 
         self.logger.record("fm/fw_loss", loss.item())
