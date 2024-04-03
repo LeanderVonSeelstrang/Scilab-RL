@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # We first test all the algorithms and then test a selection of environments
 
+export OMP_NUM_THREADS=1
 # change into git root directory
 cd $(git rev-parse --show-toplevel)
 
@@ -48,6 +49,8 @@ test_envs() {
   # ADD NEW ENVIRONMENTS HERE.
   # Don't forget to add a comma at the end of each environment name except for the last environment name.
   ENVS+="parking-limited-v0,"
+  ENVS+="PointGym-sparse-0.5-small_open_dgr-c1-rt0-s500-v0,"
+  ENVS+="AntGym-sparse-10-0.5-small_open_dgr-c1-rt0-s700-v0,"
   ENVS+="MetaW-peg-insert-side-v2-sparse"
 
   echo "Smoke-testing environments $ENVS"
