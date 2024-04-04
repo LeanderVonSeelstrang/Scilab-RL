@@ -235,21 +235,7 @@ class MoonlanderWorldEnv(Env):
         )
 
         self.update_observation()
-        # for rendering
-        # FIXME: this opens windows even if display is none because during initialisation render_mode is always none
-        #  independently of the actual render mode later
-        plt.ion()
-        self.fig, self.ax = plt.subplots()
-        eximg = np.zeros((self.state.shape))
-        eximg[0] = -10
-        eximg[1] = 3
-        self.im = self.ax.imshow(eximg)
-        # or model-based rendering
-        self.fig_mb, self.ax_mb = plt.subplots()
-        eximg_mb = np.zeros((self.state.shape[0], self.state.shape[1] * 2))
-        eximg_mb[0] = -10
-        eximg_mb[1] = 3
-        self.im_mb = self.ax_mb.imshow(eximg_mb)
+        self.rendering_first_time = True
 
         # INITIAL STATE
         self.observation_space = spaces.Box(
@@ -928,6 +914,22 @@ class MoonlanderWorldEnv(Env):
         return self.state.flatten(), reward, self.is_done(), truncated, info
 
     def render(self):
+        if self.rendering_first_time:
+            plt.ion()
+            if self.forward_model_prediction is None:
+                self.fig, self.ax = plt.subplots()
+                eximg = np.zeros((self.state.shape))
+                eximg[0] = -10
+                eximg[1] = 3
+                self.im = self.ax.imshow(eximg)
+            # or model-based rendering
+            else:
+                self.fig_mb, self.ax_mb = plt.subplots()
+                eximg_mb = np.zeros((self.state.shape[0], self.state.shape[1] * 2))
+                eximg_mb[0] = -10
+                eximg_mb[1] = 3
+                self.im_mb = self.ax_mb.imshow(eximg_mb)
+            self.rendering_first_time = False
         # FIXME: this is hardcoded for our custom moonlander env
         if self.forward_model_prediction is not None:
             if self.forward_model_prediction.size(dim=1) == 1:
@@ -937,10 +939,8 @@ class MoonlanderWorldEnv(Env):
                 for index in range(10):
                     matrix[index, 0] = -1
                     matrix[index, -1] = -1
-                    if index == 0 or index == 1 or index == 2:
-                        matrix[index, max(1, min(position - 1, 10))] = 1
+                    if index == 0:
                         matrix[index, max(1, min(position, 10))] = 1
-                        matrix[index, max(1, min(position + 1, 10))] = 1
                 forward_model_pred = matrix
             else:
                 forward_model_pred = copy.deepcopy(self.forward_model_prediction[0]).reshape(10, 12)
@@ -1042,6 +1042,7 @@ class MoonlanderWorldEnv(Env):
         )
 
         self.update_observation()
+        self.rendering_first_time = True
 
         # save all x and y positions of the agent + action
         self.positions_and_action = [
