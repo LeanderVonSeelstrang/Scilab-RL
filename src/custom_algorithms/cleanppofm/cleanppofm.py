@@ -468,7 +468,8 @@ class CLEANPPOFM:
                 flatten_last_obs = flatten_obs(flatten_last_obs)
                 flatten_new_obs = flatten_obs(flatten_new_obs)
             if not self.position_predicting:
-                forward_normal = self.fm_network(flatten_last_obs, torch.from_numpy(actions).to(device))
+                forward_normal = self.fm_network(torch.from_numpy(flatten_last_obs).to(device),
+                                                 torch.from_numpy(actions).to(device))
             else:
                 # get position out of observation
                 # FIXME: this is hardcoded for the moonlander env
