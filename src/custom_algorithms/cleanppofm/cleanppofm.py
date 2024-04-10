@@ -32,22 +32,24 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
 
 
 def flatten_obs(obs):
-    if "agent" in obs and "target" in obs:
-        agent, target = obs['agent'], obs['target']
-        if isinstance(agent, np.ndarray):
-            agent = torch.from_numpy(agent).to(device)
-        if isinstance(target, np.ndarray):
-            target = torch.from_numpy(target).to(device)
-        return torch.cat([agent, target], dim=1).to(dtype=torch.float32).detach().clone()
-    elif "observation" in obs and "achieved_goal" in obs and "desired_goal" in obs:
-        observation, ag, dg = obs["observation"], obs["achieved_goal"], obs["desired_goal"]
-        if isinstance(observation, np.ndarray):
-            observation = torch.from_numpy(observation).to(device)
-        if isinstance(ag, np.ndarray):
-            ag = torch.from_numpy(ag).to(device)
-        if isinstance(dg, np.ndarray):
-            dg = torch.from_numpy(dg).to(device)
-        return torch.cat([observation, ag, dg], dim=1).to(dtype=torch.float32)
+    # tensor can not check for string ("agent" in obs)
+    if isinstance(obs, dict):
+        if "agent" in obs and "target" in obs:
+            agent, target = obs['agent'], obs['target']
+            if isinstance(agent, np.ndarray):
+                agent = torch.from_numpy(agent).to(device)
+            if isinstance(target, np.ndarray):
+                target = torch.from_numpy(target).to(device)
+            return torch.cat([agent, target], dim=1).to(dtype=torch.float32).detach().clone()
+        elif "observation" in obs and "achieved_goal" in obs and "desired_goal" in obs:
+            observation, ag, dg = obs["observation"], obs["achieved_goal"], obs["desired_goal"]
+            if isinstance(observation, np.ndarray):
+                observation = torch.from_numpy(observation).to(device)
+            if isinstance(ag, np.ndarray):
+                ag = torch.from_numpy(ag).to(device)
+            if isinstance(dg, np.ndarray):
+                dg = torch.from_numpy(dg).to(device)
+            return torch.cat([observation, ag, dg], dim=1).to(dtype=torch.float32)
     # RGB image
     else:
         return torch.tensor(obs, device=device, dtype=torch.float32).flatten(start_dim=1).detach().clone()
