@@ -62,8 +62,11 @@ class Agent(nn.Module):
         else:
             obs_shape = np.array(env.observation_space.shape).prod()
             # RGB image
-            if env.observation_space.shape[2] == 3:
-                self.flatten = True
+            if len(env.observation_space.shape) >= 3:
+                if env.observation_space.shape[2] == 3:
+                    self.flatten = True
+                else:
+                    self.flatten = False
             else:
                 self.flatten = False
 
@@ -471,9 +474,13 @@ class CLEANPPOFM:
             # reduce reward when prediction is bad
             flatten_last_obs = self._last_obs
             flatten_new_obs = new_obs
-            if isinstance(env.observation_space, spaces.Dict) or env.observation_space.shape[2] == 3:
+            if isinstance(env.observation_space, spaces.Dict):
                 flatten_last_obs = flatten_obs(flatten_last_obs)
                 flatten_new_obs = flatten_obs(flatten_new_obs)
+            elif len(env.observation_space.shape) >= 3:
+                if env.observation_space.shape[2] == 3:
+                    flatten_last_obs = flatten_obs(flatten_last_obs)
+                    flatten_new_obs = flatten_obs(flatten_new_obs)
             else:
                 flatten_last_obs = torch.from_numpy(flatten_last_obs)
                 flatten_new_obs = torch.from_numpy(flatten_new_obs)
