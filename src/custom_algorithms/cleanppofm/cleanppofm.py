@@ -39,7 +39,7 @@ def flatten_obs(obs):
         if isinstance(target, np.ndarray):
             target = torch.from_numpy(target).to(device)
         return torch.cat([agent, target], dim=1).to(dtype=torch.float32).detach().clone()
-    else:
+    elif "observation" in obs and "achieved_goal" in obs and "desired_goal" in obs:
         observation, ag, dg = obs["observation"], obs["achieved_goal"], obs["desired_goal"]
         if isinstance(observation, np.ndarray):
             observation = torch.from_numpy(observation).to(device)
@@ -48,6 +48,9 @@ def flatten_obs(obs):
         if isinstance(dg, np.ndarray):
             dg = torch.from_numpy(dg).to(device)
         return torch.cat([observation, ag, dg], dim=1).to(dtype=torch.float32)
+    # RGB image
+    else:
+        return torch.tensor(obs, device=device, dtype=torch.float32).flatten(start_dim=1).detach().clone()
 
 
 class Agent(nn.Module):
@@ -58,7 +61,11 @@ class Agent(nn.Module):
             self.flatten = True
         else:
             obs_shape = np.array(env.observation_space.shape).prod()
-            self.flatten = False
+            # RGB image
+            if env.observation_space.shape[2] == 3:
+                self.flatten = True
+            else:
+                self.flatten = False
 
         if isinstance(env.action_space, spaces.Discrete):
             action_shape = env.action_space.n
@@ -464,12 +471,14 @@ class CLEANPPOFM:
             # reduce reward when prediction is bad
             flatten_last_obs = self._last_obs
             flatten_new_obs = new_obs
-            if isinstance(env.observation_space, spaces.Dict):
+            if isinstance(env.observation_space, spaces.Dict) or env.observation_space.shape[2] == 3:
                 flatten_last_obs = flatten_obs(flatten_last_obs)
                 flatten_new_obs = flatten_obs(flatten_new_obs)
+            else:
+                flatten_last_obs = torch.from_numpy(flatten_last_obs)
+                flatten_new_obs = torch.from_numpy(flatten_new_obs)
             if not self.position_predicting:
-                forward_normal = self.fm_network(torch.from_numpy(flatten_last_obs).to(device),
-                                                 torch.from_numpy(actions).to(device))
+                forward_normal = self.fm_network(flatten_last_obs.to(device), torch.from_numpy(actions).to(device))
             else:
                 # get position out of observation
                 # FIXME: this is hardcoded for the moonlander env
@@ -529,8 +538,11 @@ class CLEANPPOFM:
                 ):
                     terminal_obs = infos[idx]["terminal_observation"]
                     with torch.no_grad():
-                        terminal_obs["agent"] = np.expand_dims(terminal_obs["agent"], axis=0)
-                        terminal_obs["target"] = np.expand_dims(terminal_obs["target"], axis=0)
+                        if "agent" in terminal_obs and "target" in terminal_obs:
+                            terminal_obs["agent"] = np.expand_dims(terminal_obs["agent"], axis=0)
+                            terminal_obs["target"] = np.expand_dims(terminal_obs["target"], axis=0)
+                        else:
+                            terminal_obs = np.expand_dims(terminal_obs, axis=0)
                         terminal_value = self.policy.get_value(terminal_obs)[0]
                     rewards[idx] += self.gamma * terminal_value
 

@@ -18,7 +18,7 @@ class ProbabilisticSimpleForwardNet(nn.Module):
                 [obs_space.shape for obs_space in env.observation_space.spaces.values()]
             )
         else:
-            self.obs_shape = np.sum(env.observation_space.shape)
+            self.obs_shape = np.prod(env.observation_space.shape)
         self.action_shape = int(np.prod(env.action_space.shape))
 
         self.state_action_encoder = nn.Sequential(
