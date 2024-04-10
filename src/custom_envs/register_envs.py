@@ -200,6 +200,10 @@ def register_custom_envs():
              kwargs={'scene_of_input_noise': True},
              max_episode_steps=10)
 
+    register(id="MetaLunarLanderEnv-v0",
+             entry_point="custom_envs.meta_lunar_lander.meta_lunar_lander_env:MetaLunarLanderEnv",
+             max_episode_steps=1000)
+
     for n_objects in range(3):
         register(id=f'Hook-o{n_objects}-v1',
                  entry_point='custom_envs.hook.hook_env:HookEnv',
