@@ -29,7 +29,7 @@ def setup_logger(run_dir, run_name, cfg):
             wandb_args['group'] = cfg['group']
         if 'tags' in cfg:
             wandb_args['tags'] = cfg['tags']
-        wandb.init(**wandb_args)
+        wandb.init(**wandb_args, save_code=True)
         wandb.run.log_code(".", include_fn=lambda path: path.endswith(".py") or path.endswith(".yaml"))
         logger.output_formats.append(WandBOutputFormat())
     logger.info("Starting training with the following configuration:")
