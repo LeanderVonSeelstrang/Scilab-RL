@@ -22,7 +22,7 @@ class MetaLunarLanderEnv(gym.Env):
         # action 2 --> fire main engine
         # action 3 --> fire right orientation engine
         # action 4 --> switch action
-        self.action_space = gym.spaces.Discrete(4)
+        self.action_space = gym.spaces.Discrete(5)
 
         ### OBSERVATION SPACE ###
         # 8-dimensional vector for each task:
@@ -277,16 +277,23 @@ class MetaLunarLanderEnv(gym.Env):
         )
 
     def render(self):
+        self.lunar_lander_one.render_mode = "rgb_array"
+        self.lunar_lander_two.render_mode = "rgb_array"
+        # get rgb image of current lunar landers
+        if self.current_task == 0:
+            img_lunar_lander_one = self.lunar_lander_one.render()
+            img_lunar_lander_two = np.zeros_like(img_lunar_lander_one)
+        elif self.current_task == 1:
+            img_lunar_lander_two = self.lunar_lander_two.render()
+            img_lunar_lander_one = np.zeros_like(img_lunar_lander_two)
         if self.rendering_first_time:
             plt.ion()
-            self.fig, self.ax = plt.subplots()
-            eximg = np.zeros((self.state.shape))
-            eximg[0] = -10
-            eximg[1] = 3
-            self.im = self.ax.imshow(eximg)
+            self.fig, self.ax = plt.subplots(1, 2)
+            self.im_0 = self.ax[0].imshow(img_lunar_lander_one)
+            self.im_1 = self.ax[1].imshow(img_lunar_lander_two)
             self.rendering_first_time = False
-        observation = copy.deepcopy(self.state)
-        self.im.set_data(observation)
+        self.im_0.set_data(img_lunar_lander_one)
+        self.im_1.set_data(img_lunar_lander_two)
         self.fig.canvas.draw()
         if self.render_mode == "rgb_array":
             return np.frombuffer(self.fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(
