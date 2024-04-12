@@ -97,7 +97,13 @@ def get_algo_instance(cfg, logger, env):
     try:
         baseline_class = getattr(importlib.import_module('stable_baselines3.' + algo_name), algo_name.upper())
     except ModuleNotFoundError:
-        baseline_class = getattr(importlib.import_module('custom_algorithms.' + algo_name), algo_name.upper())
+        if algo_name == 'recurrentppo':
+            # Recurrent PPO is not part of stable-baselines3, but of sb3-contrib
+            # BUT PPO with frame-stacking is usually quite competitive if not better, and faster than recurrent PPO!
+            # Exception: CarRacing-v0 and LunarLanderNoVel-v2
+            baseline_class = getattr(importlib.import_module('sb3_contrib.' + 'ppo_recurrent'), 'RecurrentPPO')
+        else:
+            baseline_class = getattr(importlib.import_module('custom_algorithms.' + algo_name), algo_name.upper())
     if 'replay_buffer_class' in alg_kwargs and alg_kwargs['replay_buffer_class'] == 'HerReplayBuffer':
         alg_kwargs['replay_buffer_class'] = HerReplayBuffer
         alg_kwargs = avoid_start_learn_before_first_episode_finishes(alg_kwargs, env)
