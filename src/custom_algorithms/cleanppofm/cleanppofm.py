@@ -679,7 +679,11 @@ class CLEANPPOFM:
 
     @classmethod
     def load(cls, path, env, **kwargs):
-        model = cls(env=env, **kwargs)
+        # FIXME: this should never be hardcoded
+        model = cls(env=env, fm={
+            "learning_rate": 0.001,
+            "reward_eta": 0.2,  # small bonus by default
+            "hidden_size": 256}, **kwargs)
         loaded_dict = torch.load(path, map_location=torch.device(device))
         for k in loaded_dict:
             if k not in ["_policy", "_fm"]:
