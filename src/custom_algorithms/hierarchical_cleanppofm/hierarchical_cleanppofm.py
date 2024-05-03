@@ -8,6 +8,7 @@ import math
 import numpy as np
 import torch
 import torch.nn as nn
+import gymnasium as gym
 from gymnasium import spaces
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback
@@ -209,8 +210,6 @@ class HIERARCHICAL_CLEANPPOFM:
             fm: dict = {},
             position_predicting: bool = False,
             fm_trained_with_input_noise: bool = True,
-            sub_env_one: Union[GymEnv, str] = None,
-            sub_env_two: Union[GymEnv, str] = None
     ):
         self.num_timesteps = 0
         # assume same learning rate for all three policy networks
@@ -220,22 +219,23 @@ class HIERARCHICAL_CLEANPPOFM:
         # Buffers for logging
         self.ep_info_buffer = None  # type: Optional[deque]
 
+        self.meta_env = env
+        self.sub_env_one = gym.make("LunarLander-v2")
+        self.sub_env_two = gym.make("LunarLander-v2")
+
         # observation + action space of meta agent
-        self.observation_space_meta = env.observation_space
-        self.action_space_meta = env.action_space
+        self.observation_space_meta = self.meta_env.observation_space
+        self.action_space_meta = self.meta_env.action_space
         # observation + action space of sub agent one
-        self.observation_space_sub_one = sub_env_one.observation_space
-        self.action_space_sub_one = sub_env_one.action_space
+        self.observation_space_sub_one = self.sub_env_one.observation_space
+        self.action_space_sub_one = self.sub_env_one.action_space
         # observation + action space of sub agent two
-        self.observation_space_sub_two = sub_env_two.observation_space
-        self.action_space_sub_two = sub_env_two.action_space
+        self.observation_space_sub_two = self.sub_env_two.observation_space
+        self.action_space_sub_two = self.sub_env_two.action_space
 
         self.n_envs = env.num_envs
-        self.meta_env = env
-        self.sub_env_one = sub_env_one
-        self.sub_env_two = sub_env_two
 
-        for action_space in [self.action_space, self.action_space_sub_one, self.action_space_sub_two]:
+        for action_space in [self.action_space_meta, self.action_space_sub_one, self.action_space_sub_two]:
             if isinstance(action_space, spaces.Box):
                 assert np.all(
                     np.isfinite(np.array([action_space.low, action_space.high]))
@@ -288,10 +288,10 @@ class HIERARCHICAL_CLEANPPOFM:
 
         # Check that `n_steps * n_envs > 1` to avoid NaN
         # when doing advantage normalization
-        buffer_size = self.env.num_envs * self.n_steps
+        buffer_size = self.meta_env.num_envs * self.n_steps
         assert buffer_size > 1 or (
             not normalize_advantage
-        ), f"`n_steps * n_envs` must be greater than 1. Currently n_steps={self.n_steps} and n_envs={self.env.num_envs}"
+        ), f"`n_steps * n_envs` must be greater than 1. Currently n_steps={self.n_steps} and n_envs={self.meta_env.num_envs}"
         # Check that the rollout buffer size is a multiple of the mini-batch size
         untruncated_batches = buffer_size // batch_size
         if buffer_size % batch_size > 0:
@@ -301,7 +301,7 @@ class HIERARCHICAL_CLEANPPOFM:
                 f" after every {untruncated_batches} untruncated mini-batches,"
                 f" there will be a truncated mini-batch of size {buffer_size % batch_size}\n"
                 f"We recommend using a `batch_size` that is a factor of `n_steps * n_envs`.\n"
-                f"Info: (n_steps={self.n_steps} and n_envs={self.env.num_envs})"
+                f"Info: (n_steps={self.n_steps} and n_envs={self.meta_env.num_envs})"
             )
         self.batch_size = batch_size
         self.n_epochs = n_epochs
@@ -314,7 +314,7 @@ class HIERARCHICAL_CLEANPPOFM:
 
     def _setup_model(self) -> None:
         # same buffer class for all three agents
-        buffer_cls = DictRolloutBuffer if isinstance(self.observation_space, spaces.Dict) else RolloutBuffer
+        buffer_cls = DictRolloutBuffer if isinstance(self.observation_space_meta, spaces.Dict) else RolloutBuffer
 
         # rollout buffer for meta agent
         self.rollout_buffer_meta = buffer_cls(
