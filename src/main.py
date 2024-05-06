@@ -20,7 +20,7 @@ from utils.util import get_git_label, set_global_seeds, get_train_render_schedul
     avoid_start_learn_before_first_episode_finishes
 from utils.mlflow_util import setup_mlflow, get_hyperopt_score, log_params_from_omegaconf_dict
 from utils.custom_logger import setup_logger
-from utils.custom_callbacks import EarlyStopCallback, EvalCallback, CustomEvalCallback
+from utils.custom_callbacks import EarlyStopCallback, EvalCallback, CustomEvalCallback, CustomHierarchicalEvalCallback
 from utils.custom_wrappers import DisplayWrapper, RecordVideo
 
 # make git_label available in hydra
@@ -128,6 +128,12 @@ def create_callbacks(cfg, logger, eval_env):
                                            log_path=logger.get_dir(), best_model_save_path=logger.get_dir(),
                                            render=False,
                                            warn=False)
+    elif cfg['algorithm'].name == 'hierarchical_cleanppofm':
+        eval_callback = CustomHierarchicalEvalCallback(eval_env, n_eval_episodes=cfg.n_test_rollouts,
+                                                       eval_freq=cfg.eval_after_n_steps,
+                                                       log_path=logger.get_dir(), best_model_save_path=logger.get_dir(),
+                                                       render=False,
+                                                       warn=False)
     else:
         eval_callback = EvalCallback(eval_env, n_eval_episodes=cfg.n_test_rollouts, eval_freq=cfg.eval_after_n_steps,
                                      log_path=logger.get_dir(), best_model_save_path=logger.get_dir(), render=False,
