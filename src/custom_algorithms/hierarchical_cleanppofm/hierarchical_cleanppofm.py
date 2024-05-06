@@ -756,7 +756,7 @@ class HIERARCHICAL_CLEANPPOFM:
     def predict(
             self,
             observation: Union[np.ndarray, Dict[str, np.ndarray]],
-            # FIXME: does this break something?
+            # FIXME: does this break something? -> Yes, it does
             policy,
             fm_network,
             state: Optional[Tuple[np.ndarray, ...]] = None,
