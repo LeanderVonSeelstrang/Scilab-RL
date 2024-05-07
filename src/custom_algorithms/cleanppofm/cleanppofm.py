@@ -473,7 +473,6 @@ class CLEANPPOFM:
 
             new_obs, rewards, dones, infos = env.step(clipped_actions)
 
-            # reduce reward when prediction is bad
             flatten_last_obs = self._last_obs
             flatten_new_obs = new_obs
             if isinstance(env.observation_space, spaces.Dict):
@@ -486,24 +485,41 @@ class CLEANPPOFM:
             else:
                 flatten_last_obs = torch.from_numpy(flatten_last_obs)
                 flatten_new_obs = torch.from_numpy(flatten_new_obs)
-            if not self.position_predicting:
-                forward_normal = self.fm_network(flatten_last_obs.to(device), torch.from_numpy(actions).to(device))
-            else:
-                # get position out of observation
-                # FIXME: this is hardcoded for the moonlander env
-                positions = []
-                for obs_element in new_obs:
-                    first_index_with_one = np.where(obs_element == 1)[0][0] + 1
-                    positions.append(first_index_with_one)
-                # dtype = torch.float32 because action above (torch.from_numpy(actions)) is this type
-                positions = torch.tensor(positions, device=device, dtype=torch.float32).unsqueeze(1)
-                forward_normal = self.fm_network(positions, torch.from_numpy(actions))
 
-            self.logger.record("train/rewards_without_stddev", rewards)
-            # THIS DOESN'T WORK BECAUSE THE STDDEV IS WAY TOO LOW BECAUSE THE FM IS TRAINED WITHOUT INPUT NOISE
-            # rewards -= forward_normal.stddev.mean().item() * 10
-            # calculate manually prediction error (Euclidean distance) --> done in environment!
-            # rewards -= math.sqrt(torch.sum((forward_normal.mean - flatten_new_obs) ** 2)) * 10
+            print("reward before prediction error", rewards)
+
+            # predict 5 steps in the future and calculate the prediction error
+            # print("reward before prediction error", rewards)
+            # TODO: make range dependent on prediction error
+            # up to 27 steps possible -> 20 steps needed to get everywhere (most left to most right)
+            for i in range(5):
+                # reduce reward when prediction is bad
+                # print("flatten_last_obs", flatten_last_obs)
+                # print("flatten_new_obs", flatten_new_obs)
+                if not self.position_predicting:
+                    forward_normal = self.fm_network(flatten_last_obs.to(device), torch.from_numpy(actions).to(device))
+                else:
+                    # get position out of observation
+                    # FIXME: this is hardcoded for the moonlander env
+                    positions = []
+                    for obs_element in new_obs:
+                        first_index_with_one = np.where(obs_element == 1)[0][0] + 1
+                        positions.append(first_index_with_one)
+                    # dtype = torch.float32 because action above (torch.from_numpy(actions)) is this type
+                    positions = torch.tensor(positions, device=device, dtype=torch.float32).unsqueeze(1)
+                    forward_normal = self.fm_network(positions, torch.from_numpy(actions))
+
+                # print("forward_normal.stddev.mean().item()", forward_normal.stddev.mean().item())
+                # self.logger.record("train/rewards_without_stddev", rewards)
+                # THIS DOESN'T WORK BECAUSE THE STDDEV IS WAY TOO LOW BECAUSE THE FM IS TRAINED WITHOUT INPUT NOISE
+                # reduce reward bei standard deviation
+                rewards -= forward_normal.stddev.mean().item()
+                # calculate manually prediction error (Euclidean distance) --> done in environment!
+                # rewards -= math.sqrt(torch.sum((forward_normal.mean - flatten_new_obs) ** 2)) * 10
+                flatten_last_obs = flatten_new_obs
+                flatten_new_obs = forward_normal.mean
+
+            print("reward after prediction error", rewards)
 
             self.logger.record("train/rollout_rewards_step", float(rewards.mean()))
             self.logger.record_mean("train/rollout_rewards_mean", float(rewards.mean()))
