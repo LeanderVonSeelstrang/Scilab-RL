@@ -486,16 +486,11 @@ class CLEANPPOFM:
                 flatten_last_obs = torch.from_numpy(flatten_last_obs)
                 flatten_new_obs = torch.from_numpy(flatten_new_obs)
 
-            print("reward before prediction error", rewards)
+            future_prediction = 1
+            first_time_in_loop = True
 
-            # predict 5 steps in the future and calculate the prediction error
-            # print("reward before prediction error", rewards)
-            # TODO: make range dependent on prediction error
-            # up to 27 steps possible -> 20 steps needed to get everywhere (most left to most right)
-            for i in range(5):
-                # reduce reward when prediction is bad
-                # print("flatten_last_obs", flatten_last_obs)
-                # print("flatten_new_obs", flatten_new_obs)
+            # predict x steps in the future and calculate the prediction error
+            while future_prediction > 0:
                 if not self.position_predicting:
                     forward_normal = self.fm_network(flatten_last_obs.to(device), torch.from_numpy(actions).to(device))
                 else:
@@ -509,17 +504,31 @@ class CLEANPPOFM:
                     positions = torch.tensor(positions, device=device, dtype=torch.float32).unsqueeze(1)
                     forward_normal = self.fm_network(positions, torch.from_numpy(actions))
 
-                # print("forward_normal.stddev.mean().item()", forward_normal.stddev.mean().item())
+                # prediction error version one -> standard deviation
+                prediction_error = forward_normal.stddev.mean().item()
+                # prediction error version two -> Euclidean distance
+                # calculate manually prediction error (Euclidean distance) --> done in environment!
+                # prediction_error = math.sqrt(torch.sum((forward_normal.mean - flatten_new_obs) ** 2)) * 10
+
+                # calculate range of predicting in the future by soc
+                if first_time_in_loop:
+                    # calculate range of predicting in the future by soc
+                    # up to 27 steps possible -> 20 steps needed to get everywhere (most left to most right)
+                    # min = 0, max = 20
+                    # -> prediction error of 0 means 20 steps in the future; prediction error of 1 means 0 steps in the future
+                    future_prediction = -20 * prediction_error + 20
+                    first_time_in_loop = False
+                else:
+                    future_prediction -= 1
+
+                print("prediction_error", prediction_error)
                 # self.logger.record("train/rewards_without_stddev", rewards)
                 # THIS DOESN'T WORK BECAUSE THE STDDEV IS WAY TOO LOW BECAUSE THE FM IS TRAINED WITHOUT INPUT NOISE
-                # reduce reward bei standard deviation
-                rewards -= forward_normal.stddev.mean().item()
-                # calculate manually prediction error (Euclidean distance) --> done in environment!
-                # rewards -= math.sqrt(torch.sum((forward_normal.mean - flatten_new_obs) ** 2)) * 10
+                # reduce reward bei prediction error
+                rewards -= prediction_error
+
                 flatten_last_obs = flatten_new_obs
                 flatten_new_obs = forward_normal.mean
-
-            print("reward after prediction error", rewards)
 
             self.logger.record("train/rollout_rewards_step", float(rewards.mean()))
             self.logger.record_mean("train/rollout_rewards_mean", float(rewards.mean()))
