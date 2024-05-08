@@ -488,11 +488,13 @@ class CLEANPPOFM:
 
             future_prediction = 1
             first_time_in_loop = True
+            action_for_forward_model = actions
 
             # predict x steps in the future and calculate the prediction error
             while future_prediction > 0:
                 if not self.position_predicting:
-                    forward_normal = self.fm_network(flatten_last_obs.to(device), torch.from_numpy(actions).to(device))
+                    forward_normal = self.fm_network(flatten_last_obs.to(device),
+                                                     torch.from_numpy(action_for_forward_model).to(device))
                 else:
                     # get position out of observation
                     # FIXME: this is hardcoded for the moonlander env
@@ -502,7 +504,7 @@ class CLEANPPOFM:
                         positions.append(first_index_with_one)
                     # dtype = torch.float32 because action above (torch.from_numpy(actions)) is this type
                     positions = torch.tensor(positions, device=device, dtype=torch.float32).unsqueeze(1)
-                    forward_normal = self.fm_network(positions, torch.from_numpy(actions))
+                    forward_normal = self.fm_network(positions, torch.from_numpy(action_for_forward_model))
 
                 # prediction error version one -> standard deviation
                 prediction_error = forward_normal.stddev.mean().item()
@@ -517,6 +519,10 @@ class CLEANPPOFM:
                     # min = 0, max = 20
                     # -> prediction error of 0 means 20 steps in the future; prediction error of 1 means 0 steps in the future
                     future_prediction = -20 * prediction_error + 20
+                    # set action to default action
+                    # FIXME: this is hardcoded for the lunar lander env
+                    # FIXME: should be 1 for the moonlander env
+                    action_for_forward_model = np.array([[0]])
                     first_time_in_loop = False
                 else:
                     future_prediction -= 1
@@ -705,10 +711,11 @@ class CLEANPPOFM:
     @classmethod
     def load(cls, path, env, **kwargs):
         # FIXME: this should never be hardcoded
-        model = cls(env=env, fm={
-            "learning_rate": 0.001,
-            "reward_eta": 0.2,  # small bonus by default
-            "hidden_size": 256}, **kwargs)
+        model = cls(env=env, **kwargs)
+        # fm={
+        #     "learning_rate": 0.001,
+        #     "reward_eta": 0.2,  # small bonus by default
+        #     "hidden_size": 256}, **kwargs)
         loaded_dict = torch.load(path, map_location=torch.device(device))
         for k in loaded_dict:
             if k not in ["_policy", "_fm"]:
