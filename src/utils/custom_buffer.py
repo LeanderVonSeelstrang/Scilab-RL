@@ -27,6 +27,7 @@ class CustomRolloutBufferSamples(NamedTuple):
     observations: th.Tensor
     next_observations: th.Tensor
     actions: th.Tensor
+    rewards: th.Tensor
     old_values: th.Tensor
     old_log_prob: th.Tensor
     advantages: th.Tensor
@@ -37,6 +38,7 @@ class CustomDictRolloutBufferSamples(NamedTuple):
     observations: TensorDict
     next_observations: TensorDict
     actions: th.Tensor
+    rewards: th.Tensor
     old_values: th.Tensor
     old_log_prob: th.Tensor
     advantages: th.Tensor
@@ -196,6 +198,7 @@ class CustomRolloutBuffer(BaseBuffer):
                 "observations",
                 "next_observations",
                 "actions",
+                "rewards",
                 "values",
                 "log_probs",
                 "advantages",
@@ -224,6 +227,7 @@ class CustomRolloutBuffer(BaseBuffer):
             self.observations[batch_inds],
             self.next_observations[batch_inds],
             self.actions[batch_inds],
+            self.rewards[batch_inds],
             self.values[batch_inds].flatten(),
             self.log_probs[batch_inds].flatten(),
             self.advantages[batch_inds].flatten(),
@@ -363,7 +367,7 @@ class CustomDictRolloutBuffer(CustomRolloutBuffer):
             for key, next_obs in self.next_observations.items():
                 self.next_observations[key] = self.swap_and_flatten(next_obs)
 
-            _tensor_names = ["actions", "values", "log_probs", "advantages", "returns"]
+            _tensor_names = ["actions", "rewards", "values", "log_probs", "advantages", "returns"]
 
             for tensor in _tensor_names:
                 self.__dict__[tensor] = self.swap_and_flatten(self.__dict__[tensor])
@@ -388,6 +392,7 @@ class CustomDictRolloutBuffer(CustomRolloutBuffer):
             next_observations={key: self.to_torch(next_obs[batch_inds]) for (key, next_obs) in
                                self.next_observations.items()},
             actions=self.to_torch(self.actions[batch_inds]),
+            rewards=self.to_torch(self.rewards[batch_inds].flatten()),
             old_values=self.to_torch(self.values[batch_inds].flatten()),
             old_log_prob=self.to_torch(self.log_probs[batch_inds].flatten()),
             advantages=self.to_torch(self.advantages[batch_inds].flatten()),
