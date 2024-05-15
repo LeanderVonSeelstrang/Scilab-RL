@@ -94,6 +94,9 @@ class MetaEnv(gym.Env):
     def step(self, action: int):
         task_switching_costs = 0
         # action 0,1, or 2 (left, stay, right) for each task
+        # FIXME: sanity check
+        if action == 3:
+            action = 1
         match action:
             case 0:
                 # left action
@@ -175,35 +178,35 @@ class MetaEnv(gym.Env):
                         _,
                         info_collect,
                     ) = self.collect_asteroids.step(action=2)
-            case 3:
-                # switch
-                # TODO: switch only possible every 0.5 second = 5 frames?
-
-                # still to step so that episode does not run forever
-                (
-                    self.state_of_dodge_asteroids,
-                    reward_dodge_asteroids,
-                    is_done_dodge,
-                    _,
-                    info_dodge,
-                ) = self.dodge_asteroids.step(action=1)
-                (
-                    self.state_of_collect_asteroids,
-                    reward_collect_asteroids,
-                    is_done_collect,
-                    _,
-                    info_collect,
-                ) = self.collect_asteroids.step(action=1)
-
-                if self.current_task == 0:
-                    self.current_task = 1
-                elif self.current_task == 1:
-                    self.current_task = 0
-
-                ### TODO: TASK-SWITCHING COSTS ###
-                task_switching_costs = -0
-                reward_dodge_asteroids -= 0
-                reward_collect_asteroids -= 0
+            # case 3:
+            #     # switch
+            #     # TODO: switch only possible every 0.5 second = 5 frames?
+            #
+            #     # still to step so that episode does not run forever
+            #     (
+            #         self.state_of_dodge_asteroids,
+            #         reward_dodge_asteroids,
+            #         is_done_dodge,
+            #         _,
+            #         info_dodge,
+            #     ) = self.dodge_asteroids.step(action=1)
+            #     (
+            #         self.state_of_collect_asteroids,
+            #         reward_collect_asteroids,
+            #         is_done_collect,
+            #         _,
+            #         info_collect,
+            #     ) = self.collect_asteroids.step(action=1)
+            #
+            #     if self.current_task == 0:
+            #         self.current_task = 1
+            #     elif self.current_task == 1:
+            #         self.current_task = 0
+            #
+            #     ### TODO: TASK-SWITCHING COSTS ###
+            #     task_switching_costs = -0
+            #     reward_dodge_asteroids -= 0
+            #     reward_collect_asteroids -= 0
 
             # If an exact match is not confirmed, this last case will be used if provided
             case _:
@@ -231,8 +234,9 @@ class MetaEnv(gym.Env):
                 "reward_dodge": reward_dodge_asteroids, "reward_collect": reward_collect_asteroids}
         return (
             self.state,
-            reward_dodge_asteroids + reward_collect_asteroids,
-            is_done_dodge or is_done_collect,
+            # FIXME: reward is added from each task
+            reward_dodge_asteroids,
+            is_done_dodge,
             False,
             info,
         )

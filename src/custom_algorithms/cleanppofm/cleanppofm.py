@@ -495,10 +495,10 @@ class CLEANPPOFM:
                 clipped_actions = actions[0]
 
             new_obs, rewards, dones, infos = env.step(clipped_actions)
-            print("rewards in algorithm", rewards)
+            # print("rewards in algorithm", rewards)
             # FIXME: NOT HARDCODED BUT FROM OBSERVATION SPACE SHAPE
             # print("predicted rewards in algorithm", forward_normal.mean[0][4].item())
-            print("predicted rewards in algorithm", forward_normal.mean[0][1].item())
+            # print("predicted rewards in algorithm", forward_normal.mean[0][1].item())
 
             flatten_last_obs = self._last_obs
             flatten_new_obs = new_obs
