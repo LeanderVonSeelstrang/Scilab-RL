@@ -72,9 +72,14 @@ class MetaEnv(gym.Env):
         self.state_of_collect_asteroids, _ = self.collect_asteroids.reset()
         # concatenate state with vector of zeros
         self.mask = np.full(shape=self.state_of_collect_asteroids.shape, fill_value=5)
-        self.current_task = 0
+        # FIXME: change back to start with dodge asteroids
+        self.current_task = 1
+        # self.state = np.concatenate(
+        #     (self.state_of_dodge_asteroids.reshape(10, 12), self.mask.reshape(10, 12)),
+        #     axis=1,
+        # ).flatten()
         self.state = np.concatenate(
-            (self.state_of_dodge_asteroids.reshape(10, 12), self.mask.reshape(10, 12)),
+            (self.mask.reshape(10, 12), self.state_of_collect_asteroids.reshape(10, 12)),
             axis=1,
         ).flatten()
 
@@ -235,8 +240,8 @@ class MetaEnv(gym.Env):
         return (
             self.state,
             # FIXME: reward is added from each task
-            reward_dodge_asteroids,
-            is_done_dodge,
+            reward_collect_asteroids,
+            is_done_collect,
             False,
             info,
         )
@@ -256,9 +261,14 @@ class MetaEnv(gym.Env):
         self.state_of_collect_asteroids, _ = self.collect_asteroids.reset()
         # concatenate state with vector of zeros
         self.mask = np.full(shape=self.state_of_collect_asteroids.shape, fill_value=5)
-        self.current_task = 0
+        # FIXME: change back to start with dodge asteroids
+        self.current_task = 1
+        # self.state = np.concatenate(
+        #     (self.state_of_dodge_asteroids.reshape(10, 12), self.mask.reshape(10, 12)),
+        #     axis=1,
+        # ).flatten()
         self.state = np.concatenate(
-            (self.state_of_dodge_asteroids.reshape(10, 12), self.mask.reshape(10, 12)),
+            (self.mask.reshape(10, 12), self.state_of_collect_asteroids.reshape(10, 12)),
             axis=1,
         ).flatten()
 
