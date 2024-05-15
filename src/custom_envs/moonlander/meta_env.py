@@ -45,7 +45,7 @@ class MetaEnv(gym.Env):
         self.action_space = gym.spaces.Discrete(4)
 
         ### OBSERVATION SPACE ###
-        # 30x42 grid for each task
+        # 10x12 grid for each task
         # TODO: in the future --> SoC for each task
         self.y_position_of_agent = agent_config["size"]
         self.following_observations_size = min(
@@ -74,14 +74,14 @@ class MetaEnv(gym.Env):
         self.mask = np.full(shape=self.state_of_collect_asteroids.shape, fill_value=5)
         self.current_task = 0
         self.state = np.concatenate(
-            (self.state_of_dodge_asteroids.reshape(30, 42), self.mask.reshape(30, 42)),
+            (self.state_of_dodge_asteroids.reshape(10, 12), self.mask.reshape(10, 12)),
             axis=1,
         ).flatten()
 
         # for rendering
         plt.ion()
         self.fig, self.ax = plt.subplots()
-        eximg = np.zeros((30, 84))
+        eximg = np.zeros((10, 24))
         eximg[0] = -10
         eximg[1] = 5
         self.im = self.ax.imshow(eximg)
@@ -201,9 +201,9 @@ class MetaEnv(gym.Env):
                     self.current_task = 0
 
                 ### TODO: TASK-SWITCHING COSTS ###
-                task_switching_costs = -10
-                reward_dodge_asteroids -= 5
-                reward_collect_asteroids -= 5
+                task_switching_costs = -0
+                reward_dodge_asteroids -= 0
+                reward_collect_asteroids -= 0
 
             # If an exact match is not confirmed, this last case will be used if provided
             case _:
@@ -212,22 +212,23 @@ class MetaEnv(gym.Env):
         if self.current_task == 0:
             self.state = np.concatenate(
                 (
-                    self.state_of_dodge_asteroids.reshape(30, 42),
-                    self.mask.reshape(30, 42),
+                    self.state_of_dodge_asteroids.reshape(10, 12),
+                    self.mask.reshape(10, 12),
                 ),
                 axis=1,
             ).flatten()
         elif self.current_task == 1:
             self.state = np.concatenate(
                 (
-                    self.mask.reshape(30, 42),
-                    self.state_of_collect_asteroids.reshape(30, 42),
+                    self.mask.reshape(10, 12),
+                    self.state_of_collect_asteroids.reshape(10, 12),
                 ),
                 axis=1,
             ).flatten()
 
         self.step_counter += 1
-        info = {"dodge": info_dodge, "collect": info_collect, "task_switching_costs": task_switching_costs}
+        info = {"info_dodge": info_dodge, "info_collect": info_collect, "task_switching_costs": task_switching_costs,
+                "reward_dodge": reward_dodge_asteroids, "reward_collect": reward_collect_asteroids}
         return (
             self.state,
             reward_dodge_asteroids + reward_collect_asteroids,
@@ -237,7 +238,7 @@ class MetaEnv(gym.Env):
         )
 
     def render(self):
-        observation = copy.deepcopy(self.state).reshape(30, 84)
+        observation = copy.deepcopy(self.state).reshape(10, 24)
         self.im.set_data(observation)
         if self.render_mode == "human":
             self.fig.canvas.draw_idle()
@@ -253,7 +254,7 @@ class MetaEnv(gym.Env):
         self.mask = np.full(shape=self.state_of_collect_asteroids.shape, fill_value=5)
         self.current_task = 0
         self.state = np.concatenate(
-            (self.state_of_dodge_asteroids.reshape(30, 42), self.mask.reshape(30, 42)),
+            (self.state_of_dodge_asteroids.reshape(10, 12), self.mask.reshape(10, 12)),
             axis=1,
         ).flatten()
 

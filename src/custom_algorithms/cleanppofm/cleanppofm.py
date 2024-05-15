@@ -17,7 +17,8 @@ from torch.distributions.normal import Normal
 from torch.nn import functional as F
 
 from custom_algorithms.cleanppofm.forward_model import ProbabilisticSimpleForwardNet, \
-    ProbabilisticForwardNetPositionPrediction, ProbabilisticSimpleForwardNetIncludingReward
+    ProbabilisticForwardNetPositionPrediction, ProbabilisticSimpleForwardNetIncludingReward, \
+    ProbabilisticForwardNetPositionPredictionIncludingReward
 from utils.custom_buffer import CustomDictRolloutBuffer as DictRolloutBuffer
 from utils.custom_buffer import CustomRolloutBuffer as RolloutBuffer
 from utils.custom_wrappers import DisplayWrapper
@@ -240,13 +241,18 @@ class CLEANPPOFM:
         self.reward_predicting = reward_predicting
         self.fm_trained_with_input_noise = fm_trained_with_input_noise
         if self.position_predicting:
-            self.fm_network = ProbabilisticForwardNetPositionPrediction(self.env, self.fm).to(device)
-        elif self.reward_predicting:
-            self.fm_network = ProbabilisticSimpleForwardNetIncludingReward(self.env, self.fm).to(device)
+            if self.reward_predicting:
+                self.fm_network = ProbabilisticForwardNetPositionPredictionIncludingReward(self.env, self.fm).to(device)
+            else:
+                self.fm_network = ProbabilisticForwardNetPositionPrediction(self.env, self.fm).to(device)
         else:
-            self.fm_network = ProbabilisticSimpleForwardNet(self.env, self.fm).to(device)
+            if self.reward_predicting:
+                self.fm_network = ProbabilisticSimpleForwardNetIncludingReward(self.env, self.fm).to(device)
+            else:
+                self.fm_network = ProbabilisticSimpleForwardNet(self.env, self.fm).to(device)
         self.fm_optimizer = torch.optim.Adam(
-            self.fm_network.parameters(), lr=self.fm["learning_rate"]
+            self.fm_network.parameters(),
+            lr=self.fm["learning_rate"]
         )
 
         # Sanity check, otherwise it will lead to noisy gradient and NaN
@@ -489,6 +495,10 @@ class CLEANPPOFM:
                 clipped_actions = actions[0]
 
             new_obs, rewards, dones, infos = env.step(clipped_actions)
+            print("rewards in algorithm", rewards)
+            # FIXME: NOT HARDCODED BUT FROM OBSERVATION SPACE SHAPE
+            # print("predicted rewards in algorithm", forward_normal.mean[0][4].item())
+            print("predicted rewards in algorithm", forward_normal.mean[0][1].item())
 
             flatten_last_obs = self._last_obs
             flatten_new_obs = new_obs
@@ -702,7 +712,7 @@ class CLEANPPOFM:
             if not self.reward_predicting:
                 fw_loss = -forward_normal.log_prob(next_positions)
             else:
-                fw_loss = -forward_normal.log_prob(torch.cat((next_positions, rewards.unsqueeze(dim=1)), dim=1))
+                fw_loss = -forward_normal.log_prob(torch.cat((next_positions, rewards), dim=1))
         loss = fw_loss.mean()
 
         self.logger.record("fm/fw_loss", loss.item())
