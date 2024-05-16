@@ -28,6 +28,7 @@ class CustomRolloutBufferSamples(NamedTuple):
     next_observations: th.Tensor
     actions: th.Tensor
     rewards: th.Tensor
+    intermediate_rewards: th.Tensor
     old_values: th.Tensor
     old_log_prob: th.Tensor
     advantages: th.Tensor
@@ -39,6 +40,7 @@ class CustomDictRolloutBufferSamples(NamedTuple):
     next_observations: TensorDict
     actions: th.Tensor
     rewards: th.Tensor
+    intermediate_rewards: th.Tensor
     old_values: th.Tensor
     old_log_prob: th.Tensor
     advantages: th.Tensor
@@ -72,6 +74,7 @@ class CustomRolloutBuffer(BaseBuffer):
     next_observations: np.ndarray
     actions: np.ndarray
     rewards: np.ndarray
+    intermediate_rewards: np.ndarray
     advantages: np.ndarray
     returns: np.ndarray
     episode_starts: np.ndarray
@@ -99,6 +102,7 @@ class CustomRolloutBuffer(BaseBuffer):
         self.next_observations = np.zeros((self.buffer_size, self.n_envs, *self.obs_shape), dtype=np.float32)
         self.actions = np.zeros((self.buffer_size, self.n_envs, self.action_dim), dtype=np.float32)
         self.rewards = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
+        self.intermediate_rewards = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.returns = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.episode_starts = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.values = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
@@ -150,6 +154,7 @@ class CustomRolloutBuffer(BaseBuffer):
             next_obs: np.ndarray,
             action: np.ndarray,
             reward: np.ndarray,
+            intermediate_reward: np.ndarray,
             episode_start: np.ndarray,
             value: th.Tensor,
             log_prob: th.Tensor,
@@ -159,6 +164,7 @@ class CustomRolloutBuffer(BaseBuffer):
         :param next_obs: Next observation
         :param action: Action
         :param reward:
+        :param intermediate_reward: Intermediate reward of just the next step without changes through forward model prediction
         :param episode_start: Start of episode signal.
         :param value: estimated value of the current state
             following the current policy.
@@ -182,6 +188,7 @@ class CustomRolloutBuffer(BaseBuffer):
         self.next_observations[self.pos] = np.array(next_obs).copy()
         self.actions[self.pos] = np.array(action).copy()
         self.rewards[self.pos] = np.array(reward).copy()
+        self.intermediate_rewards[self.pos] = np.array(intermediate_reward).copy()
         self.episode_starts[self.pos] = np.array(episode_start).copy()
         self.values[self.pos] = value.clone().cpu().numpy().flatten()
         self.log_probs[self.pos] = log_prob.clone().cpu().numpy()
@@ -199,6 +206,7 @@ class CustomRolloutBuffer(BaseBuffer):
                 "next_observations",
                 "actions",
                 "rewards",
+                "intermediate_rewards",
                 "values",
                 "log_probs",
                 "advantages",
@@ -228,6 +236,7 @@ class CustomRolloutBuffer(BaseBuffer):
             self.next_observations[batch_inds],
             self.actions[batch_inds],
             self.rewards[batch_inds],
+            self.intermediate_rewards[batch_inds],
             self.values[batch_inds].flatten(),
             self.log_probs[batch_inds].flatten(),
             self.advantages[batch_inds].flatten(),
@@ -294,6 +303,7 @@ class CustomDictRolloutBuffer(CustomRolloutBuffer):
             self.next_observations[key] = np.zeros((self.buffer_size, self.n_envs, *obs_input_shape), dtype=np.float32)
         self.actions = np.zeros((self.buffer_size, self.n_envs, self.action_dim), dtype=np.float32)
         self.rewards = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
+        self.intermediate_rewards = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.returns = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.episode_starts = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.values = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
@@ -308,6 +318,7 @@ class CustomDictRolloutBuffer(CustomRolloutBuffer):
             next_obs: Dict[str, np.ndarray],
             action: np.ndarray,
             reward: np.ndarray,
+            intermediate_reward: np.ndarray,
             episode_start: np.ndarray,
             value: th.Tensor,
             log_prob: th.Tensor,
@@ -317,6 +328,7 @@ class CustomDictRolloutBuffer(CustomRolloutBuffer):
         :param next_obs: Next observation
         :param action: Action
         :param reward:
+        :param intermediate_reward: Intermediate reward of just the next step without changes through forward model prediction
         :param episode_start: Start of episode signal.
         :param value: estimated value of the current state
             following the current policy.
@@ -347,6 +359,7 @@ class CustomDictRolloutBuffer(CustomRolloutBuffer):
 
         self.actions[self.pos] = np.array(action)
         self.rewards[self.pos] = np.array(reward)
+        self.intermediate_rewards[self.pos] = np.array(intermediate_reward)
         self.episode_starts[self.pos] = np.array(episode_start)
         self.values[self.pos] = value.clone().cpu().numpy().flatten()
         self.log_probs[self.pos] = log_prob.clone().cpu().numpy()
@@ -393,6 +406,7 @@ class CustomDictRolloutBuffer(CustomRolloutBuffer):
                                self.next_observations.items()},
             actions=self.to_torch(self.actions[batch_inds]),
             rewards=self.to_torch(self.rewards[batch_inds].flatten()),
+            intermediate_rewards=self.to_torch(self.intermediate_rewards[batch_inds].flatten()),
             old_values=self.to_torch(self.values[batch_inds].flatten()),
             old_log_prob=self.to_torch(self.log_probs[batch_inds].flatten()),
             advantages=self.to_torch(self.advantages[batch_inds].flatten()),

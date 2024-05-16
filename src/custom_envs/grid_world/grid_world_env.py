@@ -135,14 +135,17 @@ class GridWorldEnv(gym.Env):
             # otherwise does the agent learn to stay at the starting position, because stddev is low (no input noise)
             reward = 100 if terminated else -1
             if self.forward_model_prediction is not None:
+                pass
+                # print(self.forward_model_stddev)
+                # FIXME: should this happen in the environment? I don't think so
                 # reward -= self.forward_model_stddev.mean().item() * 10
-                predicted_location = np.array([round(self.forward_model_prediction.numpy()[0][0]),
-                                               round(self.forward_model_prediction.numpy()[0][1]),
-                                               round(self.forward_model_prediction.numpy()[0][2]),
-                                               round(self.forward_model_prediction.numpy()[0][3])])
-                reward -= math.sqrt(
-                    np.sum(
-                        (predicted_location - np.concatenate((self._agent_location, self._target_location))) ** 2)) * 10
+                # predicted_location = np.array([round(self.forward_model_prediction.numpy()[0][0]),
+                #                                round(self.forward_model_prediction.numpy()[0][1]),
+                #                                round(self.forward_model_prediction.numpy()[0][2]),
+                #                                round(self.forward_model_prediction.numpy()[0][3])])
+                # reward -= math.sqrt(
+                #     np.sum(
+                #         (predicted_location - np.concatenate((self._agent_location, self._target_location))) ** 2))
         observation = self._get_obs()
         info = self._get_info()
 

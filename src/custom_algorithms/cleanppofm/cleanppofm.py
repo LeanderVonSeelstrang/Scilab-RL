@@ -1,3 +1,4 @@
+import copy
 import io
 import pathlib
 import warnings
@@ -320,13 +321,13 @@ class CLEANPPOFM:
                 actions = rollout_data.actions
                 observations = rollout_data.observations
                 next_observations = rollout_data.next_observations
-                rewards = rollout_data.rewards
+                intermediate_rewards = rollout_data.intermediate_rewards
 
                 if isinstance(self.action_space, spaces.Discrete):
                     # Convert discrete action from float to long
                     actions = rollout_data.actions.long().flatten()
 
-                self.train_fm(observations, next_observations, actions, rewards)
+                self.train_fm(observations, next_observations, actions, intermediate_rewards)
 
                 _, log_prob, entropy, values, _ = self.policy.get_action_and_value(fm_network=self.fm_network,
                                                                                    x=observations,
@@ -495,6 +496,7 @@ class CLEANPPOFM:
                 clipped_actions = actions[0]
 
             new_obs, rewards, dones, infos = env.step(clipped_actions)
+            intermediate_rewards = copy.deepcopy(rewards)
             # print("rewards in algorithm", rewards)
             # FIXME: NOT HARDCODED BUT FROM OBSERVATION SPACE SHAPE
             # print("predicted rewards in algorithm", forward_normal.mean[0][4].item())
@@ -624,6 +626,7 @@ class CLEANPPOFM:
                     next_obs=new_obs,
                     action=actions,
                     reward=rewards,
+                    intermediate_reward=intermediate_rewards,
                     episode_start=self._last_episode_starts,
                     value=values,
                     log_prob=log_probs,
@@ -751,12 +754,7 @@ class CLEANPPOFM:
 
     @classmethod
     def load(cls, path, env, **kwargs):
-        # FIXME: this should never be hardcoded
         model = cls(env=env, **kwargs)
-        # fm={
-        #     "learning_rate": 0.001,
-        #     "reward_eta": 0.2,  # small bonus by default
-        #     "hidden_size": 256}, **kwargs)
         loaded_dict = torch.load(path, map_location=torch.device(device))
         for k in loaded_dict:
             if k not in ["_policy", "_fm"]:
