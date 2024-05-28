@@ -100,7 +100,8 @@ def evaluate_policy_controlloss(
         # this means the actual action and a default action are alternating
         if not dones[0]:
             # zero is default action in LunarLander
-            new_obs, rewards, dones, infos = env.step(np.array([0]))
+            # one is default action in moonlander
+            new_obs, rewards, dones, infos = env.step(np.array([1]))
         rewards += old_rewards
         current_rewards += rewards
         current_lengths += 1

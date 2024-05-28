@@ -405,7 +405,8 @@ class CLEANPPO_CONTROLLOSS:
             # this means the actual action and a default action are alternating
             if not dones[0]:
                 # zero is default action in LunarLander
-                new_obs, rewards, dones, infos = env.step(np.array([0]))
+                # one is default action in moonlander
+                new_obs, rewards, dones, infos = env.step(np.array([1]))
             rewards += old_rewards
             self.logger.record("train/rollout_rewards_step", float(rewards.mean()))
             self.logger.record_mean("train/rollout_rewards_mean", float(rewards.mean()))
