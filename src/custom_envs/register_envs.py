@@ -188,6 +188,10 @@ def register_custom_envs():
              kwargs={'reward_function': 'pos_neg'},
              max_episode_steps=500)
 
+    register(id="MetaEnv-pretrained-v0",
+             entry_point="custom_envs.moonlander.meta_env_pretrained:MetaEnvPretrained",
+             max_episode_steps=500)
+
     register(id="GridworldEnv-v0",
              entry_point="custom_envs.grid_world.grid_world_env:GridWorldEnv",
              max_episode_steps=10)
