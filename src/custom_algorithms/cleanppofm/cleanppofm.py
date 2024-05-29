@@ -496,6 +496,8 @@ class CLEANPPOFM:
                 clipped_actions = actions[0]
 
             new_obs, rewards, dones, infos = env.step(clipped_actions)
+            print("rewards in env", rewards)
+            print("position in env", new_obs)
             intermediate_rewards = copy.deepcopy(rewards)
             # print("rewards in algorithm", rewards)
             # FIXME: NOT HARDCODED BUT FROM OBSERVATION SPACE SHAPE
@@ -520,55 +522,62 @@ class CLEANPPOFM:
             action_for_forward_model = actions
 
             # predict x steps in the future and calculate the prediction error
-            while future_prediction > 0:
-                if not self.position_predicting:
-                    forward_normal = self.fm_network(flatten_last_obs.to(device),
-                                                     torch.from_numpy(action_for_forward_model).to(device))
-                else:
-                    # get position out of observation
-                    # FIXME: this is hardcoded for the moonlander env
-                    positions = []
-                    for obs_element in new_obs:
-                        first_index_with_one = np.where(obs_element == 1)[0][0] + 1
-                        positions.append(first_index_with_one)
-                    # dtype = torch.float32 because action above (torch.from_numpy(actions)) is this type
-                    positions = torch.tensor(positions, device=device, dtype=torch.float32).unsqueeze(1)
-                    forward_normal = self.fm_network(positions, torch.from_numpy(action_for_forward_model))
+            # while future_prediction > 0:
+            if not self.position_predicting:
+                forward_normal = self.fm_network(flatten_last_obs.to(device),
+                                                 torch.from_numpy(action_for_forward_model).to(device))
+            else:
+                # get position out of observation
+                # FIXME: this is hardcoded for the moonlander env
+                positions = []
+                for obs_element in new_obs:
+                    first_index_with_one = np.where(obs_element == 1)[0][0] + 1
+                    positions.append(first_index_with_one)
+                # dtype = torch.float32 because action above (torch.from_numpy(actions)) is this type
+                positions = torch.tensor(positions, device=device, dtype=torch.float32).unsqueeze(1)
+                forward_normal = self.fm_network(positions, torch.from_numpy(action_for_forward_model))
 
-                # prediction error version one -> standard deviation
-                prediction_error = forward_normal.stddev.mean().item()
-                # prediction error version two -> Euclidean distance
-                # calculate manually prediction error (Euclidean distance) --> done in environment!
-                # prediction_error = math.sqrt(torch.sum((forward_normal.mean - flatten_new_obs) ** 2)) * 10
-
-                # calculate range of predicting in the future by soc
-                if first_time_in_loop:
-                    # calculate range of predicting in the future by soc
-                    # up to 27 steps possible -> 20 steps needed to get everywhere (most left to most right)
-                    # min = 0, max = 20
-                    # -> prediction error of 0 means 20 steps in the future; prediction error of 1 means 0 steps in the future
-                    future_prediction = -20 * prediction_error + 20
-                    # set action to default action
-                    # FIXME: this is hardcoded for the lunar lander env
-                    # FIXME: should be 1 for the moonlander env
-                    action_for_forward_model = np.array([[0]])
-                    first_time_in_loop = False
-                else:
-                    future_prediction -= 1
-
-                # print("prediction_error", prediction_error)
-                # self.logger.record("train/rewards_without_stddev", rewards)
-                # THIS DOESN'T WORK BECAUSE THE STDDEV IS WAY TOO LOW BECAUSE THE FM IS TRAINED WITHOUT INPUT NOISE
-                # reduce reward bei prediction error
-                rewards -= prediction_error
-
-                flatten_last_obs = flatten_new_obs
-                if not self.reward_predicting:
-                    flatten_new_obs = forward_normal.mean
-                else:
-                    # remove reward prediction from forward prediction
-                    flatten_new_obs = forward_normal.mean[0][0:4].unsqueeze(dim=0)
-
+            # prediction error version one -> standard deviation
+            # prediction_error = forward_normal.stddev.mean().item()
+            # prediction error version two -> Euclidean distance
+            # calculate manually prediction error (Euclidean distance) --> done in environment!
+            # prediction_error = math.sqrt(torch.sum((forward_normal.mean - flatten_new_obs) ** 2)) * 10
+            #
+            #     # calculate range of predicting in the future by soc
+            #     if first_time_in_loop:
+            #         # calculate range of predicting in the future by soc
+            #         # up to 27 steps possible -> 20 steps needed to get everywhere (most left to most right)
+            #         # min = 0, max = 20
+            #         # -> prediction error of 0 means 20 steps in the future; prediction error of 1 means 0 steps in the future
+            #         future_prediction = -20 * prediction_error + 20
+            #         # set action to default action
+            #         # FIXME: this is hardcoded for the lunar lander env
+            #         # FIXME: should be 1 for the moonlander env
+            #         action_for_forward_model = np.array([[0]])
+            #         first_time_in_loop = False
+            #     else:
+            #         future_prediction -= 1
+            #
+            #     # print("prediction_error", prediction_error)
+            #     # self.logger.record("train/rewards_without_stddev", rewards)
+            #     # THIS DOESN'T WORK BECAUSE THE STDDEV IS WAY TOO LOW BECAUSE THE FM IS TRAINED WITHOUT INPUT NOISE
+            #     # reduce reward bei prediction error
+            #     rewards -= prediction_error
+            #
+            #     flatten_last_obs = flatten_new_obs
+            #     if not self.reward_predicting:
+            #         flatten_new_obs = forward_normal.mean
+            #     else:
+            #         # remove reward prediction from forward prediction
+            #         flatten_new_obs = forward_normal.mean[0][0:4].unsqueeze(dim=0)
+            from decimal import localcontext, Decimal, ROUND_HALF_UP
+            with localcontext() as ctx:
+                ctx.rounding = ROUND_HALF_UP
+                print("next predicted reward", forward_normal.mean[0][4].item(),
+                      Decimal(forward_normal.mean[0][4].item()).to_integral_value())
+                for element in forward_normal.mean[0][0:4]:
+                    print("next predicted position", element.item(),
+                          Decimal(element.item()).to_integral_value())
             self.logger.record("train/rollout_rewards_step", float(rewards.mean()))
             self.logger.record_mean("train/rollout_rewards_mean", float(rewards.mean()))
             # this is only logged when no hyperparameter tuning is running?
