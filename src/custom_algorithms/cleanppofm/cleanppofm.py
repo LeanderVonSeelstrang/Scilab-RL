@@ -2,7 +2,7 @@ import copy
 import io
 import pathlib
 import warnings
-from collections import deque
+from collections import deque, OrderedDict
 from typing import Dict, Optional, Tuple, Union
 import math
 
@@ -495,6 +495,7 @@ class CLEANPPOFM:
             elif isinstance(self.action_space, spaces.Discrete):
                 clipped_actions = actions[0]
 
+            # dones = terminated or truncated
             new_obs, rewards, dones, infos = env.step(clipped_actions)
             print("rewards in env", rewards)
             print("position in env", new_obs)
@@ -575,6 +576,8 @@ class CLEANPPOFM:
                 ctx.rounding = ROUND_HALF_UP
                 print("next predicted reward", forward_normal.mean[0][4].item(),
                       Decimal(forward_normal.mean[0][4].item()).to_integral_value())
+                self.logger.record("train/predicted_reward",
+                                   Decimal(forward_normal.mean[0][4].item()).to_integral_value())
                 for element in forward_normal.mean[0][0:4]:
                     print("next predicted position", element.item(),
                           Decimal(element.item()).to_integral_value())
@@ -612,27 +615,30 @@ class CLEANPPOFM:
 
             # Handle timeout by bootstraping with value function
             # see GitHub issue #633
+            # FIXME: go here to get actual terminal observation
+            temporary_new_obs = new_obs
             for idx, done in enumerate(dones):
-                if (
-                        done
-                        and infos[idx].get("terminal_observation") is not None
-                        and infos[idx].get("TimeLimit.truncated", False)
-                ):
-                    terminal_obs = infos[idx]["terminal_observation"]
-                    with torch.no_grad():
-                        if "agent" in terminal_obs and "target" in terminal_obs:
-                            terminal_obs["agent"] = np.expand_dims(terminal_obs["agent"], axis=0)
-                            terminal_obs["target"] = np.expand_dims(terminal_obs["target"], axis=0)
-                        else:
-                            terminal_obs = np.expand_dims(terminal_obs, axis=0)
-                        terminal_value = self.policy.get_value(terminal_obs)[0]
-                    rewards[idx] += self.gamma * terminal_value
+                if done and infos[idx].get("terminal_observation") is not None:
+                    # what about multiple elements in the list?
+                    temporary_new_obs = OrderedDict(infos[idx]["terminal_observation"])
+
+                    # TimeLimit.truncated = truncated and not terminated --> when episode is done because of time limit (steps)
+                    if infos[idx].get("TimeLimit.truncated", False):
+                        terminal_obs = infos[idx]["terminal_observation"]
+                        with torch.no_grad():
+                            if "agent" in terminal_obs and "target" in terminal_obs:
+                                terminal_obs["agent"] = np.expand_dims(terminal_obs["agent"], axis=0)
+                                terminal_obs["target"] = np.expand_dims(terminal_obs["target"], axis=0)
+                            else:
+                                terminal_obs = np.expand_dims(terminal_obs, axis=0)
+                            terminal_value = self.policy.get_value(terminal_obs)[0]
+                        rewards[idx] += self.gamma * terminal_value
 
             # this is needed because otherwise the last observation and action does not match the new observation
             if not infos[0]["TimeLimit.truncated"]:
                 rollout_buffer.add(
                     obs=self._last_obs,
-                    next_obs=new_obs,
+                    next_obs=temporary_new_obs,
                     action=actions,
                     reward=rewards,
                     intermediate_reward=intermediate_rewards,
