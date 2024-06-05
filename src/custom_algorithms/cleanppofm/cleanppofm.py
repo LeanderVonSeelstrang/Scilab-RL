@@ -497,8 +497,8 @@ class CLEANPPOFM:
 
             # dones = terminated or truncated
             new_obs, rewards, dones, infos = env.step(clipped_actions)
-            print("rewards in env", rewards)
-            print("position in env", new_obs)
+            # print("rewards in env", rewards)
+            # print("position in env", new_obs)
             intermediate_rewards = copy.deepcopy(rewards)
             # print("rewards in algorithm", rewards)
             # FIXME: NOT HARDCODED BUT FROM OBSERVATION SPACE SHAPE
@@ -574,13 +574,13 @@ class CLEANPPOFM:
             from decimal import localcontext, Decimal, ROUND_HALF_UP
             with localcontext() as ctx:
                 ctx.rounding = ROUND_HALF_UP
-                print("next predicted reward", forward_normal.mean[0][4].item(),
-                      Decimal(forward_normal.mean[0][4].item()).to_integral_value())
+                # print("next predicted reward", forward_normal.mean[0][4].item(),
+                #       Decimal(forward_normal.mean[0][4].item()).to_integral_value())
                 self.logger.record("train/predicted_reward",
-                                   Decimal(forward_normal.mean[0][4].item()).to_integral_value())
-                for element in forward_normal.mean[0][0:4]:
-                    print("next predicted position", element.item(),
-                          Decimal(element.item()).to_integral_value())
+                                   int(Decimal(forward_normal.mean[0][4].item()).to_integral_value()))
+                # for element in forward_normal.mean[0][0:4]:
+                #     print("next predicted position", element.item(),
+                #           Decimal(element.item()).to_integral_value())
             self.logger.record("train/rollout_rewards_step", float(rewards.mean()))
             self.logger.record_mean("train/rollout_rewards_mean", float(rewards.mean()))
             # this is only logged when no hyperparameter tuning is running?
