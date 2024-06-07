@@ -23,6 +23,7 @@ from custom_algorithms.cleanppofm.forward_model import ProbabilisticSimpleForwar
 from utils.custom_buffer import CustomDictRolloutBuffer as DictRolloutBuffer
 from utils.custom_buffer import CustomRolloutBuffer as RolloutBuffer
 from utils.custom_wrappers import DisplayWrapper
+from decimal import localcontext, Decimal, ROUND_HALF_UP
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -474,15 +475,24 @@ class CLEANPPOFM:
                     self.env.envs[0].env.env.env.forward_model_stddev = forward_normal.stddev.cpu()
             else:
                 if isinstance(self.env.envs[0], DisplayWrapper):
+                    # FIXME: this is hardcoded for the gridworld env
+                    agent_location = self.env.envs[0].env.env.env.env._agent_location
+                    target_location = self.env.envs[0].env.env.env.env._target_location
                     self.env.envs[0].env.env.env.env.forward_model_prediction = forward_normal.mean[0][0:4].unsqueeze(
                         dim=0).cpu()
                     self.env.envs[0].env.env.env.env.forward_model_stddev = forward_normal.stddev[0][0:4].unsqueeze(
                         dim=0).cpu()
                 else:
+                    # FIXME: NOT HARDCODED BUT FROM OBSERVATION SPACE SHAPE
+                    # FIXME: this is hardcoded for the gridworld env
+                    agent_location = self.env.envs[0].env.env.env._agent_location
+                    target_location = self.env.envs[0].env.env.env._target_location
                     self.env.envs[0].env.env.env.forward_model_prediction = forward_normal.mean[0][0:4].unsqueeze(
                         dim=0).cpu()
                     self.env.envs[0].env.env.env.forward_model_stddev = forward_normal.stddev[0][0:4].unsqueeze(
                         dim=0).cpu()
+            # FIXME: this is hardcoded for the gridworld env
+            max_distance_in_gridworld = math.sqrt(((4 - 0) ** 2) + ((4 - 0) ** 2))
             actions = actions.cpu().numpy()
             log_prob_float = float(np.mean(log_probs.cpu().numpy()))
             self.logger.record("train/rollout_logprob_step", float(log_prob_float))
@@ -497,13 +507,7 @@ class CLEANPPOFM:
 
             # dones = terminated or truncated
             new_obs, rewards, dones, infos = env.step(clipped_actions)
-            # print("rewards in env", rewards)
-            # print("position in env", new_obs)
             intermediate_rewards = copy.deepcopy(rewards)
-            # print("rewards in algorithm", rewards)
-            # FIXME: NOT HARDCODED BUT FROM OBSERVATION SPACE SHAPE
-            # print("predicted rewards in algorithm", forward_normal.mean[0][4].item())
-            # print("predicted rewards in algorithm", forward_normal.mean[0][1].item())
 
             flatten_last_obs = self._last_obs
             flatten_new_obs = new_obs
@@ -543,44 +547,23 @@ class CLEANPPOFM:
             # prediction error version two -> Euclidean distance
             # calculate manually prediction error (Euclidean distance) --> done in environment!
             # prediction_error = math.sqrt(torch.sum((forward_normal.mean - flatten_new_obs) ** 2)) * 10
-            #
-            #     # calculate range of predicting in the future by soc
-            #     if first_time_in_loop:
-            #         # calculate range of predicting in the future by soc
-            #         # up to 27 steps possible -> 20 steps needed to get everywhere (most left to most right)
-            #         # min = 0, max = 20
-            #         # -> prediction error of 0 means 20 steps in the future; prediction error of 1 means 0 steps in the future
-            #         future_prediction = -20 * prediction_error + 20
-            #         # set action to default action
-            #         # FIXME: this is hardcoded for the lunar lander env
-            #         # FIXME: should be 1 for the moonlander env
-            #         action_for_forward_model = np.array([[0]])
-            #         first_time_in_loop = False
-            #     else:
-            #         future_prediction -= 1
-            #
-            #     # print("prediction_error", prediction_error)
-            #     # self.logger.record("train/rewards_without_stddev", rewards)
-            #     # THIS DOESN'T WORK BECAUSE THE STDDEV IS WAY TOO LOW BECAUSE THE FM IS TRAINED WITHOUT INPUT NOISE
-            #     # reduce reward bei prediction error
-            #     rewards -= prediction_error
-            #
-            #     flatten_last_obs = flatten_new_obs
-            #     if not self.reward_predicting:
-            #         flatten_new_obs = forward_normal.mean
-            #     else:
-            #         # remove reward prediction from forward prediction
-            #         flatten_new_obs = forward_normal.mean[0][0:4].unsqueeze(dim=0)
-            from decimal import localcontext, Decimal, ROUND_HALF_UP
-            with localcontext() as ctx:
-                ctx.rounding = ROUND_HALF_UP
-                # print("next predicted reward", forward_normal.mean[0][4].item(),
-                #       Decimal(forward_normal.mean[0][4].item()).to_integral_value())
-                self.logger.record("train/predicted_reward",
-                                   int(Decimal(forward_normal.mean[0][4].item()).to_integral_value()))
-                # for element in forward_normal.mean[0][0:4]:
-                #     print("next predicted position", element.item(),
-                #           Decimal(element.item()).to_integral_value())
+            print("rewards", rewards)
+            if self.reward_predicting:
+                predicted_location = np.array([round(forward_normal.mean.cpu().detach().numpy()[0][0]),
+                                               round(forward_normal.mean.cpu().detach().numpy()[0][1]),
+                                               round(forward_normal.mean.cpu().detach().numpy()[0][2]),
+                                               round(forward_normal.mean.cpu().detach().numpy()[0][3])])
+                corrected_reward = rewards - ((math.sqrt(
+                    np.sum(
+                        (predicted_location - np.concatenate(
+                            (agent_location, target_location))) ** 2))) / max_distance_in_gridworld)
+            print("corrected reward", corrected_reward)
+            # FIXME: why is are there multiple rewards but only one reward prediction?
+            if self.reward_predicting:
+                with localcontext() as ctx:
+                    ctx.rounding = ROUND_HALF_UP
+                    self.logger.record("train/predicted_reward",
+                                       int(Decimal(forward_normal.mean[0][4].item()).to_integral_value()))
             self.logger.record("train/rollout_rewards_step", float(rewards.mean()))
             self.logger.record_mean("train/rollout_rewards_mean", float(rewards.mean()))
             # this is only logged when no hyperparameter tuning is running?
