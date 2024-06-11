@@ -16,7 +16,7 @@ position_predicting: false
 reward_predicting: true
 
 # forward model computation hyperparameters
-fm:
+fm_parameters:
   learning_rate: 0.001
   reward_eta: 0.2 # small bonus by default
   hidden_size: 256
