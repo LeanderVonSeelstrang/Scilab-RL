@@ -3,6 +3,7 @@ import math
 import gymnasium as gym
 import numpy as np
 import pygame
+import torch
 from gymnasium import spaces
 
 
@@ -11,6 +12,7 @@ class GridWorldEnv(gym.Env):
 
     def __init__(self, render_mode=None, size=5, is_it_possible_that_input_noise_is_applied: bool = False,
                  scene_of_input_noise: bool = False):
+        self.name = "GridWorldEnv"
         self.size = size  # The size of the square grid
         self.window_size = 512  # The size of the PyGame window
 
@@ -53,7 +55,6 @@ class GridWorldEnv(gym.Env):
         }
         # forward model prediction
         self.forward_model_prediction = None
-        self.forward_model_stddev = 0
         self.last_action = 0
         self.agent_location_one_step_before = None
 
@@ -100,7 +101,6 @@ class GridWorldEnv(gym.Env):
 
         # forward model prediction
         self.forward_model_prediction = None
-        self.forward_model_stddev = 0
         self.last_action = 0
         self.agent_location_one_step_before = self._agent_location
 
@@ -134,18 +134,6 @@ class GridWorldEnv(gym.Env):
             # much higher reward when reaching the target
             # otherwise does the agent learn to stay at the starting position, because stddev is low (no input noise)
             reward = 100 if terminated else -1
-            if self.forward_model_prediction is not None:
-                pass
-                # print(self.forward_model_stddev)
-                # FIXME: should this happen in the environment? I don't think so
-                # reward -= self.forward_model_stddev.mean().item() * 10
-                # predicted_location = np.array([round(self.forward_model_prediction.numpy()[0][0]),
-                #                                round(self.forward_model_prediction.numpy()[0][1]),
-                #                                round(self.forward_model_prediction.numpy()[0][2]),
-                #                                round(self.forward_model_prediction.numpy()[0][3])])
-                # reward -= math.sqrt(
-                #     np.sum(
-                #         (predicted_location - np.concatenate((self._agent_location, self._target_location))) ** 2))
         observation = self._get_obs()
         info = self._get_info()
 
@@ -300,3 +288,6 @@ class GridWorldEnv(gym.Env):
         if self.window is not None:
             pygame.display.quit()
             pygame.quit()
+
+    def set_forward_model_prediction(self, new_forward_model_prediction: torch.tensor) -> None:
+        self.forward_model_prediction = new_forward_model_prediction

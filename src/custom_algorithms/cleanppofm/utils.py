@@ -67,21 +67,15 @@ def get_reward_estimation_of_forward_model(fm_network, obs: torch.Tensor,
         reward estimation of the forward model for number_of_future_steps steps
 
     """
+    # the first obs is a matrix, the following obs are just the positions
+    if position_predicting:
+        obs = get_position_of_observation(obs)
+
     ##### PREDICT NEXT REWARDS #####
     # predict next rewards from last state and default action
     reward_estimation = 0
     for i in range(number_of_future_steps):
-        if position_predicting:
-            positions = []
-            for obs_element in obs:
-                # agent in observation is marked with 1
-                first_index_with_one = np.where(obs_element.cpu() == 1)[0][0] + 1
-                positions.append(first_index_with_one)
-            positions = torch.tensor(positions, device=device).unsqueeze(1)
-            forward_model_prediction_normal_distribution = fm_network(positions, default_action.float())
-        else:
-            forward_model_prediction_normal_distribution = fm_network(obs, default_action.float())
-
+        forward_model_prediction_normal_distribution = fm_network(obs, default_action.float())
         # add reward estimation to last reward
         reward_estimation += forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[0][-1]
         ##### REMOVE REWARD FROM NEW PREDICTED OBS #####
@@ -104,7 +98,7 @@ def get_position_of_observation(obs: torch.Tensor) -> torch.Tensor:
     positions = []
     for obs_element in obs:
         # agent in observation is marked with 1
-        first_index_with_one = np.where(obs_element.cpu() == 1)[0][0] + 1
+        first_index_with_one = np.where(obs_element.cpu() == 1)[0][0]
         positions.append(first_index_with_one)
     return torch.tensor(positions, device=device).unsqueeze(1)
 

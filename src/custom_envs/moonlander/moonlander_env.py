@@ -11,6 +11,7 @@ from typing import List, Dict
 import custom_envs.moonlander.helper_functions as hlp
 import cv2
 import numpy as np
+import torch
 import yaml
 from gymnasium import Env
 from gymnasium import spaces
@@ -33,6 +34,7 @@ class MoonlanderWorldEnv(Env):
         initialises the environment
         Args:
         """
+        self.name = "MoonlanderWorldEnv"
         self.ROOT_DIR = "."
         if task == "dodge":
             config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "standard_config.yaml")
@@ -137,13 +139,17 @@ class MoonlanderWorldEnv(Env):
         drift_config = world_config["drift"]
         objects_config = world_config["objects"]
 
+        size = agent_config["size"]
         # random x position of agent
         if agent_config["initial_x_position"] is None:
-            size = agent_config["size"]
             x_width = world_config["x_width"]
             self.x_position_of_agent = rnd.randint(size, x_width - size + 1)
         else:
             self.x_position_of_agent = agent_config["initial_x_position"]
+
+        # needed to read out the sizes of the moonlander world
+        self.first_possible_x_position = size
+        self.last_possible_x_position = world_config["x_width"] - size + 1
 
         self.y_position_of_agent = agent_config["size"]
 
@@ -253,7 +259,6 @@ class MoonlanderWorldEnv(Env):
 
         # forward model prediction
         self.forward_model_prediction = None
-        self.forward_model_stddev = 0
 
         ### LOGGING
         if verbose_level > 0:
@@ -981,6 +986,10 @@ class MoonlanderWorldEnv(Env):
         else:
             self.x_position_of_agent = agent_config["initial_x_position"]
 
+        # needed to read out the sizes of the moonlander world
+        self.first_possible_x_position = size
+        self.last_possible_x_position = world_config["x_width"] - size + 1
+
         self.y_position_of_agent = size
 
         (
@@ -1052,7 +1061,6 @@ class MoonlanderWorldEnv(Env):
 
         # forward model prediction
         self.forward_model_prediction = None
-        self.forward_model_stddev = 0
 
         if self.config["verbose_level"] > 0:
             ### OBJECTS
@@ -1094,3 +1102,6 @@ class MoonlanderWorldEnv(Env):
                 "pos_neg": self.pos_neg_reward_info_dict_per_step, "number_of_crashed_or_collected_objects": 0}
 
         return self.state.flatten(), info
+
+    def set_forward_model_prediction(self, new_forward_model_prediction: torch.tensor) -> None:
+        self.forward_model_prediction = new_forward_model_prediction

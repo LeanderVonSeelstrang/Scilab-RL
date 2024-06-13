@@ -46,6 +46,7 @@ class Agent(nn.Module):
             layer_init(nn.Linear(64, env.action_space.n), std=0.01),
         )
         self.actor_logstd = nn.Parameter(torch.zeros(1, env.action_space.n))
+        self.env = env
 
     def get_value(self, obs) -> torch.Tensor:
         """
@@ -62,13 +63,13 @@ class Agent(nn.Module):
             obs = torch.tensor(obs, device=device, dtype=torch.float32).detach().clone()
         return self.critic(obs)
 
-    # FIXME: missing documentation
-    def get_action_and_value_and_forward_model_prediction_and_prediction_error(self, fm_network, obs, action=None,
+    def get_action_and_value_and_forward_model_prediction_and_prediction_error(self, fm_network, obs, env_name: str,
+                                                                               action=None,
                                                                                deterministic: bool = False,
                                                                                logger: Logger = None,
                                                                                position_predicting: bool = False) -> \
-    tuple[
-        torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.distributions.Normal, float]:
+            tuple[
+                torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.distributions.Normal, float]:
         """
         Get the action, logarithmic probability of action distribution, entropy of the action distribution
         value of the critic network and forward model prediction in form of a normal distribution
@@ -90,7 +91,7 @@ class Agent(nn.Module):
         if self.flatten:
             obs = flatten_obs(obs)
         else:
-            obs = torch.tensor(obs, device=device, dtype=torch.float32).detach().clone()
+            obs = torch.tensor(obs, device=device, dtype=torch.float32).clone().detach()
 
         ##### PREDICT NEXT ACTION #####
         # obs is a tensor
@@ -134,22 +135,44 @@ class Agent(nn.Module):
             forward_model_prediction_normal_distribution = fm_network(obs, forward_normal_action.float())
 
         ##### CALCULATE PREDICTION ERROR #####
-        # FIXME: this is hardcoded for the gridworld env
         # prediction error version one -> standard deviation
         # prediction_error = forward_normal.stddev.mean().item()
         # prediction error version two -> Euclidean distance
-        # calculate manually prediction error (Euclidean distance) --> done in environment!
-        # prediction_error = math.sqrt(torch.sum((forward_normal.mean - flatten_new_obs) ** 2)) * 10
-        # predicted location can only be between 0 and 4
-        max_distance_in_gridworld = math.sqrt(((4 - 0) ** 2) + ((4 - 0) ** 2) + ((4 - 0) ** 2) + ((4 - 0) ** 2))
-        predicted_location = torch.tensor(
-            [min(max(0, round(forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[0][0])), 4),
-             min(max(0, round(forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[0][1])), 4),
-             min(max(0, round(forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[0][2])), 4),
-             min(max(0, round(forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[0][3])), 4)])
-        prediction_error = (math.sqrt(torch.sum((predicted_location - obs) ** 2))) / max_distance_in_gridworld
+        # calculate manually prediction error (Euclidean distance)
+        if env_name == "GridWorldEnv":
+            # predicted location can only be between 0 and 4
+            max_distance_in_gridworld = math.sqrt(((4 - 0) ** 2) + ((4 - 0) ** 2) + ((4 - 0) ** 2) + ((4 - 0) ** 2))
+            predicted_location = torch.tensor(
+                [min(max(0, round(forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[0][0])), 4),
+                 min(max(0, round(forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[0][1])), 4),
+                 min(max(0, round(forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[0][2])), 4),
+                 min(max(0, round(forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[0][3])), 4)])
+            prediction_error = (math.sqrt(torch.sum((predicted_location - obs) ** 2))) / max_distance_in_gridworld
+        elif env_name == "MoonlanderWorldEnv":
+            # we just care for the x position of the moonlander agent, because the y position is always equally to the size of the agent
+            if position_predicting:
+                positions = get_position_of_observation(obs)
 
-        # TODO: put prediction of fm network into observation --> standard deviation or whole observation?
+                # Smallest x position of the agent is the size of the agent
+                # Biggest x position of the agent is the width of the moonlander world - the size of the agent
+                first_possible_x_position = self.env.get_attr("first_possible_x_position")[0]
+                last_possible_x_position = self.env.get_attr("last_possible_x_position")[0]
+                max_distance_in_moonlander_world = math.sqrt(
+                    (last_possible_x_position - first_possible_x_position) ** 2)
+                predicted_x_position = torch.tensor([min(max(first_possible_x_position,
+                                                             forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[
+                                                                 0][0]),
+                                                         last_possible_x_position)])
+                prediction_error = (math.sqrt(
+                    torch.sum((predicted_x_position - positions[0]) ** 2))) / max_distance_in_moonlander_world
+            # TODO: implement prediction error calculation for moonlander world env with predicting whole observation
+            else:
+                raise NotImplementedError(
+                    "Prediction error calculation not implemented for MoonlanderWorldEnv with predicting whole observation!")
+        else:
+            raise ValueError("Environment not supported")
+
+        # TODO: put prediction of fm network into observation? --> standard deviation or whole observation?
         ##### LOGGING #####
         # std describes the (un-)certainty of the prediction of each pixel
         # more logging possible

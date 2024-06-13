@@ -4,8 +4,6 @@ import pathlib
 import warnings
 from collections import deque, OrderedDict
 from typing import Dict, Optional, Tuple, Union
-import math
-
 import numpy as np
 import torch
 from gymnasium import spaces
@@ -20,11 +18,8 @@ from custom_algorithms.cleanppofm.forward_model import ProbabilisticSimpleForwar
 from custom_algorithms.cleanppofm.utils import flatten_obs, get_reward_estimation_of_forward_model, \
     get_position_of_observation, get_next_observation_gridworld
 from custom_algorithms.cleanppofm.agent import Agent
-from custom_envs.grid_world.grid_world_env import GridWorldEnv
-from custom_envs.moonlander.moonlander_env import MoonlanderWorldEnv
 from utils.custom_buffer import CustomDictRolloutBuffer as DictRolloutBuffer
 from utils.custom_buffer import CustomRolloutBuffer as RolloutBuffer
-from utils.custom_wrappers import DisplayWrapper
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -153,22 +148,16 @@ class CLEANPPOFM:
         # boolean if the training data for the forward model is generated with input noise or not
         self.fm_trained_with_input_noise = fm_trained_with_input_noise
 
-        # Get actual env from the vectorized envs
-        # FIXME: Problem, we need to add the forward model prediction to the environment for displaying it
-        #  when display wrapper is included, one "env" more is needed
-        # FIXME: VERY UGLY CODING
-        if isinstance(self.env.envs[0], DisplayWrapper):
-            self.actual_env = self.env.envs[0].env.env.env.env
-        else:
-            self.actual_env = self.env.envs[0].env.env.env
-        if not (isinstance(self.actual_env, GridWorldEnv) or isinstance(self.actual_env, MoonlanderWorldEnv)):
+        # get the env name as described here: https://github.com/DLR-RM/stable-baselines3/blob/master/docs/guide/vec_envs.rst
+        self.env_name = self.env.get_attr("name")[0]
+        if not (self.env_name == "GridWorldEnv" or self.env_name == "MoonlanderWorldEnv"):
             raise NotImplementedError("This algorithm is not implemented for this environment yet!")
 
         # position predicting only possible for moonlander env
-        if self.position_predicting and not isinstance(self.actual_env, MoonlanderWorldEnv):
+        if self.position_predicting and not self.env_name == "MoonlanderWorldEnv":
             raise NotImplementedError("Position predicting is only possible for the moonlander environment by now!")
         # fm trained without input noise only possible for gridworld env
-        if not self.fm_trained_with_input_noise and not isinstance(self.actual_env, GridWorldEnv):
+        if not self.fm_trained_with_input_noise and not self.env_name == "GridWorldEnv":
             raise NotImplementedError(
                 "Training the forward model without input noise is only possible for the gridworld environment!")
         # number of future steps only possible for reward predicting
@@ -247,6 +236,7 @@ class CLEANPPOFM:
                 _, log_prob, entropy, values, _, _ = self.policy.get_action_and_value_and_forward_model_prediction_and_prediction_error(
                     fm_network=self.fm_network,
                     obs=observations,
+                    env_name=self.env_name,
                     action=actions, logger=self.logger,
                     position_predicting=self.position_predicting)
                 values = values.flatten()
@@ -328,7 +318,6 @@ class CLEANPPOFM:
         callback.on_training_start(locals(), globals())
 
         while self.num_timesteps < total_timesteps:
-            print("iteration", iteration)
             continue_training = self.collect_rollouts(self.env, callback, self.rollout_buffer)
 
             if continue_training is False:
@@ -385,7 +374,8 @@ class CLEANPPOFM:
                 # get action and forward model prediction
                 actions, log_probs, _, values, forward_normal, prediction_error = self.policy.get_action_and_value_and_forward_model_prediction_and_prediction_error(
                     fm_network=self.fm_network,
-                    obs=self._last_obs, logger=self.logger, position_predicting=self.position_predicting)
+                    obs=self._last_obs, env_name=self.env_name, logger=self.logger,
+                    position_predicting=self.position_predicting)
 
             # log logarithmic probability of action distribution (one value in tensor)
             log_prob_float = float(np.mean(log_probs.cpu().numpy()))
@@ -401,12 +391,13 @@ class CLEANPPOFM:
                 clipped_actions = actions[0]
 
             ##### DISPLAYING THE FORWARD MODEL PREDICTION #####
+            # modify the env attributes as described here:
+            # https://github.com/DLR-RM/stable-baselines3/blob/master/docs/guide/vec_envs.rst
             if not self.reward_predicting:
-                self.actual_env.forward_model_prediction = forward_normal.mean.cpu()
-                self.actual_env.forward_model_stddev = forward_normal.stddev.cpu()
+                self.env.env_method("set_forward_model_prediction", forward_normal.mean.cpu())
+            # remove reward because it is not needed to display the predicted observation
             else:
-                self.actual_env.forward_model_prediction = forward_normal.mean[0][:-1].cpu().unsqueeze(0)
-                self.actual_env.forward_model_stddev = forward_normal.stddev[0][:-1].cpu().unsqueeze(0)
+                self.env.env_method("set_forward_model_prediction", forward_normal.mean[0][:-1].cpu().unsqueeze(0))
 
             ##### STEP IN ENVIRONMENT #####
             # dones = terminated or truncated
@@ -430,10 +421,10 @@ class CLEANPPOFM:
                     flatten_new_obs = torch.from_numpy(flatten_new_obs)
 
                 # default action is stay at same position
-                if isinstance(self.actual_env, MoonlanderWorldEnv):
+                if self.env_name == "MoonlanderWorldEnv":
                     default_action = torch.Tensor([[0]])
                 # random default action for gridworld env
-                elif isinstance(self.actual_env, GridWorldEnv):
+                elif self.env_name == "GridWorldEnv":
                     default_action = torch.randint(low=0, high=8, size=(1, 1), device=device)
                 # TODO: do this only after a warm-up phase of the forward model
                 ##### REWARD ESTIMATION #####
@@ -491,8 +482,11 @@ class CLEANPPOFM:
             temporary_new_obs = new_obs
             for idx, done in enumerate(dones):
                 if done and infos[idx].get("terminal_observation") is not None:
-                    # what about multiple elements in the list?
-                    temporary_new_obs = OrderedDict(infos[idx]["terminal_observation"])
+                    # fixme: what about multiple elements in the list?
+                    if self.env_name == "GridWorldEnv":
+                        temporary_new_obs = OrderedDict(infos[idx]["terminal_observation"])
+                    elif self.env_name == "MoonlanderWorldEnv":
+                        temporary_new_obs = infos[idx]["terminal_observation"]
 
                     # TimeLimit.truncated = truncated and not terminated --> when episode is done because of time limit (steps)
                     if infos[idx].get("TimeLimit.truncated", False):
@@ -574,7 +568,6 @@ class CLEANPPOFM:
         # moonlander
         else:
             # get position out of observation
-            # FIXME: this is hardcoded for the moonlander env
             observations = get_position_of_observation(observations)
             next_observations_formatted = get_position_of_observation(next_observations)
             if self.reward_predicting:
@@ -619,6 +612,7 @@ class CLEANPPOFM:
             action, _, _, _, forward_model_prediction_normal_distribution, _ = self.policy.get_action_and_value_and_forward_model_prediction_and_prediction_error(
                 fm_network=self.fm_network,
                 obs=observation,
+                env_name=self.env_name,
                 deterministic=deterministic,
                 logger=self.logger,
                 position_predicting=self.position_predicting)
@@ -631,7 +625,7 @@ class CLEANPPOFM:
         # Copy parameter list, so we don't mutate the original dict
         data = self.__dict__.copy()
         for to_exclude in ["logger", "env", "num_timesteps", "policy",
-                           "_last_obs", "_last_episode_starts", "actual_env"]:
+                           "_last_obs", "_last_episode_starts"]:
             del data[to_exclude]
         # save network parameters
         data["_policy"] = self.policy.state_dict()
