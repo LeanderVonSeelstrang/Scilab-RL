@@ -63,9 +63,11 @@ class Agent(nn.Module):
         return self.critic(obs)
 
     # FIXME: missing documentation
-    def get_action_and_value_and_forward_model_prediction(self, fm_network, obs, action=None,
-                                                          deterministic: bool = False, logger: Logger = None,
-                                                          position_predicting: bool = False) -> tuple[
+    def get_action_and_value_and_forward_model_prediction_and_prediction_error(self, fm_network, obs, action=None,
+                                                                               deterministic: bool = False,
+                                                                               logger: Logger = None,
+                                                                               position_predicting: bool = False) -> \
+    tuple[
         torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.distributions.Normal, float]:
         """
         Get the action, logarithmic probability of action distribution, entropy of the action distribution

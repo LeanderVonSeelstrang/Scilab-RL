@@ -158,11 +158,11 @@ class GridWorldEnv(gym.Env):
     def _render_frame(self):
         if self.forward_model_prediction is not None:
             predicted_agent_location = np.array(
-                [round(self.forward_model_prediction.numpy()[0][0]),
-                 round(self.forward_model_prediction.numpy()[0][1])])
+                [min(max(0, round(self.forward_model_prediction.numpy()[0][0])), 4),
+                 min(max(0, round(self.forward_model_prediction.numpy()[0][1])), 4)])
             predicted_target_location = np.array(
-                [round(self.forward_model_prediction.numpy()[0][2]),
-                 round(self.forward_model_prediction.numpy()[0][3])])
+                [min(max(0, round(self.forward_model_prediction.numpy()[0][2])), 4),
+                 min(max(0, round(self.forward_model_prediction.numpy()[0][3])), 4)])
             range_of_grid = self.size * 2
             grid_window_size = self.window_size * 2
         else:

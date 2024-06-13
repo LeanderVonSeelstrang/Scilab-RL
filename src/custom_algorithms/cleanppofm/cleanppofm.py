@@ -18,12 +18,13 @@ from custom_algorithms.cleanppofm.forward_model import ProbabilisticSimpleForwar
     ProbabilisticForwardNetPositionPrediction, ProbabilisticSimpleForwardNetIncludingReward, \
     ProbabilisticForwardNetPositionPredictionIncludingReward
 from custom_algorithms.cleanppofm.utils import flatten_obs, get_reward_estimation_of_forward_model, \
-    get_position_of_observation
+    get_position_of_observation, get_next_observation_gridworld
 from custom_algorithms.cleanppofm.agent import Agent
+from custom_envs.grid_world.grid_world_env import GridWorldEnv
+from custom_envs.moonlander.moonlander_env import MoonlanderWorldEnv
 from utils.custom_buffer import CustomDictRolloutBuffer as DictRolloutBuffer
 from utils.custom_buffer import CustomRolloutBuffer as RolloutBuffer
 from utils.custom_wrappers import DisplayWrapper
-from decimal import localcontext, Decimal, ROUND_HALF_UP
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -82,6 +83,7 @@ class CLEANPPOFM:
             fm_parameters: dict = None,
             position_predicting: bool = False,
             reward_predicting: bool = False,
+            number_of_future_steps: int = 10,
             fm_trained_with_input_noise: bool = True
     ):
         if fm_parameters is None:
@@ -151,6 +153,31 @@ class CLEANPPOFM:
         # boolean if the training data for the forward model is generated with input noise or not
         self.fm_trained_with_input_noise = fm_trained_with_input_noise
 
+        # Get actual env from the vectorized envs
+        # FIXME: Problem, we need to add the forward model prediction to the environment for displaying it
+        #  when display wrapper is included, one "env" more is needed
+        # FIXME: VERY UGLY CODING
+        if isinstance(self.env.envs[0], DisplayWrapper):
+            self.actual_env = self.env.envs[0].env.env.env.env
+        else:
+            self.actual_env = self.env.envs[0].env.env.env
+        if not (isinstance(self.actual_env, GridWorldEnv) or isinstance(self.actual_env, MoonlanderWorldEnv)):
+            raise NotImplementedError("This algorithm is not implemented for this environment yet!")
+
+        # position predicting only possible for moonlander env
+        if self.position_predicting and not isinstance(self.actual_env, MoonlanderWorldEnv):
+            raise NotImplementedError("Position predicting is only possible for the moonlander environment by now!")
+        # fm trained without input noise only possible for gridworld env
+        if not self.fm_trained_with_input_noise and not isinstance(self.actual_env, GridWorldEnv):
+            raise NotImplementedError(
+                "Training the forward model without input noise is only possible for the gridworld environment!")
+        # number of future steps only possible for reward predicting
+        if number_of_future_steps > 0 and not self.reward_predicting:
+            warnings.warn(
+                f"You have specified a number of future steps of {number_of_future_steps},"
+                f" but because you set the `reward_predicting` parameter to False,"
+                f" it does not have any effect.\n"
+            )
         if self.position_predicting:
             fm_cls = ProbabilisticForwardNetPositionPredictionIncludingReward if self.reward_predicting else \
                 ProbabilisticForwardNetPositionPrediction
@@ -217,7 +244,7 @@ class CLEANPPOFM:
                 self.train_fm(observations, next_observations, actions, rewards_of_env)
                 #####
 
-                _, log_prob, entropy, values, _, _ = self.policy.get_action_and_value_and_forward_model_prediction(
+                _, log_prob, entropy, values, _, _ = self.policy.get_action_and_value_and_forward_model_prediction_and_prediction_error(
                     fm_network=self.fm_network,
                     obs=observations,
                     action=actions, logger=self.logger,
@@ -356,7 +383,7 @@ class CLEANPPOFM:
         while elements_in_rollout_buffer < self.n_steps:
             with torch.no_grad():
                 # get action and forward model prediction
-                actions, log_probs, _, values, forward_normal, prediction_error = self.policy.get_action_and_value_and_forward_model_prediction(
+                actions, log_probs, _, values, forward_normal, prediction_error = self.policy.get_action_and_value_and_forward_model_prediction_and_prediction_error(
                     fm_network=self.fm_network,
                     obs=self._last_obs, logger=self.logger, position_predicting=self.position_predicting)
 
@@ -374,30 +401,12 @@ class CLEANPPOFM:
                 clipped_actions = actions[0]
 
             ##### DISPLAYING THE FORWARD MODEL PREDICTION #####
-            # FIXME: Problem, we need to add the forward model prediction to the environment for displaying it
-            # FIXME: very ugly coding
-            #  when display wrapper is included, one "env" more is needed
             if not self.reward_predicting:
-                if isinstance(self.env.envs[0], DisplayWrapper):
-                    self.env.envs[0].env.env.env.env.forward_model_prediction = forward_normal.mean.cpu()
-                    self.env.envs[0].env.env.env.env.forward_model_stddev = forward_normal.stddev.cpu()
-                else:
-                    self.env.envs[0].env.env.env.forward_model_prediction = forward_normal.mean.cpu()
-                    self.env.envs[0].env.env.env.forward_model_stddev = forward_normal.stddev.cpu()
+                self.actual_env.forward_model_prediction = forward_normal.mean.cpu()
+                self.actual_env.forward_model_stddev = forward_normal.stddev.cpu()
             else:
-                if isinstance(self.env.envs[0], DisplayWrapper):
-                    # FIXME: this is hardcoded for the gridworld env
-                    self.env.envs[0].env.env.env.env.forward_model_prediction = forward_normal.mean[0][0:4].unsqueeze(
-                        dim=0).cpu()
-                    self.env.envs[0].env.env.env.env.forward_model_stddev = forward_normal.stddev[0][0:4].unsqueeze(
-                        dim=0).cpu()
-                else:
-                    # FIXME: NOT HARDCODED BUT FROM OBSERVATION SPACE SHAPE
-                    # FIXME: this is hardcoded for the gridworld env
-                    self.env.envs[0].env.env.env.forward_model_prediction = forward_normal.mean[0][0:4].unsqueeze(
-                        dim=0).cpu()
-                    self.env.envs[0].env.env.env.forward_model_stddev = forward_normal.stddev[0][0:4].unsqueeze(
-                        dim=0).cpu()
+                self.actual_env.forward_model_prediction = forward_normal.mean[0][:-1].cpu().unsqueeze(0)
+                self.actual_env.forward_model_stddev = forward_normal.stddev[0][:-1].cpu().unsqueeze(0)
 
             ##### STEP IN ENVIRONMENT #####
             # dones = terminated or truncated
@@ -420,6 +429,12 @@ class CLEANPPOFM:
                     flatten_last_obs = torch.from_numpy(flatten_last_obs)
                     flatten_new_obs = torch.from_numpy(flatten_new_obs)
 
+                # default action is stay at same position
+                if isinstance(self.actual_env, MoonlanderWorldEnv):
+                    default_action = torch.Tensor([[0]])
+                # random default action for gridworld env
+                elif isinstance(self.actual_env, GridWorldEnv):
+                    default_action = torch.randint(low=0, high=8, size=(1, 1), device=device)
                 # TODO: do this only after a warm-up phase of the forward model
                 ##### REWARD ESTIMATION #####
                 future_reward_estimation = get_reward_estimation_of_forward_model(
@@ -520,7 +535,8 @@ class CLEANPPOFM:
 
         return True
 
-    def train_fm(self, observations, next_observations, actions, rewards) -> None:
+    def train_fm(self, observations: torch.Tensor, next_observations: torch.Tensor, actions: torch.Tensor,
+                 rewards: torch.Tensor) -> None:
         """
         Train the forward model with the actual next observations and rewards
         Args:
@@ -535,34 +551,23 @@ class CLEANPPOFM:
         if self.policy.flatten:
             observations = flatten_obs(observations)
             next_observations = flatten_obs(next_observations)
+
+        ##### FORMAT OBSERVATION FOR FORWARD MODEL #####
+        # 1. with or without reward (line 572)
+        # 2. with or without position predicting (moonlander)
+        # 3. with or without input noise
+
         # gridworld or moonlander without position predicting
         if not self.position_predicting:
+            # the if-clause is only implemented for the gridworld env
+            # an error is raised in the __init__ method if the moonlander env is used with training without input noise
             if not self.fm_trained_with_input_noise:
-                # FIXME: this is hardcoded for the gridworld env
-                ##### WHILE THE AGENT IS TRAINED WITH INPUT NOISE, THE FM IS TRAINED WITHOUT INPUT NOISE
-                action_to_direction = {
-                    0: np.array([1, 0]),  # right
-                    1: np.array([1, 1]),  # right down (diagonal)
-                    2: np.array([0, 1]),  # down
-                    3: np.array([-1, 1]),  # left down (diagonal)
-                    4: np.array([-1, 0]),  # left
-                    5: np.array([-1, -1]),  # left up
-                    6: np.array([0, -1]),  # up
-                    7: np.array([1, -1])  # right up
-                }
-                agent_location_without_input_noise = torch.empty(size=(observations.shape[0], 4), device=device)
-                for index, action in enumerate(actions):
-                    direction = action_to_direction[int(action)]
-                    # We use `np.clip` to make sure we don't leave the grid
-                    standard_agent_location = np.clip(
-                        np.array(observations[index][0:2].cpu()) + direction, 0, 4
-                    )
-                    agent_location_without_input_noise[index] = torch.tensor(
-                        np.concatenate((standard_agent_location, observations[index][2:4].cpu())), device=device
-                    )
+                agent_location_without_input_noise = get_next_observation_gridworld(observations=observations,
+                                                                                    actions=actions)
 
                 next_observations_formatted = agent_location_without_input_noise if not self.reward_predicting else torch.cat(
                     (agent_location_without_input_noise, rewards.unsqueeze(dim=1)), dim=1)
+            # default case: observation optional with reward
             else:
                 next_observations_formatted = next_observations if not self.reward_predicting else torch.cat(
                     (next_observations, rewards.unsqueeze(dim=1)), dim=1)
@@ -575,12 +580,13 @@ class CLEANPPOFM:
             if self.reward_predicting:
                 next_observations_formatted = torch.cat((next_observations_formatted, rewards), dim=1)
 
+        ##### FORWARD MODEL TRAINING #####
         # forward model prediction
-        forward_normal = self.fm_network(observations, actions.float().unsqueeze(1))
+        forward_model_prediction_normal_distribution = self.fm_network(observations, actions.float().unsqueeze(1))
         # log probs is the logarithm of the maximum likelihood
         # log because the deviation is easier (addition instead of multiplication)
         # negative because likelihood normally maximizes
-        fw_loss = -forward_normal.log_prob(next_observations_formatted)
+        fw_loss = -forward_model_prediction_normal_distribution.log_prob(next_observations_formatted)
         loss = fw_loss.mean()
 
         self.logger.record("fm/fw_loss", loss.item())
@@ -595,8 +601,22 @@ class CLEANPPOFM:
             episode_start: Optional[np.ndarray] = None,
             deterministic: bool = False,
     ) -> Tuple[np.ndarray, Optional[Tuple[np.ndarray, ...]], torch.distributions.Normal]:
+        """
+        From the stable-baselines3 PPO implementation.
+        Get the policy action from an observation (and optional hidden state).
+        Includes sugar-coating to handle different observations (e.g. normalizing images).
+        Args:
+            observation: the input observation
+            state: The last hidden states (can be None, used in recurrent policies)
+            episode_start: The last masks (can be None, used in recurrent policies)
+                this corresponds to beginning of episodes, where the hidden states of the RNN must be reset.
+            deterministic: Whether or not to return deterministic actions.
+
+        Returns:
+            the model's action and the next hidden state (used in recurrent policies)
+        """
         with torch.no_grad():
-            action, _, _, _, forward_model_prediction_normal_distribution, _ = self.policy.get_action_and_value_and_forward_model_prediction(
+            action, _, _, _, forward_model_prediction_normal_distribution, _ = self.policy.get_action_and_value_and_forward_model_prediction_and_prediction_error(
                 fm_network=self.fm_network,
                 obs=observation,
                 deterministic=deterministic,
@@ -611,7 +631,7 @@ class CLEANPPOFM:
         # Copy parameter list, so we don't mutate the original dict
         data = self.__dict__.copy()
         for to_exclude in ["logger", "env", "num_timesteps", "policy",
-                           "_last_obs", "_last_episode_starts"]:
+                           "_last_obs", "_last_episode_starts", "actual_env"]:
             del data[to_exclude]
         # save network parameters
         data["_policy"] = self.policy.state_dict()
@@ -633,5 +653,5 @@ class CLEANPPOFM:
     def set_logger(self, logger):
         self.logger = logger
 
-    def get_env(self):
+    def get_env(self) -> VecEnv:
         return self.env

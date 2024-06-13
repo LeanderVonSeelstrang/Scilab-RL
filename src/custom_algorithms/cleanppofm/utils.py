@@ -107,3 +107,38 @@ def get_position_of_observation(obs: torch.Tensor) -> torch.Tensor:
         first_index_with_one = np.where(obs_element.cpu() == 1)[0][0] + 1
         positions.append(first_index_with_one)
     return torch.tensor(positions, device=device).unsqueeze(1)
+
+
+def get_next_observation_gridworld(observations: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
+    """
+    Calculate the next observation in the gridworld environment manually to exclude random observations through input noise.
+    Args:
+        observations: observations
+        actions: actions
+
+    Returns:
+        next observation in the gridworld environment without input noise
+
+    """
+    ##### WHILE THE AGENT IS TRAINED WITH INPUT NOISE, THE FM IS TRAINED WITHOUT INPUT NOISE
+    action_to_direction = {
+        0: np.array([1, 0]),  # right
+        1: np.array([1, 1]),  # right down (diagonal)
+        2: np.array([0, 1]),  # down
+        3: np.array([-1, 1]),  # left down (diagonal)
+        4: np.array([-1, 0]),  # left
+        5: np.array([-1, -1]),  # left up
+        6: np.array([0, -1]),  # up
+        7: np.array([1, -1])  # right up
+    }
+    agent_location_without_input_noise = torch.empty(size=(observations.shape[0], 4), device=device)
+    for index, action in enumerate(actions):
+        direction = action_to_direction[int(action)]
+        # We use `np.clip` to make sure we don't leave the grid
+        standard_agent_location = np.clip(
+            np.array(observations[index][0:2].cpu()) + direction, 0, 4
+        )
+        agent_location_without_input_noise[index] = torch.tensor(
+            np.concatenate((standard_agent_location, observations[index][2:4].cpu())), device=device
+        )
+    return agent_location_without_input_noise
