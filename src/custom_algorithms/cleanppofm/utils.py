@@ -4,11 +4,11 @@ import torch
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def flatten_obs(obs) -> torch.Tensor:
+def flatten_obs(obs: dict) -> torch.Tensor:
     """
-    Flatten an observation
+    Flatten a dict observation of the Gridworld envs.
     Args:
-        obs: observation of type ...
+        obs: observation of type dict
 
     Returns:
         flattened observation in tensor format
@@ -23,10 +23,9 @@ def flatten_obs(obs) -> torch.Tensor:
         if isinstance(target, np.ndarray):
             target = torch.from_numpy(target).to(device)
         return torch.cat([agent, target], dim=1).to(dtype=torch.float32).detach().clone()
-    # RGB image
-    # FIXME: missing documentation because of error in moonlander
     else:
-        return torch.tensor(obs, device=device, dtype=torch.float32).flatten(start_dim=1).detach().clone()
+        raise NotImplementedError(
+            "Flatten observation not implemented for this environment with this observation type.")
 
 
 def layer_init(layer, std: np.float64 = np.sqrt(2), bias_const: float = 0.0) -> torch.nn.Module:
@@ -83,6 +82,36 @@ def get_reward_estimation_of_forward_model(fm_network, obs: torch.Tensor,
                           min=0,
                           max=4)
     return reward_estimation
+
+
+def get_reward_with_future_reward_estimation_corrective(rewards: torch.Tensor, future_reward_estimation: float,
+                                                        prediction_error: float) -> torch.Tensor:
+    """
+    Get the reward with future reward estimation corrective.
+    Args:
+        rewards: rewards of last step
+        future_reward_estimation: estimation of future rewards
+        prediction_error: error between predicted and last actual observation
+
+    Returns:
+        reward with future reward estimation corrective
+
+    """
+    rewards_with_future_reward_estimation = rewards + future_reward_estimation
+    # different reward estimation for positive and negative rewards
+    if rewards_with_future_reward_estimation < 0:
+        # negative rewards
+        reward_with_future_reward_estimation_corrective = rewards_with_future_reward_estimation - (
+                abs(rewards_with_future_reward_estimation) * prediction_error)
+    else:
+        # positive rewards
+        if not prediction_error == 0:
+            reward_with_future_reward_estimation_corrective = rewards_with_future_reward_estimation / prediction_error
+        # prediction error is zero -> we cannot divide by zero
+        # -> give a boost of * 10 = perfect prediction (* 10 is similar range than other rewards)
+        else:
+            reward_with_future_reward_estimation_corrective = rewards_with_future_reward_estimation * 10
+    return reward_with_future_reward_estimation_corrective
 
 
 def get_position_of_observation(obs: torch.Tensor) -> torch.Tensor:

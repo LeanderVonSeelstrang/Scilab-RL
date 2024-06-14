@@ -16,7 +16,7 @@ from custom_algorithms.cleanppofm.forward_model import ProbabilisticSimpleForwar
     ProbabilisticForwardNetPositionPrediction, ProbabilisticSimpleForwardNetIncludingReward, \
     ProbabilisticForwardNetPositionPredictionIncludingReward
 from custom_algorithms.cleanppofm.utils import flatten_obs, get_reward_estimation_of_forward_model, \
-    get_position_of_observation, get_next_observation_gridworld
+    get_position_of_observation, get_next_observation_gridworld, get_reward_with_future_reward_estimation_corrective
 from custom_algorithms.cleanppofm.agent import Agent
 from utils.custom_buffer import CustomDictRolloutBuffer as DictRolloutBuffer
 from utils.custom_buffer import CustomRolloutBuffer as RolloutBuffer
@@ -435,8 +435,11 @@ class CLEANPPOFM:
                     default_action=torch.Tensor(
                         [[0]]),
                     number_of_future_steps=10)
-                reward_with_future_reward_estimation_corrective = (
-                                                                          rewards + future_reward_estimation) / prediction_error
+                reward_with_future_reward_estimation_corrective = get_reward_with_future_reward_estimation_corrective(
+                    rewards=rewards, future_reward_estimation=future_reward_estimation,
+                    prediction_error=prediction_error)
+
+            # fixme: reward_with_future_reward_estimation_corrective is not used
 
             ##### LOGGING #####
             # FIXME: why is are there multiple rewards but only one reward prediction?
