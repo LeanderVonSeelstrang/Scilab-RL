@@ -604,7 +604,7 @@ class CLEANPPOFM:
                                                       next_obs=torch.tensor(new_obs, device=device),
                                                       forward_model_prediction_normal_distribution=forward_normal,
                                                       position_predicting=self.position_predicting)
-        print("prediction_error", prediction_error)
+        # print("prediction_error", prediction_error)
 
         if self.reward_predicting:
             ##### FLATTING OBSERVATIONS FOR FUTURE REWARD ESTIMATION #####
@@ -619,8 +619,8 @@ class CLEANPPOFM:
                     flatten_last_obs = flatten_obs(flatten_last_obs)
                     flatten_new_obs = flatten_obs(flatten_new_obs)
             else:
-                flatten_last_obs = torch.from_numpy(flatten_last_obs)
-                flatten_new_obs = torch.from_numpy(flatten_new_obs)
+                flatten_last_obs = torch.from_numpy(flatten_last_obs).to(device)
+                flatten_new_obs = torch.from_numpy(flatten_new_obs).to(device)
 
             # default action is stay at same position
             if self.env_name == "MoonlanderWorldEnv":

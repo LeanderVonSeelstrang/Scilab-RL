@@ -194,13 +194,13 @@ def calculate_prediction_error(env_name: str, env, next_obs, forward_model_predi
             [min(max(0, round(forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[0][0])), 4),
              min(max(0, round(forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[0][1])), 4),
              min(max(0, round(forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[0][2])), 4),
-             min(max(0, round(forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[0][3])), 4)])
+             min(max(0, round(forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[0][3])), 4)], device=device)
         prediction_error = (math.sqrt(torch.sum((predicted_location - next_obs) ** 2))) / max_distance_in_gridworld
     elif env_name == "MoonlanderWorldEnv":
         # we just care for the x position of the moonlander agent, because the y position is always equally to the size of the agent
         if position_predicting:
             positions = get_position_of_observation(next_obs)
-            print("actual positions: ", positions)
+            #print("actual positions: ", positions)
 
             # Smallest x position of the agent is the size of the agent
             # Biggest x position of the agent is the width of the moonlander world - the size of the agent
@@ -211,7 +211,7 @@ def calculate_prediction_error(env_name: str, env, next_obs, forward_model_predi
             predicted_x_position = torch.tensor([min(max(first_possible_x_position,
                                                          forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[
                                                              0][0]),
-                                                     last_possible_x_position)])
+                                                     last_possible_x_position)], device=device)
             prediction_error = (math.sqrt(
                 torch.sum((predicted_x_position - positions[0]) ** 2))) / max_distance_in_moonlander_world
         # TODO: implement prediction error calculation for moonlander world env with predicting whole observation

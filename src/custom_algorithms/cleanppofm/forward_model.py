@@ -8,6 +8,8 @@ from torch.distributions import Normal
 LOG_STD_MAX = 2
 LOG_STD_MIN = -20
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 class ProbabilisticSimpleForwardNet(nn.Module):
     def __init__(self, env, cfg):
@@ -90,7 +92,7 @@ class ProbabilisticForwardNetPositionPredictionIncludingReward(nn.Module):
 
     def forward(self, old_position, action):
         # foward model: p(w' | w, a)
-        hx = torch.cat([old_position, action], dim=-1)
+        hx = torch.cat([old_position.to(device), action.to(device)], dim=-1)
         hx = self.state_action_encoder(hx)
         hx = F.relu(hx)
         fw_mu, fw_log_std = self.fw_mu(hx), self.fw_std(hx)
