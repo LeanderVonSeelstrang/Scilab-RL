@@ -225,13 +225,9 @@ class CLEANPPOFM:
 
                 # our custom implementation of the buffer includes the next observation for training the forward model
                 next_observations = rollout_data.next_observations
-                # our custom implementation of the buffer includes intermediate rewards for training the forward model
-                # rewards of env mean that it is the actual reward of the environment
-                # we add more components to the reward after getting it from the environment which cannot and
-                # should not be predicted by the forward model
-                rewards_of_env = rollout_data.rewards_of_env
+                rewards = rollout_data.rewards
 
-                self.train_fm(observations, next_observations, actions, rewards_of_env)
+                self.train_fm(observations, next_observations, actions, rewards)
                 #####
 
                 _, log_prob, entropy, values, _ = self.policy.get_action_and_value_and_forward_model_prediction(
@@ -390,63 +386,8 @@ class CLEANPPOFM:
             elif isinstance(self.action_space, spaces.Discrete):
                 clipped_actions = actions[0]
 
-            ##### DISPLAYING THE FORWARD MODEL PREDICTION #####
-            # modify the env attributes as described here:
-            # https://github.com/DLR-RM/stable-baselines3/blob/master/docs/guide/vec_envs.rst
-            if not self.reward_predicting:
-                self.env.env_method("set_forward_model_prediction", forward_normal.mean.cpu())
-            # remove reward because it is not needed to display the predicted observation
-            else:
-                self.env.env_method("set_forward_model_prediction", forward_normal.mean[0][:-1].cpu().unsqueeze(0))
-
-            ##### STEP IN ENVIRONMENT #####
-            # dones = terminated or truncated
-            new_obs, rewards, dones, infos = env.step(clipped_actions)
-            rewards_of_env = copy.deepcopy(rewards)
-
-            ##### CALCULATING PREDICTION ERROR #####
-            prediction_error = calculate_prediction_error(env_name=self.env_name, env=env,
-                                                          next_obs=torch.tensor(new_obs, device=device),
-                                                          forward_model_prediction_normal_distribution=forward_normal,
-                                                          position_predicting=self.position_predicting)
-            print("prediction_error", prediction_error)
-
-            if self.reward_predicting:
-                ##### FLATTING OBSERVATIONS FOR FUTURE REWARD ESTIMATION #####
-                flatten_last_obs = self._last_obs
-                flatten_new_obs = new_obs
-                if isinstance(env.observation_space, spaces.Dict):
-                    flatten_last_obs = flatten_obs(flatten_last_obs)
-                    flatten_new_obs = flatten_obs(flatten_new_obs)
-                # FIXME: what is happening here exactly?
-                elif len(env.observation_space.shape) >= 3:
-                    if env.observation_space.shape[2] == 3:
-                        flatten_last_obs = flatten_obs(flatten_last_obs)
-                        flatten_new_obs = flatten_obs(flatten_new_obs)
-                else:
-                    flatten_last_obs = torch.from_numpy(flatten_last_obs)
-                    flatten_new_obs = torch.from_numpy(flatten_new_obs)
-
-                # default action is stay at same position
-                if self.env_name == "MoonlanderWorldEnv":
-                    default_action = torch.Tensor([[0]])
-                # random default action for gridworld env
-                elif self.env_name == "GridWorldEnv":
-                    default_action = torch.randint(low=0, high=8, size=(1, 1), device=device)
-                # TODO: do this only after a warm-up phase of the forward model
-                ##### REWARD ESTIMATION #####
-                future_reward_estimation = get_reward_estimation_of_forward_model(
-                    fm_network=self.fm_network,
-                    obs=flatten_new_obs,
-                    position_predicting=self.position_predicting,
-                    default_action=torch.Tensor(
-                        [[0]]),
-                    number_of_future_steps=10)
-                reward_with_future_reward_estimation_corrective = get_reward_with_future_reward_estimation_corrective(
-                    rewards=rewards, future_reward_estimation=future_reward_estimation,
-                    prediction_error=prediction_error)
-
-            # fixme: reward_with_future_reward_estimation_corrective is not used
+            new_obs, rewards, dones, infos, prediction_error, reward_with_future_reward_estimation_corrective = self.step_in_env(
+                actions=clipped_actions, forward_normal=forward_normal)
 
             ##### LOGGING #####
             # FIXME: why is are there multiple rewards but only one reward prediction?
@@ -520,7 +461,7 @@ class CLEANPPOFM:
                     next_obs=temporary_new_obs,
                     action=actions,
                     reward=rewards,
-                    reward_of_env=rewards_of_env,
+                    reward_with_future_reward_estimation_corrective=reward_with_future_reward_estimation_corrective,
                     episode_start=self._last_episode_starts,
                     value=values,
                     log_prob=log_probs,
@@ -626,6 +567,82 @@ class CLEANPPOFM:
                 logger=self.logger,
                 position_predicting=self.position_predicting)
         return action.cpu().numpy(), state, forward_model_prediction_normal_distribution
+
+    def step_in_env(self, actions, forward_normal) -> tuple[np.ndarray, float, float, bool, dict, float]:
+        """
+        Step in the environment with the given actions and the forward model prediction.
+        This includes the displaying of the forward model prediction and the calculation of the prediction error.
+        The reward is modified through the prediction error
+        Args:
+            actions: action to take in the environment
+            forward_normal: prediction of the forward model (normal distribution)
+
+        Returns:
+            new_obs: new observation
+            rewards: rewards
+            reward_with_future_reward_estimation_corrective: reward corrected by prediction error
+            dones: if the episode is done
+            infos: additional information
+            prediction_error: calculated prediction error
+        """
+        ##### DISPLAYING THE FORWARD MODEL PREDICTION #####
+        # modify the env attributes as described here:
+        # https://github.com/DLR-RM/stable-baselines3/blob/master/docs/guide/vec_envs.rst
+        if not self.reward_predicting:
+            self.env.env_method("set_forward_model_prediction", forward_normal.mean.cpu())
+        # remove reward because it is not needed to display the predicted observation
+        else:
+            self.env.env_method("set_forward_model_prediction", forward_normal.mean[0][:-1].cpu().unsqueeze(0))
+
+        ##### STEP IN ENVIRONMENT #####
+        # dones = terminated or truncated
+        new_obs, rewards, dones, infos = self.env.step(actions)
+        deepcopy_of_rewards_for_corrective = copy.deepcopy(rewards)
+
+        ##### CALCULATING PREDICTION ERROR #####
+        prediction_error = calculate_prediction_error(env_name=self.env_name, env=self.env,
+                                                      next_obs=torch.tensor(new_obs, device=device),
+                                                      forward_model_prediction_normal_distribution=forward_normal,
+                                                      position_predicting=self.position_predicting)
+        print("prediction_error", prediction_error)
+
+        if self.reward_predicting:
+            ##### FLATTING OBSERVATIONS FOR FUTURE REWARD ESTIMATION #####
+            flatten_last_obs = self._last_obs
+            flatten_new_obs = new_obs
+            if isinstance(self.env.observation_space, spaces.Dict):
+                flatten_last_obs = flatten_obs(flatten_last_obs)
+                flatten_new_obs = flatten_obs(flatten_new_obs)
+            # FIXME: what is happening here exactly?
+            elif len(self.env.observation_space.shape) >= 3:
+                if self.env.observation_space.shape[2] == 3:
+                    flatten_last_obs = flatten_obs(flatten_last_obs)
+                    flatten_new_obs = flatten_obs(flatten_new_obs)
+            else:
+                flatten_last_obs = torch.from_numpy(flatten_last_obs)
+                flatten_new_obs = torch.from_numpy(flatten_new_obs)
+
+            # default action is stay at same position
+            if self.env_name == "MoonlanderWorldEnv":
+                default_action = torch.Tensor([[0]])
+            # random default action for gridworld env
+            elif self.env_name == "GridWorldEnv":
+                default_action = torch.randint(low=0, high=8, size=(1, 1), device=device)
+            # TODO: do this only after a warm-up phase of the forward model
+            ##### REWARD ESTIMATION #####
+            future_reward_estimation = get_reward_estimation_of_forward_model(
+                fm_network=self.fm_network,
+                obs=flatten_new_obs,
+                position_predicting=self.position_predicting,
+                default_action=torch.Tensor(
+                    [[0]]),
+                number_of_future_steps=10)
+            reward_with_future_reward_estimation_corrective = get_reward_with_future_reward_estimation_corrective(
+                rewards=deepcopy_of_rewards_for_corrective, future_reward_estimation=future_reward_estimation,
+                prediction_error=prediction_error)
+
+        # fixme: reward_with_future_reward_estimation_corrective is not used
+        return new_obs, rewards, dones, infos, prediction_error, reward_with_future_reward_estimation_corrective
 
     def save(
             self,

@@ -3,11 +3,14 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import gymnasium as gym
 import numpy as np
+import torch
 
 from stable_baselines3.common import base_class
 from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv, VecMonitor, is_vecenv_wrapped
 
 from utils.custom_wrappers import DisplayWrapper, RecordVideo
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 # modified copy from stable baselines
@@ -21,10 +24,13 @@ def evaluate_policy(
         reward_threshold: Optional[float] = None,
         return_episode_rewards: bool = False,
         warn: bool = True,
+        # from us
         callback_metric_viz=None,
         logger=None,
 ) -> Union[Tuple[float, float], Tuple[List[float], List[int], List[int]]]:
     """
+    From the stable-baselines3 evaluation implementation.
+
     Runs policy for ``n_eval_episodes`` episodes and returns average reward.
     If a vector env is passed in, this divides the episodes to evaluate onto the
     different elements of the vector env. This static division of work is done to
@@ -77,7 +83,6 @@ def evaluate_policy(
     n_envs = env.num_envs
     episode_rewards = []
     episode_lengths = []
-    episode_number_of_crashed_or_collected_objects = []
 
     episode_counts = np.zeros(n_envs, dtype="int")
     # Divides episodes among different sub environments in the vector as evenly as possible
@@ -88,18 +93,21 @@ def evaluate_policy(
     current_number_of_crashed_or_collected_objects = np.zeros(n_envs, dtype="int")
     observations = env.reset()
     states = None
-    while (episode_counts < episode_count_targets).any():
-        actions, states, forward_normal = model.predict(observations, state=states, deterministic=deterministic)
-        # FIXME: very ugly coding
-        #  when display wrapper is included, one "env" more is needed
-        if isinstance(env.envs[0], DisplayWrapper) or isinstance(env.envs[0], RecordVideo):
-            env.envs[0].env.env.env.env.forward_model_prediction = forward_normal.mean.cpu()
-            env.envs[0].env.env.env.env.forward_model_stddev = forward_normal.stddev.cpu()
-        else:
-            env.envs[0].env.env.env.forward_model_prediction = forward_normal.mean.cpu()
-            env.envs[0].env.env.env.forward_model_stddev = forward_normal.stddev.cpu()
 
-        observations, rewards, dones, infos = env.step(actions)
+    ### from me
+    episode_number_of_crashed_or_collected_objects = []
+    env_name = env.get_attr("name")[0]
+    ###
+
+    while (episode_counts < episode_count_targets).any():
+
+        ### custom code
+        actions, states, forward_normal = model.predict(observations, state=states, deterministic=deterministic)
+
+        observations, rewards, dones, infos, prediction_error, reward_with_future_reward_estimation_corrective = model.step_in_env(
+            actions=actions,
+            forward_normal=forward_normal)
+
         logger.record("eval/reward", rewards)
         logger.record("eval/predicted_reward", round(forward_normal.mean[0][-1].item()))
         # dodge/collect env
@@ -109,10 +117,14 @@ def evaluate_policy(
         # trigger metric visualization
         if callback_metric_viz:
             callback_metric_viz._on_step()
-        current_rewards += rewards
-        current_lengths += 1
+
         if "simple" in infos[0].keys():
             current_number_of_crashed_or_collected_objects += infos[0]["number_of_crashed_or_collected_objects"]
+
+        ### until here
+
+        current_rewards += rewards
+        current_lengths += 1
         for i in range(n_envs):
             if episode_counts[i] < episode_count_targets[i]:
 
@@ -140,12 +152,18 @@ def evaluate_policy(
                     else:
                         episode_rewards.append(current_rewards[i])
                         episode_lengths.append(current_lengths[i])
+                        episode_counts[i] += 1
+
+                        ### from me
                         episode_number_of_crashed_or_collected_objects.append(
                             current_number_of_crashed_or_collected_objects[i])
-                        episode_counts[i] += 1
+
                     current_rewards[i] = 0
                     current_lengths[i] = 0
+
+                    ### from me
                     current_number_of_crashed_or_collected_objects[i] = 0
+
                     if states is not None:
                         states[i] *= 0
 
