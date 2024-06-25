@@ -937,18 +937,15 @@ class MoonlanderWorldEnv(Env):
             self.rendering_first_time = False
         # FIXME: this is hardcoded for our custom moonlander env
         if self.forward_model_prediction is not None:
-            if self.forward_model_prediction.size(dim=1) == 1:
-                position = int(copy.deepcopy(self.forward_model_prediction[0][0]))
-                # build empty obs
-                matrix = np.zeros(shape=(10, 10 + 2), dtype=np.int16)
-                for index in range(10):
-                    matrix[index, 0] = -1
-                    matrix[index, -1] = -1
-                    if index == 0:
-                        matrix[index, max(1, min(position, 10))] = 1
-                forward_model_pred = matrix
-            else:
-                forward_model_pred = copy.deepcopy(self.forward_model_prediction[0]).reshape(10, 12)
+            position = int(copy.deepcopy(self.forward_model_prediction[0][0]))
+            # build empty obs
+            matrix = np.zeros(shape=(10, 10 + 2), dtype=np.int16)
+            for index in range(10):
+                matrix[index, 0] = -1
+                matrix[index, -1] = -1
+                if index == 0:
+                    matrix[index, max(1, min(position, 10))] = 1
+            forward_model_pred = matrix
             plotted_image = np.concatenate((self.state, forward_model_pred), axis=1)
             self.im_mb.set_data(plotted_image)
             self.fig_mb.canvas.draw()
