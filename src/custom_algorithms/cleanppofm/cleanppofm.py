@@ -16,7 +16,8 @@ from custom_algorithms.cleanppofm.forward_model import ProbabilisticSimpleForwar
     ProbabilisticForwardNetPositionPrediction, ProbabilisticSimpleForwardNetIncludingReward, \
     ProbabilisticForwardNetPositionPredictionIncludingReward
 from custom_algorithms.cleanppofm.utils import flatten_obs, get_reward_estimation_of_forward_model, \
-    get_position_of_observation, get_next_observation_gridworld, get_reward_with_future_reward_estimation_corrective
+    get_position_of_observation, get_next_observation_gridworld, get_reward_with_future_reward_estimation_corrective, \
+    calculate_prediction_error
 from custom_algorithms.cleanppofm.agent import Agent
 from utils.custom_buffer import CustomDictRolloutBuffer as DictRolloutBuffer
 from utils.custom_buffer import CustomRolloutBuffer as RolloutBuffer
@@ -233,10 +234,9 @@ class CLEANPPOFM:
                 self.train_fm(observations, next_observations, actions, rewards_of_env)
                 #####
 
-                _, log_prob, entropy, values, _, _ = self.policy.get_action_and_value_and_forward_model_prediction_and_prediction_error(
+                _, log_prob, entropy, values, _ = self.policy.get_action_and_value_and_forward_model_prediction(
                     fm_network=self.fm_network,
                     obs=observations,
-                    env_name=self.env_name,
                     action=actions, logger=self.logger,
                     position_predicting=self.position_predicting)
                 values = values.flatten()
@@ -372,9 +372,9 @@ class CLEANPPOFM:
         while elements_in_rollout_buffer < self.n_steps:
             with torch.no_grad():
                 # get action and forward model prediction
-                actions, log_probs, _, values, forward_normal, prediction_error = self.policy.get_action_and_value_and_forward_model_prediction_and_prediction_error(
+                actions, log_probs, _, values, forward_normal = self.policy.get_action_and_value_and_forward_model_prediction(
                     fm_network=self.fm_network,
-                    obs=self._last_obs, env_name=self.env_name, logger=self.logger,
+                    obs=self._last_obs, logger=self.logger,
                     position_predicting=self.position_predicting)
 
             # log logarithmic probability of action distribution (one value in tensor)
@@ -403,6 +403,13 @@ class CLEANPPOFM:
             # dones = terminated or truncated
             new_obs, rewards, dones, infos = env.step(clipped_actions)
             rewards_of_env = copy.deepcopy(rewards)
+
+            ##### CALCULATING PREDICTION ERROR #####
+            prediction_error = calculate_prediction_error(env_name=self.env_name, env=env,
+                                                          next_obs=torch.tensor(new_obs, device=device),
+                                                          forward_model_prediction_normal_distribution=forward_normal,
+                                                          position_predicting=self.position_predicting)
+            print("prediction_error", prediction_error)
 
             if self.reward_predicting:
                 ##### FLATTING OBSERVATIONS FOR FUTURE REWARD ESTIMATION #####
@@ -612,10 +619,9 @@ class CLEANPPOFM:
             the model's action and the next hidden state (used in recurrent policies)
         """
         with torch.no_grad():
-            action, _, _, _, forward_model_prediction_normal_distribution, _ = self.policy.get_action_and_value_and_forward_model_prediction_and_prediction_error(
+            action, _, _, _, forward_model_prediction_normal_distribution = self.policy.get_action_and_value_and_forward_model_prediction(
                 fm_network=self.fm_network,
                 obs=observation,
-                env_name=self.env_name,
                 deterministic=deterministic,
                 logger=self.logger,
                 position_predicting=self.position_predicting)

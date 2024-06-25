@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import math
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -101,8 +102,8 @@ def get_reward_with_future_reward_estimation_corrective(rewards: torch.Tensor, f
     # different reward estimation for positive and negative rewards
     if rewards_with_future_reward_estimation < 0:
         # negative rewards
-        reward_with_future_reward_estimation_corrective = rewards_with_future_reward_estimation - (
-                abs(rewards_with_future_reward_estimation) * prediction_error)
+        reward_with_future_reward_estimation_corrective = rewards_with_future_reward_estimation + (
+                abs(rewards_with_future_reward_estimation) * (1 - prediction_error))
     else:
         # positive rewards
         if not prediction_error == 0:
@@ -165,3 +166,59 @@ def get_next_observation_gridworld(observations: torch.Tensor, actions: torch.Te
             np.concatenate((standard_agent_location, observations[index][2:4].cpu())), device=device
         )
     return agent_location_without_input_noise
+
+
+def calculate_prediction_error(env_name: str, env, next_obs, forward_model_prediction_normal_distribution: torch.normal,
+                               position_predicting: bool) -> float:
+    """
+    Calculate the prediction error between the next obs and the forward model prediction.
+    Args:
+        env_name: name of the environment
+        env: environment
+        next_obs: observation after actually executing the action
+        forward_model_prediction_normal_distribution: prediction of next observation by forward model
+        position_predicting: if the forward model is predicting the position or actual observation
+
+    Returns:
+        prediction error between the next obs and the forward model prediction
+    """
+    ##### CALCULATE PREDICTION ERROR #####
+    # prediction error version one -> standard deviation
+    # prediction_error = forward_normal.stddev.mean().item()
+    # prediction error version two -> Euclidean distance
+    # calculate manually prediction error (Euclidean distance)
+    if env_name == "GridWorldEnv":
+        # predicted location can only be between 0 and 4
+        max_distance_in_gridworld = math.sqrt(((4 - 0) ** 2) + ((4 - 0) ** 2) + ((4 - 0) ** 2) + ((4 - 0) ** 2))
+        predicted_location = torch.tensor(
+            [min(max(0, round(forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[0][0])), 4),
+             min(max(0, round(forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[0][1])), 4),
+             min(max(0, round(forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[0][2])), 4),
+             min(max(0, round(forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[0][3])), 4)])
+        prediction_error = (math.sqrt(torch.sum((predicted_location - next_obs) ** 2))) / max_distance_in_gridworld
+    elif env_name == "MoonlanderWorldEnv":
+        # we just care for the x position of the moonlander agent, because the y position is always equally to the size of the agent
+        if position_predicting:
+            positions = get_position_of_observation(next_obs)
+            print("actual positions: ", positions)
+
+            # Smallest x position of the agent is the size of the agent
+            # Biggest x position of the agent is the width of the moonlander world - the size of the agent
+            first_possible_x_position = env.get_attr("first_possible_x_position")[0]
+            last_possible_x_position = env.get_attr("last_possible_x_position")[0]
+            max_distance_in_moonlander_world = math.sqrt(
+                (last_possible_x_position - first_possible_x_position) ** 2)
+            predicted_x_position = torch.tensor([min(max(first_possible_x_position,
+                                                         forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[
+                                                             0][0]),
+                                                     last_possible_x_position)])
+            prediction_error = (math.sqrt(
+                torch.sum((predicted_x_position - positions[0]) ** 2))) / max_distance_in_moonlander_world
+        # TODO: implement prediction error calculation for moonlander world env with predicting whole observation
+        else:
+            raise NotImplementedError(
+                "Prediction error calculation not implemented for MoonlanderWorldEnv with predicting whole observation!")
+    else:
+        raise ValueError("Environment not supported")
+
+    return prediction_error
