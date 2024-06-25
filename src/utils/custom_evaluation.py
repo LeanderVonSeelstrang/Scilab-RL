@@ -108,11 +108,22 @@ def evaluate_policy(
             actions=actions,
             forward_normal=forward_normal)
 
-        logger.record("eval/reward", rewards)
-        logger.record("eval/predicted_reward", round(forward_normal.mean[0][-1].item()))
+        if model.reward_predicting:
+            logger.record("eval/predicted_rewards", float(forward_normal.mean[:, -1].mean()))
+            logger.record_mean("eval/predicted_rewards_mean", float(forward_normal.mean[:, -1].mean()))
+            logger.record("eval/reward_with_future_reward_estimation_corrective",
+                          reward_with_future_reward_estimation_corrective.mean())
+            logger.record_mean("eval/reward_with_future_reward_estimation_corrective_mean",
+                               reward_with_future_reward_estimation_corrective.mean())
+        logger.record("eval/prediction_error", prediction_error)
+        logger.record_mean("eval/prediction_error_mean", prediction_error)
+        # already logged in custom callback
+        logger.record("eval/rollout_rewards_step", float(rewards.mean()))
+        logger.record_mean("eval/rollout_rewards_mean", float(rewards.mean()))
+
         # dodge/collect env
         if "simple" in infos[0].keys():
-            logger.record("rollout_number_of_crashed_or_collected_objects",
+            logger.record("eval/number_of_crashed_or_collected_objects",
                           float(infos[0]["number_of_crashed_or_collected_objects"]))
         # trigger metric visualization
         if callback_metric_viz:

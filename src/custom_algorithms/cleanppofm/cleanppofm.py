@@ -389,12 +389,20 @@ class CLEANPPOFM:
             new_obs, rewards, dones, infos, prediction_error, reward_with_future_reward_estimation_corrective = self.step_in_env(
                 actions=clipped_actions, forward_normal=forward_normal)
 
+            # FIXME: is it possible that multiple actions are taken here?
             ##### LOGGING #####
-            # FIXME: why is are there multiple rewards but only one reward prediction?
             if self.reward_predicting:
-                self.logger.record("train/predicted_reward", round(forward_normal.mean[0][-1].item()))
+                self.logger.record("train/predicted_rewards", float(forward_normal.mean[:, -1].mean()))
+                self.logger.record_mean("train/predicted_rewards_mean", float(forward_normal.mean[:, -1].mean()))
+                self.logger.record("train/reward_with_future_reward_estimation_corrective",
+                                   reward_with_future_reward_estimation_corrective.mean())
+                self.logger.record_mean("train/reward_with_future_reward_estimation_corrective_mean",
+                                        reward_with_future_reward_estimation_corrective.mean())
+            self.logger.record("train/prediction_error", prediction_error)
+            self.logger.record_mean("train/prediction_error_mean", prediction_error)
             self.logger.record("train/rollout_rewards_step", float(rewards.mean()))
             self.logger.record_mean("train/rollout_rewards_mean", float(rewards.mean()))
+
             # this is only logged when no hyperparameter tuning is running?
             # dodge/collect env
             if "simple" in infos[0].keys():
