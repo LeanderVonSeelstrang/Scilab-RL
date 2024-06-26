@@ -360,10 +360,12 @@ class MoonlanderWorldEnv(Env):
             int(self.config["world"]["y_height"] - self.y_position_of_agent + 1),
         )
 
-        # action_movement is -1 to go left, 0 to stay and 1 to go right.
+        # action_movement is -1 to go left, 0 to stay and 1 to go right for agent size 1
+        # for agent size 2 it is -2, 0, 2
+        # for agent size 3 it is -3, 0, 3 ...
         # this allows simply adding the drift force to the action step to compute the
         # next location.
-        action_movement = 2 * action - 2 + step_width
+        action_movement = self.config["agent"]["size"] * action - self.config["agent"]["size"] + step_width
 
         # Pick out the first drift range that contains the current y position, and take its drift direction value
         (_, _, drift, _, is_drift_fake) = next(
