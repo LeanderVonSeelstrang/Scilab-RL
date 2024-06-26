@@ -82,7 +82,8 @@ class CLEANPPOFM:
             position_predicting: bool = False,
             reward_predicting: bool = False,
             number_of_future_steps: int = 10,
-            fm_trained_with_input_noise: bool = True
+            fm_trained_with_input_noise: bool = True,
+            input_noise_on: bool = False
     ):
         if fm_parameters is None:
             fm_parameters = {}
@@ -151,6 +152,8 @@ class CLEANPPOFM:
         self.reward_predicting = reward_predicting
         # boolean if the training data for the forward model is generated with input noise or not
         self.fm_trained_with_input_noise = fm_trained_with_input_noise
+        # boolean if the input noise is on
+        self.input_noise_on = input_noise_on
 
         # get the env name as described here: https://github.com/DLR-RM/stable-baselines3/blob/master/docs/guide/vec_envs.rst
         # Note: you should use vec_env.env_method("get_wrapper_attr", "attribute_name") in Gymnasium v1.0
@@ -604,9 +607,23 @@ class CLEANPPOFM:
             self.env.set_attr("forward_model_prediction", forward_normal.mean.cpu())
         # remove reward because it is not needed to display the predicted observation
         else:
-            self.env.set_attr("forward_model_prediction", forward_normal.mean[0][:-1].cpu().unsqueeze(0))
+            # FIXME
+            # this does not work
+            # self.env.set_attr("forward_model_prediction", forward_normal.mean[0][:-1].cpu().unsqueeze(0))
+            # but this throws a warning?
+            # same below for input noise
+            self.env.env_method("set_forward_model_prediction", forward_normal.mean[0][:-1].cpu().unsqueeze(0))
 
         ##### STEP IN ENVIRONMENT #####
+        # if input noise is applied!
+        input_noise = 0
+        if self.input_noise_on:
+            mu = 0
+            sigma = 1.5
+            input_noise = np.random.normal(loc=mu, scale=sigma)
+            input_noise = int(round(input_noise, 0))
+        self.env.env_method("set_input_noise", input_noise)
+
         # dones = terminated or truncated
         new_obs, rewards, dones, infos = self.env.step(actions)
         deepcopy_of_rewards_for_corrective = copy.deepcopy(rewards)

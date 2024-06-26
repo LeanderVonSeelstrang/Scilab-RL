@@ -260,6 +260,9 @@ class MoonlanderWorldEnv(Env):
         # forward model prediction
         self.forward_model_prediction = None
 
+        # input noise
+        self.input_noise = 0
+
         ### LOGGING
         if verbose_level > 0:
             os.mkdir(self.ROOT_DIR + "/logs/" + self.current_time)
@@ -365,7 +368,9 @@ class MoonlanderWorldEnv(Env):
         # for agent size 3 it is -3, 0, 3 ...
         # this allows simply adding the drift force to the action step to compute the
         # next location.
-        action_movement = self.config["agent"]["size"] * action - self.config["agent"]["size"] + step_width
+        # input noise variable because with wrapping the env it is not possible to have more than one argument for the step function
+        action_movement = self.config["agent"]["size"] * action - self.config["agent"][
+            "size"] + step_width + self.input_noise
 
         # Pick out the first drift range that contains the current y position, and take its drift direction value
         (_, _, drift, _, is_drift_fake) = next(
@@ -1062,6 +1067,9 @@ class MoonlanderWorldEnv(Env):
         # forward model prediction
         self.forward_model_prediction = None
 
+        # input noise
+        self.input_noise = 0
+
         if self.config["verbose_level"] > 0:
             ### OBJECTS
             with open(self.filepath_for_object_list, "a") as file:
@@ -1105,3 +1113,6 @@ class MoonlanderWorldEnv(Env):
 
     def set_forward_model_prediction(self, new_forward_model_prediction: torch.tensor) -> None:
         self.forward_model_prediction = new_forward_model_prediction
+
+    def set_input_noise(self, new_input_noise: float) -> None:
+        self.input_noise = new_input_noise
