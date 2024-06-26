@@ -232,8 +232,9 @@ def calculate_prediction_error(env_name: str, env, next_obs, forward_model_predi
 
             # Smallest x position of the agent is the size of the agent
             # Biggest x position of the agent is the width of the moonlander world - the size of the agent
-            first_possible_x_position = env.get_attr("first_possible_x_position")[0]
-            last_possible_x_position = env.get_attr("last_possible_x_position")[0]
+            # Note: you should use vec_env.env_method("get_wrapper_attr", "attribute_name") in Gymnasium v1.0
+            first_possible_x_position = env.env_method("get_wrapper_attr", "first_possible_x_position")[0]
+            last_possible_x_position = env.env_method("get_wrapper_attr", "last_possible_x_position")[0]
             max_distance_in_moonlander_world = math.sqrt(
                 (last_possible_x_position - first_possible_x_position) ** 2)
             predicted_x_position = torch.tensor([min(max(first_possible_x_position,

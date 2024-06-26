@@ -90,7 +90,10 @@ class Agent(nn.Module):
         if self.flatten:
             obs = flatten_obs(obs)
         else:
-            obs = torch.tensor(obs, device=device, dtype=torch.float32).clone().detach()
+            if isinstance(obs, torch.Tensor):
+                obs = obs.clone().detach()
+            else:
+                obs = torch.tensor(obs, device=device, dtype=torch.float32).clone().detach()
 
         ##### PREDICT NEXT ACTION #####
         # obs is a tensor

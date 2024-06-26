@@ -7,6 +7,7 @@ from typing import Dict, Optional, Tuple, Union
 import numpy as np
 import torch
 from gymnasium import spaces
+from gymnasium import logger as gymnasium_logger
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback
 from stable_baselines3.common.vec_env import VecEnv
@@ -96,7 +97,8 @@ class CLEANPPOFM:
         self.action_space = env.action_space
         self.n_envs = env.num_envs
         self.env = env
-        warnings.warn("This algorithm is only tested under the Gridworld and Moonlander Envs")
+        # use gymnasium logger for yellow colored logging
+        gymnasium_logger.warn("This algorithm is only tested under the Gridworld and Moonlander Envs")
 
         if isinstance(self.action_space, spaces.Box):
             assert np.all(
@@ -151,7 +153,8 @@ class CLEANPPOFM:
         self.fm_trained_with_input_noise = fm_trained_with_input_noise
 
         # get the env name as described here: https://github.com/DLR-RM/stable-baselines3/blob/master/docs/guide/vec_envs.rst
-        self.env_name = self.env.get_attr("name")[0]
+        # Note: you should use vec_env.env_method("get_wrapper_attr", "attribute_name") in Gymnasium v1.0
+        self.env_name = self.env.env_method("get_wrapper_attr", "name")[0]
         if not (self.env_name == "GridWorldEnv" or self.env_name == "MoonlanderWorldEnv"):
             raise NotImplementedError("This algorithm is not implemented for this environment yet!")
 
@@ -598,10 +601,10 @@ class CLEANPPOFM:
         # modify the env attributes as described here:
         # https://github.com/DLR-RM/stable-baselines3/blob/master/docs/guide/vec_envs.rst
         if not self.reward_predicting:
-            self.env.env_method("set_forward_model_prediction", forward_normal.mean.cpu())
+            self.env.set_attr("forward_model_prediction", forward_normal.mean.cpu())
         # remove reward because it is not needed to display the predicted observation
         else:
-            self.env.env_method("set_forward_model_prediction", forward_normal.mean[0][:-1].cpu().unsqueeze(0))
+            self.env.set_attr("forward_model_prediction", forward_normal.mean[0][:-1].cpu().unsqueeze(0))
 
         ##### STEP IN ENVIRONMENT #####
         # dones = terminated or truncated

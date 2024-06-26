@@ -96,7 +96,8 @@ def evaluate_policy(
 
     ### from me
     episode_number_of_crashed_or_collected_objects = []
-    env_name = env.get_attr("name")[0]
+    # Note: you should use vec_env.env_method("get_wrapper_attr", "attribute_name") in Gymnasium v1.0
+    env_name = env.env_method("get_wrapper_attr", "name")[0]
     ###
 
     while (episode_counts < episode_count_targets).any():

@@ -662,7 +662,8 @@ def create_agent_observation(
             no_crashes=no_crashes,
         )
 
-    return np.array(matrix)
+    # gymnasium expects an int64 numpy array
+    return np.array(matrix, dtype=np.int64)
 
 
 def add_agent_to_observation(

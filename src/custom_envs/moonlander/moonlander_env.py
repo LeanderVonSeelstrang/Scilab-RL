@@ -623,7 +623,8 @@ class MoonlanderWorldEnv(Env):
             blurred_state[blurred_state == -10] = 255
 
         # apply gaussian filter (7x7)
-        blurred_state = cv2.GaussianBlur(blurred_state, (7, 7), 0)
+        # gymnasium expects an int64 numpy array, but gaussian blur only works with int16
+        blurred_state = cv2.GaussianBlur(blurred_state.astype(np.int16), (7, 7), 0)
 
         # get values of each pixel of current agent position
         values_of_agent_position = []
