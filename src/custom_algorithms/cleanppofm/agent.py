@@ -5,7 +5,7 @@ import torch.nn as nn
 from gymnasium import spaces
 from torch.distributions.categorical import Categorical
 from stable_baselines3.common.logger import Logger
-from custom_algorithms.cleanppofm.utils import flatten_obs, layer_init, get_position_of_observation
+from custom_algorithms.cleanppofm.utils import flatten_obs, layer_init, get_position_and_object_positions_of_observation
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -128,7 +128,7 @@ class Agent(nn.Module):
         # formal_normal_action in form of tensor([[action]])
         # get position of last state out of the observation --> moonlander specific implementation
         if position_predicting:
-            positions = get_position_of_observation(obs)
+            positions, _ = get_position_and_object_positions_of_observation(obs)
             forward_model_prediction_normal_distribution = fm_network(positions, forward_normal_action.float())
         else:
             forward_model_prediction_normal_distribution = fm_network(obs, forward_normal_action.float())
@@ -158,9 +158,9 @@ class Agent(nn.Module):
         #  but if you feed your cat vs dog classifier a picture containing both a cat and a dog,
         #  you probably want the model to give you a 50-50 split which is maximal entropy.
         # value of critic network, forward model prediction in normal distribution
-        #print("positions", positions)
-        #print("action", action)
-        #print("forward_model_prediction_normal_distribution", forward_model_prediction_normal_distribution.mean)
+        # print("positions", positions)
+        # print("action", action)
+        # print("forward_model_prediction_normal_distribution", forward_model_prediction_normal_distribution.mean)
 
         return action.unsqueeze(0), distribution.log_prob(action), distribution.entropy(), self.critic(
             obs), forward_model_prediction_normal_distribution

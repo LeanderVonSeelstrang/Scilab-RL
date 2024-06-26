@@ -16,7 +16,8 @@ from custom_algorithms.cleanppofm.forward_model import ProbabilisticSimpleForwar
     ProbabilisticForwardNetPositionPrediction, ProbabilisticSimpleForwardNetIncludingReward, \
     ProbabilisticForwardNetPositionPredictionIncludingReward
 from custom_algorithms.cleanppofm.utils import flatten_obs, get_reward_estimation_of_forward_model, \
-    get_position_of_observation, get_next_observation_gridworld, get_reward_with_future_reward_estimation_corrective, \
+    get_position_and_object_positions_of_observation, get_next_observation_gridworld, \
+    get_reward_with_future_reward_estimation_corrective, \
     calculate_prediction_error
 from custom_algorithms.cleanppofm.agent import Agent
 from utils.custom_buffer import CustomDictRolloutBuffer as DictRolloutBuffer
@@ -527,8 +528,8 @@ class CLEANPPOFM:
         # moonlander
         else:
             # get position out of observation
-            observations = get_position_of_observation(observations)
-            next_observations_formatted = get_position_of_observation(next_observations)
+            observations, _ = get_position_and_object_positions_of_observation(observations)
+            next_observations_formatted, _ = get_position_and_object_positions_of_observation(next_observations)
             if self.reward_predicting:
                 next_observations_formatted = torch.cat((next_observations_formatted, rewards), dim=1)
 

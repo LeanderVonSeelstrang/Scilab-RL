@@ -69,7 +69,7 @@ def get_reward_estimation_of_forward_model(fm_network, obs: torch.Tensor,
     """
     # the first obs is a matrix, the following obs are just the positions
     if position_predicting:
-        obs = get_position_of_observation(obs)
+        obs, _ = get_position_and_object_positions_of_observation(obs)
 
     ##### PREDICT NEXT REWARDS #####
     # predict next rewards from last state and default action
@@ -115,22 +115,49 @@ def get_reward_with_future_reward_estimation_corrective(rewards: torch.Tensor, f
     return reward_with_future_reward_estimation_corrective
 
 
-def get_position_of_observation(obs: torch.Tensor) -> torch.Tensor:
+def get_position_and_object_positions_of_observation(obs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     """
     Get the position of the agent in the observation.
     Args:
         obs: observation
 
     Returns:
-        position of the agent in the observation
-
+        first position of the agent in the observation
+        position of the objects in the observation
     """
     positions = []
+    object_positions = []
     for obs_element in obs:
         # agent in observation is marked with 1
         first_index_with_one = np.where(obs_element.cpu() == 1)[0][0]
         positions.append(first_index_with_one)
-    return torch.tensor(positions, device=device).unsqueeze(1)
+
+        # object in observation is marked with 2 or 3
+        if 2 in obs_element or 3 in obs_element:
+            if 2 in obs_element:
+                search_value = 2
+            else:
+                search_value = 3
+            x_y_coordinates = []
+            indices_with_two_or_three = np.where(obs_element.cpu() == search_value)[0]
+
+            for index in indices_with_two_or_three:
+                x_coordinate = index % 12
+                y_coordinate = math.floor(index / 12)
+                x_y_coordinates.append([x_coordinate, y_coordinate])
+            object_positions.append(x_y_coordinates)
+
+    # include padding because the number of objects can vary, but tensors need to have the same shape
+    if object_positions:
+        object_positions_with_padding = np.zeros(
+            [len(object_positions), len(max(object_positions, key=lambda x: len(x))), 2])
+        for i, j in enumerate(object_positions):
+            object_positions_with_padding[i][0:len(j)] = np.array(j)
+    else:
+        object_positions_with_padding = np.array([])
+
+    return torch.tensor(positions, device=device).unsqueeze(1), torch.tensor(object_positions_with_padding,
+                                                                             device=device)
 
 
 def get_next_observation_gridworld(observations: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
@@ -194,13 +221,14 @@ def calculate_prediction_error(env_name: str, env, next_obs, forward_model_predi
             [min(max(0, round(forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[0][0])), 4),
              min(max(0, round(forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[0][1])), 4),
              min(max(0, round(forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[0][2])), 4),
-             min(max(0, round(forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[0][3])), 4)], device=device)
+             min(max(0, round(forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[0][3])), 4)],
+            device=device)
         prediction_error = (math.sqrt(torch.sum((predicted_location - next_obs) ** 2))) / max_distance_in_gridworld
     elif env_name == "MoonlanderWorldEnv":
         # we just care for the x position of the moonlander agent, because the y position is always equally to the size of the agent
         if position_predicting:
-            positions = get_position_of_observation(next_obs)
-            #print("actual positions: ", positions)
+            positions, _ = get_position_and_object_positions_of_observation(next_obs)
+            # print("actual positions: ", positions)
 
             # Smallest x position of the agent is the size of the agent
             # Biggest x position of the agent is the width of the moonlander world - the size of the agent
