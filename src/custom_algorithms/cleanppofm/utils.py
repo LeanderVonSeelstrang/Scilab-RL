@@ -115,11 +115,15 @@ def get_reward_with_future_reward_estimation_corrective(rewards: torch.Tensor, f
     return reward_with_future_reward_estimation_corrective
 
 
-def get_position_and_object_positions_of_observation(obs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+def get_position_and_object_positions_of_observation(obs: torch.Tensor, maximal_number_of_objects: int = 5) -> tuple[
+    torch.Tensor, torch.Tensor]:
     """
     Get the position of the agent in the observation.
     Args:
         obs: observation
+        maximal_number_of_objects: the number of objects that are considered in the observation
+        # FIXME: note, these are the first objects you get, when going down in the obs and going from left to right
+        # FIXME: these are not necessary the nearest objects to the agent
 
     Returns:
         first position of the agent in the observation
@@ -147,14 +151,18 @@ def get_position_and_object_positions_of_observation(obs: torch.Tensor) -> tuple
                 x_y_coordinates.append([x_coordinate, y_coordinate])
             object_positions.append(x_y_coordinates)
 
+    counter = 0
     # include padding because the number of objects can vary, but tensors need to have the same shape
     if object_positions:
-        object_positions_with_padding = np.zeros(
-            [len(object_positions), len(max(object_positions, key=lambda x: len(x))), 2])
-        for i, j in enumerate(object_positions):
-            object_positions_with_padding[i][0:len(j)] = np.array(j)
+        object_positions_with_padding = np.zeros([len(object_positions), maximal_number_of_objects, 2])
+        while counter < maximal_number_of_objects:
+            if counter < len(object_positions):
+                object_positions_with_padding[counter][
+                0:min(maximal_number_of_objects, len(object_positions[counter]))] = np.array(
+                    object_positions[counter])[:min(maximal_number_of_objects, len(object_positions[counter]))]
+            counter += 1
     else:
-        object_positions_with_padding = np.array([])
+        object_positions_with_padding = np.array([[[0, 0] * maximal_number_of_objects]])
 
     return torch.tensor(positions, device=device).unsqueeze(1), torch.tensor(object_positions_with_padding,
                                                                              device=device)
