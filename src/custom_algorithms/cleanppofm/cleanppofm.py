@@ -627,7 +627,7 @@ class CLEANPPOFM:
         ##### STEP IN ENVIRONMENT #####
         # if input noise is applied!
         input_noise = 0
-        if self.input_noise_on:
+        if self.input_noise_on and not actions[0] == 0:
             mu = 0
             sigma = 1.5
             input_noise = np.random.normal(loc=mu, scale=sigma)
