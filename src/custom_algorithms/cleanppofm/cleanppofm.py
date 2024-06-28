@@ -83,7 +83,8 @@ class CLEANPPOFM:
             reward_predicting: bool = False,
             number_of_future_steps: int = 10,
             fm_trained_with_input_noise: bool = True,
-            input_noise_on: bool = False
+            input_noise_on: bool = False,
+            maximum_number_of_objects: int = 5
     ):
         if fm_parameters is None:
             fm_parameters = {}
@@ -154,6 +155,8 @@ class CLEANPPOFM:
         self.fm_trained_with_input_noise = fm_trained_with_input_noise
         # boolean if the input noise is on
         self.input_noise_on = input_noise_on
+        # maximal number of objects considered in the forward model
+        self.maximum_number_of_objects = maximum_number_of_objects
 
         # get the env name as described here: https://github.com/DLR-RM/stable-baselines3/blob/master/docs/guide/vec_envs.rst
         # Note: you should use vec_env.env_method("get_wrapper_attr", "attribute_name") in Gymnasium v1.0
@@ -241,7 +244,8 @@ class CLEANPPOFM:
                     fm_network=self.fm_network,
                     obs=observations,
                     action=actions, logger=self.logger,
-                    position_predicting=self.position_predicting)
+                    position_predicting=self.position_predicting,
+                    maximum_number_of_objects=self.maximum_number_of_objects)
                 values = values.flatten()
                 # Normalize advantage
                 advantages = rollout_data.advantages
@@ -378,7 +382,8 @@ class CLEANPPOFM:
                 actions, log_probs, _, values, forward_normal = self.policy.get_action_and_value_and_forward_model_prediction(
                     fm_network=self.fm_network,
                     obs=self._last_obs, logger=self.logger,
-                    position_predicting=self.position_predicting)
+                    position_predicting=self.position_predicting,
+                    maximum_number_of_objects=self.maximum_number_of_objects)
 
             # log logarithmic probability of action distribution (one value in tensor)
             log_prob_float = float(np.mean(log_probs.cpu().numpy()))
@@ -534,8 +539,10 @@ class CLEANPPOFM:
         # moonlander
         else:
             # get position out of observation
-            observations, _ = get_position_and_object_positions_of_observation(observations)
-            next_observations_formatted, _ = get_position_and_object_positions_of_observation(next_observations)
+            observations, _ = get_position_and_object_positions_of_observation(observations,
+                                                                               maximum_number_of_objects=self.maximum_number_of_objects)
+            next_observations_formatted, _ = get_position_and_object_positions_of_observation(next_observations,
+                                                                                              maximum_number_of_objects=self.maximum_number_of_objects)
             if self.reward_predicting:
                 next_observations_formatted = torch.cat((next_observations_formatted, rewards), dim=1)
 
@@ -580,7 +587,7 @@ class CLEANPPOFM:
                 obs=observation,
                 deterministic=deterministic,
                 logger=self.logger,
-                position_predicting=self.position_predicting)
+                position_predicting=self.position_predicting, maximum_number_of_objects=self.maximum_number_of_objects)
         return action.cpu().numpy(), state, forward_model_prediction_normal_distribution
 
     def step_in_env(self, actions, forward_normal) -> tuple[np.ndarray, float, float, bool, dict, float]:
@@ -632,7 +639,8 @@ class CLEANPPOFM:
         prediction_error = calculate_prediction_error(env_name=self.env_name, env=self.env,
                                                       next_obs=torch.tensor(new_obs, device=device),
                                                       forward_model_prediction_normal_distribution=forward_normal,
-                                                      position_predicting=self.position_predicting)
+                                                      position_predicting=self.position_predicting,
+                                                      maximum_number_of_objects=self.maximum_number_of_objects)
         # print("prediction_error", prediction_error)
 
         if self.reward_predicting:
@@ -665,7 +673,7 @@ class CLEANPPOFM:
                 position_predicting=self.position_predicting,
                 default_action=torch.Tensor(
                     [[0]]),
-                number_of_future_steps=10)
+                number_of_future_steps=10, maximum_number_of_objects=self.maximum_number_of_objects)
             reward_with_future_reward_estimation_corrective = get_reward_with_future_reward_estimation_corrective(
                 rewards=deepcopy_of_rewards_for_corrective, future_reward_estimation=future_reward_estimation,
                 prediction_error=prediction_error)

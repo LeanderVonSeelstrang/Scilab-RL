@@ -66,7 +66,8 @@ class Agent(nn.Module):
     def get_action_and_value_and_forward_model_prediction(self, fm_network, obs, action=None,
                                                           deterministic: bool = False,
                                                           logger: Logger = None,
-                                                          position_predicting: bool = False) -> \
+                                                          position_predicting: bool = False,
+                                                          maximum_number_of_objects: int = 5) -> \
             tuple[
                 torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.distributions.Normal]:
         """
@@ -79,6 +80,7 @@ class Agent(nn.Module):
             deterministic: if true the action selection is deterministic and not stochastic
             logger: logger for logging
             position_predicting: if true the forward model predicts the position of the agent out of the observation
+            maximum_number_of_objects: maximal number of objects considered in the forward model prediction
 
         Returns:
             action, logarithmic probability of action distribution, entropy of the action distribution, value of the
@@ -131,7 +133,8 @@ class Agent(nn.Module):
         # formal_normal_action in form of tensor([[action]])
         # get position of last state out of the observation --> moonlander specific implementation
         if position_predicting:
-            positions, _ = get_position_and_object_positions_of_observation(obs)
+            positions, _ = get_position_and_object_positions_of_observation(obs,
+                                                                            maximum_number_of_objects=maximum_number_of_objects)
             forward_model_prediction_normal_distribution = fm_network(positions, forward_normal_action.float())
         else:
             forward_model_prediction_normal_distribution = fm_network(obs, forward_normal_action.float())

@@ -53,7 +53,8 @@ def layer_init(layer, std: np.float64 = np.sqrt(2), bias_const: float = 0.0) -> 
 def get_reward_estimation_of_forward_model(fm_network, obs: torch.Tensor,
                                            position_predicting: bool,
                                            default_action: torch.Tensor = torch.Tensor([[0]]),
-                                           number_of_future_steps: int = 10) -> float:
+                                           number_of_future_steps: int = 10,
+                                           maximum_number_of_objects: int = 5) -> float:
     """
     Get the reward estimation of the forward model for number_of_future_steps steps.
     Args:
@@ -62,6 +63,7 @@ def get_reward_estimation_of_forward_model(fm_network, obs: torch.Tensor,
         position_predicting: boolean if the forward model is predicting the position or actual observation
         default_action: action that is executed when not controlling the environment
         number_of_future_steps: number of future steps to predict
+        maximum_number_of_objects: the number of objects that are considered in the forward model prediction
 
     Returns:
         reward estimation of the forward model for number_of_future_steps steps
@@ -69,7 +71,8 @@ def get_reward_estimation_of_forward_model(fm_network, obs: torch.Tensor,
     """
     # the first obs is a matrix, the following obs are just the positions
     if position_predicting:
-        obs, _ = get_position_and_object_positions_of_observation(obs)
+        obs, _ = get_position_and_object_positions_of_observation(obs,
+                                                                  maximum_number_of_objects=maximum_number_of_objects)
 
     ##### PREDICT NEXT REWARDS #####
     # predict next rewards from last state and default action
@@ -115,13 +118,13 @@ def get_reward_with_future_reward_estimation_corrective(rewards: torch.Tensor, f
     return reward_with_future_reward_estimation_corrective
 
 
-def get_position_and_object_positions_of_observation(obs: torch.Tensor, maximal_number_of_objects: int = 5) -> tuple[
+def get_position_and_object_positions_of_observation(obs: torch.Tensor, maximum_number_of_objects: int = 5) -> tuple[
     torch.Tensor, torch.Tensor]:
     """
     Get the position of the agent in the observation.
     Args:
         obs: observation
-        maximal_number_of_objects: the number of objects that are considered in the observation
+        maximum_number_of_objects: the number of objects that are considered in the observation
         # FIXME: note, these are the first objects you get, when going down in the obs and going from left to right
         # FIXME: these are not necessary the nearest objects to the agent
 
@@ -154,15 +157,15 @@ def get_position_and_object_positions_of_observation(obs: torch.Tensor, maximal_
     counter = 0
     # include padding because the number of objects can vary, but tensors need to have the same shape
     if object_positions:
-        object_positions_with_padding = np.zeros([len(object_positions), maximal_number_of_objects, 2])
-        while counter < maximal_number_of_objects:
+        object_positions_with_padding = np.zeros([len(object_positions), maximum_number_of_objects, 2])
+        while counter < maximum_number_of_objects:
             if counter < len(object_positions):
                 object_positions_with_padding[counter][
-                0:min(maximal_number_of_objects, len(object_positions[counter]))] = np.array(
-                    object_positions[counter])[:min(maximal_number_of_objects, len(object_positions[counter]))]
+                0:min(maximum_number_of_objects, len(object_positions[counter]))] = np.array(
+                    object_positions[counter])[:min(maximum_number_of_objects, len(object_positions[counter]))]
             counter += 1
     else:
-        object_positions_with_padding = np.array([[[0, 0] * maximal_number_of_objects]])
+        object_positions_with_padding = np.array([[[0, 0] * maximum_number_of_objects]])
 
     return torch.tensor(positions, device=device).unsqueeze(1), torch.tensor(object_positions_with_padding,
                                                                              device=device)
@@ -204,7 +207,7 @@ def get_next_observation_gridworld(observations: torch.Tensor, actions: torch.Te
 
 
 def calculate_prediction_error(env_name: str, env, next_obs, forward_model_prediction_normal_distribution: torch.normal,
-                               position_predicting: bool) -> float:
+                               position_predicting: bool, maximum_number_of_objects: int = 5) -> float:
     """
     Calculate the prediction error between the next obs and the forward model prediction.
     Args:
@@ -213,6 +216,7 @@ def calculate_prediction_error(env_name: str, env, next_obs, forward_model_predi
         next_obs: observation after actually executing the action
         forward_model_prediction_normal_distribution: prediction of next observation by forward model
         position_predicting: if the forward model is predicting the position or actual observation
+        maximum_number_of_objects: the number of objects that are considered in the forward model prediction
 
     Returns:
         prediction error between the next obs and the forward model prediction
@@ -235,7 +239,8 @@ def calculate_prediction_error(env_name: str, env, next_obs, forward_model_predi
     elif env_name == "MoonlanderWorldEnv":
         # we just care for the x position of the moonlander agent, because the y position is always equally to the size of the agent
         if position_predicting:
-            positions, _ = get_position_and_object_positions_of_observation(next_obs)
+            positions, _ = get_position_and_object_positions_of_observation(next_obs,
+                                                                            maximum_number_of_objects=maximum_number_of_objects)
             # print("actual positions: ", positions)
 
             # Smallest x position of the agent is the size of the agent
