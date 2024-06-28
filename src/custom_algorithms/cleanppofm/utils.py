@@ -212,6 +212,44 @@ def get_next_observation_gridworld(observations: torch.Tensor, actions: torch.Te
     return agent_location_without_input_noise
 
 
+def get_next_observation_moonlander(observations: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
+    """
+    Calculate the next observation in the moonlander environment manually to exclude random observations through input noise.
+    Args:
+        observations: observations
+        actions: actions
+
+    Returns:
+        next observation in the moonlander environment without input noise
+    """
+    next_observation_without_input_noise = observations.clone().detach()
+
+    for index, obs in enumerate(observations):
+        # first two elements are agent x and y position
+        counter = 2
+        # index[0] is agent x position
+        # apply action to agent x position
+        next_observation_without_input_noise[index][0] += (actions[index] - 1)
+        # clip to range of 1 to 10
+        next_observation_without_input_noise[index][0] = torch.clamp(next_observation_without_input_noise[index][0], 1,
+                                                                     10)
+
+        # check if there is an object that already is on position 0 -> removed
+        while counter < 10:
+            if not next_observation_without_input_noise[index][counter] == 0 and \
+                    next_observation_without_input_noise[index][counter + 1] == 0:
+                next_observation_without_input_noise[index][counter] = 0
+                next_observation_without_input_noise[index][counter + 1] = 0
+            counter += 2
+
+        # apply step to every y position (agent and objects)
+        next_observation_without_input_noise[index][1::2] -= 1
+        next_observation_without_input_noise[index][1::2] = torch.clamp(
+            next_observation_without_input_noise[index][1::2], 0, 10)
+
+    return next_observation_without_input_noise
+
+
 def calculate_prediction_error(env_name: str, env, next_obs, forward_model_prediction_normal_distribution: torch.normal,
                                position_predicting: bool, maximum_number_of_objects: int = 5) -> float:
     """

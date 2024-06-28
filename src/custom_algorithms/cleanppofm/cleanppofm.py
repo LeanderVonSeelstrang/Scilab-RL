@@ -19,7 +19,7 @@ from custom_algorithms.cleanppofm.forward_model import ProbabilisticSimpleForwar
 from custom_algorithms.cleanppofm.utils import flatten_obs, get_reward_estimation_of_forward_model, \
     get_position_and_object_positions_of_observation, get_next_observation_gridworld, \
     get_reward_with_future_reward_estimation_corrective, \
-    calculate_prediction_error
+    calculate_prediction_error, get_next_observation_moonlander
 from custom_algorithms.cleanppofm.agent import Agent
 from utils.custom_buffer import CustomDictRolloutBuffer as DictRolloutBuffer
 from utils.custom_buffer import CustomRolloutBuffer as RolloutBuffer
@@ -167,10 +167,6 @@ class CLEANPPOFM:
         # position predicting only possible for moonlander env
         if self.position_predicting and not self.env_name == "MoonlanderWorldEnv":
             raise NotImplementedError("Position predicting is only possible for the moonlander environment by now!")
-        # fm trained without input noise only possible for gridworld env
-        if not self.fm_trained_with_input_noise and not self.env_name == "GridWorldEnv":
-            raise NotImplementedError(
-                "Training the forward model without input noise is only possible for the gridworld environment!")
         # number of future steps only possible for reward predicting
         if number_of_future_steps > 0 and not self.reward_predicting:
             warnings.warn(
@@ -527,8 +523,6 @@ class CLEANPPOFM:
 
         # gridworld or moonlander without position predicting
         if not self.position_predicting:
-            # the if-clause is only implemented for the gridworld env
-            # an error is raised in the __init__ method if the moonlander env is used with training without input noise
             if not self.fm_trained_with_input_noise:
                 agent_location_without_input_noise = get_next_observation_gridworld(observations=observations,
                                                                                     actions=actions)
@@ -544,8 +538,12 @@ class CLEANPPOFM:
             # get position out of observation
             observations = get_position_and_object_positions_of_observation(observations,
                                                                             maximum_number_of_objects=self.maximum_number_of_objects)
-            next_observations_formatted = get_position_and_object_positions_of_observation(next_observations,
-                                                                                           maximum_number_of_objects=self.maximum_number_of_objects)
+            if not self.fm_trained_with_input_noise:
+                next_observations_formatted = get_next_observation_moonlander(observations=observations,
+                                                                              actions=actions)
+            else:
+                next_observations_formatted = get_position_and_object_positions_of_observation(next_observations,
+                                                                                               maximum_number_of_objects=self.maximum_number_of_objects)
             if self.reward_predicting:
                 next_observations_formatted = torch.cat((next_observations_formatted, rewards), dim=1)
 
