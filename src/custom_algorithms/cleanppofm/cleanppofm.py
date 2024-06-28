@@ -183,7 +183,10 @@ class CLEANPPOFM:
                 ProbabilisticForwardNetPositionPrediction
         else:
             fm_cls = ProbabilisticSimpleForwardNetIncludingReward if self.reward_predicting else ProbabilisticSimpleForwardNet
-        self.fm_network = fm_cls(self.env, self.fm_parameters).to(device)
+        if not fm_cls == ProbabilisticForwardNetPositionPredictionIncludingReward:
+            self.fm_network = fm_cls(self.env, self.fm_parameters).to(device)
+        else:
+            self.fm_network = fm_cls(self.env, self.fm_parameters, self.maximum_number_of_objects).to(device)
         self.fm_optimizer = torch.optim.Adam(
             self.fm_network.parameters(),
             lr=self.fm_parameters["learning_rate"]
@@ -539,10 +542,10 @@ class CLEANPPOFM:
         # moonlander
         else:
             # get position out of observation
-            observations, _ = get_position_and_object_positions_of_observation(observations,
-                                                                               maximum_number_of_objects=self.maximum_number_of_objects)
-            next_observations_formatted, _ = get_position_and_object_positions_of_observation(next_observations,
-                                                                                              maximum_number_of_objects=self.maximum_number_of_objects)
+            observations = get_position_and_object_positions_of_observation(observations,
+                                                                            maximum_number_of_objects=self.maximum_number_of_objects)
+            next_observations_formatted = get_position_and_object_positions_of_observation(next_observations,
+                                                                                           maximum_number_of_objects=self.maximum_number_of_objects)
             if self.reward_predicting:
                 next_observations_formatted = torch.cat((next_observations_formatted, rewards), dim=1)
 

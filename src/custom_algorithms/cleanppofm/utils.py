@@ -71,8 +71,8 @@ def get_reward_estimation_of_forward_model(fm_network, obs: torch.Tensor,
     """
     # the first obs is a matrix, the following obs are just the positions
     if position_predicting:
-        obs, _ = get_position_and_object_positions_of_observation(obs,
-                                                                  maximum_number_of_objects=maximum_number_of_objects)
+        obs = get_position_and_object_positions_of_observation(obs,
+                                                               maximum_number_of_objects=maximum_number_of_objects)
 
     ##### PREDICT NEXT REWARDS #####
     # predict next rewards from last state and default action
@@ -118,10 +118,10 @@ def get_reward_with_future_reward_estimation_corrective(rewards: torch.Tensor, f
     return reward_with_future_reward_estimation_corrective
 
 
-def get_position_and_object_positions_of_observation(obs: torch.Tensor, maximum_number_of_objects: int = 5) -> tuple[
-    torch.Tensor, torch.Tensor]:
+def get_position_and_object_positions_of_observation(obs: torch.Tensor,
+                                                     maximum_number_of_objects: int = 5) -> torch.Tensor:
     """
-    Get the position of the agent in the observation.
+    Get the position of the agent and up to maximum_number_of_objects objects in the observation.
     Args:
         obs: observation
         maximum_number_of_objects: the number of objects that are considered in the observation
@@ -129,15 +129,13 @@ def get_position_and_object_positions_of_observation(obs: torch.Tensor, maximum_
         # FIXME: these are not necessary the nearest objects to the agent
 
     Returns:
-        first position of the agent in the observation
-        position of the objects in the observation
+        position of the agent and maximum_number_of_objects objects in the observation
     """
-    positions = []
-    object_positions = []
+    agent_and_object_positions = []
     for obs_element in obs:
+        current_number_of_objects_in_list = 0
         # agent in observation is marked with 1
         first_index_with_one = np.where(obs_element.cpu() == 1)[0][0]
-        positions.append(first_index_with_one)
 
         # object in observation is marked with 2 or 3
         if 2 in obs_element or 3 in obs_element:
@@ -149,26 +147,34 @@ def get_position_and_object_positions_of_observation(obs: torch.Tensor, maximum_
             indices_with_two_or_three = np.where(obs_element.cpu() == search_value)[0]
 
             for index in indices_with_two_or_three:
+                # break if we have enough objects
+                if current_number_of_objects_in_list >= maximum_number_of_objects:
+                    break
+                # get x and y coordinate of object
                 x_coordinate = index % 12
                 y_coordinate = math.floor(index / 12)
                 x_y_coordinates.append([x_coordinate, y_coordinate])
-            object_positions.append(x_y_coordinates)
+                current_number_of_objects_in_list += 1
 
-    counter = 0
-    # include padding because the number of objects can vary, but tensors need to have the same shape
-    if object_positions:
-        object_positions_with_padding = np.zeros([len(object_positions), maximum_number_of_objects, 2])
-        while counter < maximum_number_of_objects:
-            if counter < len(object_positions):
-                object_positions_with_padding[counter][
-                0:min(maximum_number_of_objects, len(object_positions[counter]))] = np.array(
-                    object_positions[counter])[:min(maximum_number_of_objects, len(object_positions[counter]))]
-            counter += 1
-    else:
-        object_positions_with_padding = np.array([[[0, 0] * maximum_number_of_objects]])
+            # add zeros to the list if we have not enough objects
+            while current_number_of_objects_in_list < maximum_number_of_objects:
+                x_y_coordinates.append([0, 0])
+                current_number_of_objects_in_list += 1
 
-    return torch.tensor(positions, device=device).unsqueeze(1), torch.tensor(object_positions_with_padding,
-                                                                             device=device)
+            # add agent to object positions
+            x_y_coordinates = [[first_index_with_one % 12, math.floor(first_index_with_one / 12)]] + x_y_coordinates
+            agent_and_object_positions.append(x_y_coordinates)
+        else:  # no object in observation
+            # add agent to object positions + zeros for objects
+            x_y_coordinates = [[first_index_with_one % 12, math.floor(first_index_with_one / 12)]] + [[0, 0] for i in
+                                                                                                      range(
+                                                                                                          maximum_number_of_objects)]
+            agent_and_object_positions.append(x_y_coordinates)
+
+    agent_and_object_positions_tensor = torch.flatten(torch.tensor(agent_and_object_positions, device=device),
+                                                      start_dim=1)
+
+    return agent_and_object_positions_tensor
 
 
 def get_next_observation_gridworld(observations: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
@@ -239,8 +245,8 @@ def calculate_prediction_error(env_name: str, env, next_obs, forward_model_predi
     elif env_name == "MoonlanderWorldEnv":
         # we just care for the x position of the moonlander agent, because the y position is always equally to the size of the agent
         if position_predicting:
-            positions, _ = get_position_and_object_positions_of_observation(next_obs,
-                                                                            maximum_number_of_objects=maximum_number_of_objects)
+            positions = get_position_and_object_positions_of_observation(next_obs,
+                                                                         maximum_number_of_objects=maximum_number_of_objects)
             # print("actual positions: ", positions)
 
             # Smallest x position of the agent is the size of the agent
