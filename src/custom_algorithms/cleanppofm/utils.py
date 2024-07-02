@@ -129,7 +129,8 @@ def get_position_and_object_positions_of_observation(obs: torch.Tensor,
         # FIXME: these are not necessary the nearest objects to the agent
 
     Returns:
-        position of the agent and maximum_number_of_objects objects in the observation
+        position of the agent and maximum_number_of_objects objects in the observation, where the first two elements
+        are the x and y position of the agent
     """
     agent_and_object_positions = []
     for obs_element in obs:

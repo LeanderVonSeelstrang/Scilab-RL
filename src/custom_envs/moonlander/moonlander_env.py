@@ -945,14 +945,29 @@ class MoonlanderWorldEnv(Env):
             self.rendering_first_time = False
         # FIXME: this is hardcoded for our custom moonlander env
         if self.forward_model_prediction is not None:
-            position = int(copy.deepcopy(self.forward_model_prediction[0][0]))
+            # tensor of (1,12)
+            copy_of_forward_model_prediction = copy.deepcopy(self.forward_model_prediction)
             # build empty obs
             matrix = np.zeros(shape=(10, 10 + 2), dtype=np.int16)
-            for index in range(10):
-                matrix[index, 0] = -1
-                matrix[index, -1] = -1
-                if index == 0:
-                    matrix[index, max(1, min(position, 10))] = 1
+
+            # add agent
+            # first element is the y position of the agent, second element is the x position of the agent
+            matrix[max(0, min(int(copy_of_forward_model_prediction[0][1]), 9)), max(1, min(int(
+                copy_of_forward_model_prediction[0][0]), 10))] = 1
+
+            # add objects
+            counter = 2
+            while counter < len(copy_of_forward_model_prediction[0]):
+                # objects can be predicted in wall but will be overwritten by wall
+                # -> also catches empty objects at position 0,0
+                matrix[max(0, min(int(copy_of_forward_model_prediction[0][counter + 1]), 9)), max(0, min(int(
+                    copy_of_forward_model_prediction[0][counter]), 11))] = 2
+                counter += 2
+
+            # add wall
+            matrix[:, 0] = -1
+            matrix[:, -1] = -1
+
             forward_model_pred = matrix
             plotted_image = np.concatenate((self.state, forward_model_pred), axis=1)
             self.im_mb.set_data(plotted_image)
