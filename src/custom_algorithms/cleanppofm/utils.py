@@ -300,7 +300,7 @@ def calculate_prediction_error(env_name: str, env, next_obs, forward_model_predi
                                                              0][0]),
                                                      last_possible_x_position)], device=device)
             prediction_error = (math.sqrt(
-                torch.sum((predicted_x_position - positions[0]) ** 2))) / max_distance_in_moonlander_world
+                torch.sum((predicted_x_position - positions[0][0]) ** 2))) / max_distance_in_moonlander_world
         # TODO: implement prediction error calculation for moonlander world env with predicting whole observation
         else:
             raise NotImplementedError(
