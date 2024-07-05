@@ -24,21 +24,28 @@ env_kwargs: { }
 render: 'none' # 'display', 'record', or anything else for neither one
 render_freq: 1 # epochs
 render_metrics_train: [
-  #'train/rollout_rewards_step',
-  #'train/rollout_rewards_mean',
-  #'fm/fw_loss',
-  #'train/predicted_reward',
-  #'train/predicted_rewards_mean',
-  #'train/reward_with_future_reward_estimation_corrective',
-  #'train/reward_with_future_reward_estimation_corrective_mean',
-  #'train/prediction_error',
-  #'train/prediction_error_mean',
-  'eval/rollout_rewards_step',
-  'eval/number_of_crashed_or_collected_objects',
-  'eval/predicted_rewards',
-  'eval/predicted_rewards_mean',
-  'eval/reward_with_future_reward_estimation_corrective',
-  'eval/prediction_error',
+  #  'train/rollout_rewards_step',
+  #  'train/rollout_rewards_mean',
+  #  'fm/fw_loss',
+  #  'train/predicted_reward',
+  #  'train/predicted_rewards_mean',
+  #  'train/reward_with_future_reward_estimation_corrective',
+  #  'train/reward_with_future_reward_estimation_corrective_mean',
+  #  'train/prediction_error',
+  #  'train/prediction_error_mean',
+  #  'eval/rollout_rewards_step',
+  #  'eval/number_of_crashed_or_collected_objects',
+  #  'eval/predicted_rewards',
+  #  'eval/predicted_rewards_mean',
+  #  'eval/reward_with_future_reward_estimation_corrective',
+  #  'eval/prediction_error',
+  # meta env
+  'train/rollout_rewards_step',
+  'train/rollout_rewards_mean',
+  'train/rollout_rewards_dodge_step',
+  'train/rollout_rewards_dodge_mean',
+  'train/rollout_rewards_collect_step',
+  'train/rollout_rewards_collect_mean',
 ]
 render_metrics_test: [
 ]

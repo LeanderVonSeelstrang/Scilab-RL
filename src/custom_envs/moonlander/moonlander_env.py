@@ -453,6 +453,9 @@ class MoonlanderWorldEnv(Env):
         Returns (int): reward for the current step
 
         """
+        # sometimes the x_position of the agent is converted to a tensor (when? why?)
+        # which results in errors in calculating the rewards
+        self.x_position_of_agent = int(self.x_position_of_agent)
         actual_reward = 0
         collected_objects = self.find_intersections(self.object_dict_list)
         number_of_crashed_or_collected_objects = 0

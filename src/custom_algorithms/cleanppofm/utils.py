@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import math
+import copy
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -118,6 +119,32 @@ def get_reward_with_future_reward_estimation_corrective(rewards: torch.Tensor, f
     return reward_with_future_reward_estimation_corrective
 
 
+def reward_estimation(fm_network, new_obs: np.array, env_name: str, rewards, prediction_error: float,
+                      position_predicting: bool, number_of_future_steps: int = 10, maximum_number_of_objects: int = 5):
+    # default action is stay at same position
+    if env_name == "MoonlanderWorldEnv":
+        default_action = torch.Tensor([[0]])
+    # random default action for gridworld env
+    elif env_name == "GridWorldEnv":
+        default_action = torch.randint(low=0, high=8, size=(1, 1), device=device)
+    else:
+        raise ValueError("Environment not supported")
+
+    # TODO: do this only after a warm-up phase of the forward model
+    ##### REWARD ESTIMATION #####
+    future_reward_estimation = get_reward_estimation_of_forward_model(
+        fm_network=fm_network,
+        obs=new_obs,
+        position_predicting=position_predicting,
+        default_action=default_action,
+        number_of_future_steps=number_of_future_steps, maximum_number_of_objects=maximum_number_of_objects)
+    reward_with_future_reward_estimation_corrective = get_reward_with_future_reward_estimation_corrective(
+        rewards=rewards, future_reward_estimation=future_reward_estimation,
+        prediction_error=prediction_error)
+
+    return reward_with_future_reward_estimation_corrective
+
+
 def get_position_and_object_positions_of_observation(obs: torch.Tensor,
                                                      maximum_number_of_objects: int = 5) -> torch.Tensor:
     """
@@ -176,6 +203,35 @@ def get_position_and_object_positions_of_observation(obs: torch.Tensor,
                                                       start_dim=1)
 
     return agent_and_object_positions_tensor
+
+
+def get_observation_of_position_and_object_positions(agent_and_object_positions: torch.Tensor) -> torch.Tensor:
+    # tensor of (1,12)
+    # copy_of_agent_and_object_positions = copy.deepcopy(agent_and_object_positions)
+    copy_of_agent_and_object_positions = agent_and_object_positions.clone().detach()
+    # build empty obs
+    matrix = np.zeros(shape=(10, 10 + 2), dtype=np.int16)
+
+    # add objects
+    counter = 2
+    while counter < len(copy_of_agent_and_object_positions[0]):
+        # objects can be predicted in wall but will be overwritten by wall
+        # objects can be predicted in agent but will be overwritten by agent
+        # -> also catches empty objects at position 0,0
+        matrix[max(0, min(int(copy_of_agent_and_object_positions[0][counter + 1]), 9)), max(0, min(int(
+            copy_of_agent_and_object_positions[0][counter]), 11))] = 2
+        counter += 2
+
+    # add agent
+    # first element is the y position of the agent, second element is the x position of the agent
+    matrix[max(0, min(int(copy_of_agent_and_object_positions[0][1]), 9)), max(1, min(int(
+        copy_of_agent_and_object_positions[0][0]), 10))] = 1
+
+    # add wall
+    matrix[:, 0] = -1
+    matrix[:, -1] = -1
+
+    return torch.from_numpy(matrix).to(device)
 
 
 def get_next_observation_gridworld(observations: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
@@ -286,7 +342,6 @@ def calculate_prediction_error(env_name: str, env, next_obs, forward_model_predi
         if position_predicting:
             positions = get_position_and_object_positions_of_observation(next_obs,
                                                                          maximum_number_of_objects=maximum_number_of_objects)
-            # print("actual positions: ", positions)
 
             # Smallest x position of the agent is the size of the agent
             # Biggest x position of the agent is the width of the moonlander world - the size of the agent

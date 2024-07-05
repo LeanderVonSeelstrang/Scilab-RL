@@ -5,16 +5,19 @@ from collections import deque
 from typing import Dict, Optional, Tuple, Union
 
 import numpy as np
+from gymnasium import spaces
 import torch
 import torch.nn as nn
-from gymnasium import spaces
+from torch.nn import functional as F
+from torch.distributions.normal import Normal
+from torch.distributions.categorical import Categorical
+
 from stable_baselines3.common.buffers import DictRolloutBuffer, RolloutBuffer
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback
 from stable_baselines3.common.vec_env import VecEnv
-from torch.distributions.categorical import Categorical
-from torch.distributions.normal import Normal
-from torch.nn import functional as F
+
+from custom_algorithms.cleanppofm.utils import flatten_obs
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -25,32 +28,18 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     return layer
 
 
-def flatten_obs(obs):
-    if "agent" in obs and "target" in obs:
-        agent, target = obs['agent'], obs['target']
-        if isinstance(agent, np.ndarray):
-            agent = torch.from_numpy(agent).to(device)
-        if isinstance(target, np.ndarray):
-            target = torch.from_numpy(target).to(device)
-        return torch.cat([agent, target], dim=1).to(dtype=torch.float32).detach().clone()
-    elif "agent_0" in obs and "agent_1" in obs and "target" in obs:
-        agent_0, agent_1, target = obs['agent_0'], obs['agent_1'], obs['target']
-        if isinstance(agent_0, np.ndarray):
-            agent_0 = torch.from_numpy(agent_0).to(device)
-        if isinstance(agent_1, np.ndarray):
-            agent_1 = torch.from_numpy(agent_1).to(device)
-        if isinstance(target, np.ndarray):
-            target = torch.from_numpy(target).to(device)
-        return torch.cat([agent_0, agent_1, target], dim=1).to(dtype=torch.float32).detach().clone()
+def flatten_obs_old(obs):
+    observation, ag, dg = obs['observation'], obs['achieved_goal'], obs['desired_goal']
+    if isinstance(observation, np.ndarray):
+        observation = torch.from_numpy(observation).to(device)
+    if isinstance(ag, np.ndarray):
+        ag = torch.from_numpy(ag).to(device)
+    if isinstance(dg, np.ndarray):
+        dg = torch.from_numpy(dg).to(device)
+    if len(ag.shape) > 1:
+        return torch.cat([observation, ag, dg], dim=1).to(dtype=torch.float32).detach().clone()
     else:
-        observation, ag, dg = obs["observation"], obs["achieved_goal"], obs["desired_goal"]
-        if isinstance(observation, np.ndarray):
-            observation = torch.from_numpy(observation).to(device)
-        if isinstance(ag, np.ndarray):
-            ag = torch.from_numpy(ag).to(device)
-        if isinstance(dg, np.ndarray):
-            dg = torch.from_numpy(dg).to(device)
-        return torch.cat([observation, ag, dg], dim=1).to(dtype=torch.float32)
+        return torch.cat([observation, ag, dg]).to(dtype=torch.float32).detach().clone()
 
 
 class Agent(nn.Module):
@@ -402,23 +391,14 @@ class CLEANPPO:
             new_obs, rewards, dones, infos = env.step(clipped_actions)
             self.logger.record("train/rollout_rewards_step", float(rewards.mean()))
             self.logger.record_mean("train/rollout_rewards_mean", float(rewards.mean()))
-            # this is only logged when no hyperparameter tuning is running?
-            # dodge/collect env
-            if "simple" in infos[0].keys():
-                self.logger.record("rollout_reward_simple", float(infos[0]["simple"]))
-                self.logger.record("rollout_reward_gaussian", float(infos[0]["gaussian"]))
-                self.logger.record("rollout_reward_pos_neg",
-                                   float(infos[0]["pos_neg"]["pos"][0] + infos[0]["pos_neg"]["neg"][0]))
-                self.logger.record("rollout_number_of_crashed_or_collected_objects",
-                                   float(infos[0]["number_of_crashed_or_collected_objects"]))
-            # gridworld env
-            if "input_noise_is_applied_in_this_episode" in infos[0].keys():
-                self.logger.record("input_noise_applied", infos[0]["input_noise_is_applied_in_this_episode"])
-            # meta env
-            if "dodge" in infos[0].keys():
-                self.logger.record("dodge_gaussian_reward", infos[0]["dodge"]["gaussian"])
-                self.logger.record("collect_gaussian_reward", infos[0]["collect"]["gaussian"])
-                self.logger.record("task_switching_costs", infos[0]["task_switching_costs"])
+
+            # log rewards of dodge and collect
+            if "reward_dodge" in infos[0]:
+                self.logger.record("train/rollout_rewards_dodge_step", infos[0]["reward_dodge"])
+                self.logger.record_mean("train/rollout_rewards_dodge_mean", infos[0]["reward_dodge"])
+            if "reward_collect" in infos[0]:
+                self.logger.record("train/rollout_rewards_collect_step", infos[0]["reward_collect"])
+                self.logger.record_mean("train/rollout_rewards_collect_mean", infos[0]["reward_collect"])
             self.num_timesteps += env.num_envs
 
             # Give access to local variables
@@ -442,11 +422,6 @@ class CLEANPPO:
                 ):
                     terminal_obs = infos[idx]["terminal_observation"]
                     with torch.no_grad():
-                        # terminal_obs["agent_0"] = np.expand_dims(terminal_obs["agent_0"], axis=0)
-                        # terminal_obs["agent_1"] = np.expand_dims(terminal_obs["agent_1"], axis=0)
-                        # terminal_obs["target"] = np.expand_dims(terminal_obs["target"], axis=0)
-                        terminal_obs["agent"] = np.expand_dims(terminal_obs["agent"], axis=0)
-                        terminal_obs["target"] = np.expand_dims(terminal_obs["target"], axis=0)
                         terminal_value = self.policy.get_value(terminal_obs)[0]
                     rewards[idx] += self.gamma * terminal_value
 
@@ -498,7 +473,7 @@ class CLEANPPO:
     @classmethod
     def load(cls, path, env, **kwargs):
         model = cls(env=env, **kwargs)
-        loaded_dict = torch.load(path, map_location=torch.device('cpu'))
+        loaded_dict = torch.load(path)
         for k in loaded_dict:
             if k not in ["_policy"]:
                 model.__dict__[k] = loaded_dict[k]

@@ -18,7 +18,7 @@ from custom_algorithms.cleanppofm.forward_model import ProbabilisticSimpleForwar
     ProbabilisticForwardNetPositionPredictionIncludingReward
 from custom_algorithms.cleanppofm.utils import flatten_obs, get_reward_estimation_of_forward_model, \
     get_position_and_object_positions_of_observation, get_next_observation_gridworld, \
-    get_reward_with_future_reward_estimation_corrective, \
+    get_reward_with_future_reward_estimation_corrective, reward_estimation, \
     calculate_prediction_error, get_next_observation_moonlander
 from custom_algorithms.cleanppofm.agent import Agent
 from utils.custom_buffer import CustomDictRolloutBuffer as DictRolloutBuffer
@@ -151,12 +151,16 @@ class CLEANPPOFM:
         self.position_predicting = position_predicting
         # boolean if the forward model should also predict the reward
         self.reward_predicting = reward_predicting
+        # number of future steps for the reward predicting forward model
+        self.number_of_future_steps = number_of_future_steps
         # boolean if the training data for the forward model is generated with input noise or not
         self.fm_trained_with_input_noise = fm_trained_with_input_noise
         # boolean if the input noise is on
         self.input_noise_on = input_noise_on
         # maximal number of objects considered in the forward model
         self.maximum_number_of_objects = maximum_number_of_objects
+        # prediction error of the prediction of the forward model and the actual next observation
+        self.prediction_error = 1
 
         # get the env name as described here: https://github.com/DLR-RM/stable-baselines3/blob/master/docs/guide/vec_envs.rst
         # Note: you should use vec_env.env_method("get_wrapper_attr", "attribute_name") in Gymnasium v1.0
@@ -168,9 +172,9 @@ class CLEANPPOFM:
         if self.position_predicting and not self.env_name == "MoonlanderWorldEnv":
             raise NotImplementedError("Position predicting is only possible for the moonlander environment by now!")
         # number of future steps only possible for reward predicting
-        if number_of_future_steps > 0 and not self.reward_predicting:
+        if self.number_of_future_steps > 0 and not self.reward_predicting:
             warnings.warn(
-                f"You have specified a number of future steps of {number_of_future_steps},"
+                f"You have specified a number of future steps of {self.number_of_future_steps},"
                 f" but because you set the `reward_predicting` parameter to False,"
                 f" it does not have any effect.\n"
             )
@@ -185,7 +189,9 @@ class CLEANPPOFM:
             self.fm_network = fm_cls(self.env, self.fm_parameters, self.maximum_number_of_objects).to(device)
         self.fm_optimizer = torch.optim.Adam(
             self.fm_network.parameters(),
-            lr=self.fm_parameters["learning_rate"]
+            # FIXME
+            # lr=self.fm_parameters["learning_rate"]
+            lr=0.001
         )
         self.logger = None
 
@@ -642,42 +648,21 @@ class CLEANPPOFM:
                                                       forward_model_prediction_normal_distribution=forward_normal,
                                                       position_predicting=self.position_predicting,
                                                       maximum_number_of_objects=self.maximum_number_of_objects)
-        # print("prediction_error", prediction_error)
+        self.prediction_error = prediction_error
 
         if self.reward_predicting:
             ##### FLATTING OBSERVATIONS FOR FUTURE REWARD ESTIMATION #####
-            flatten_last_obs = self._last_obs
             flatten_new_obs = new_obs
             if isinstance(self.env.observation_space, spaces.Dict):
-                flatten_last_obs = flatten_obs(flatten_last_obs)
                 flatten_new_obs = flatten_obs(flatten_new_obs)
-            # FIXME: what is happening here exactly?
-            elif len(self.env.observation_space.shape) >= 3:
-                if self.env.observation_space.shape[2] == 3:
-                    flatten_last_obs = flatten_obs(flatten_last_obs)
-                    flatten_new_obs = flatten_obs(flatten_new_obs)
             else:
-                flatten_last_obs = torch.from_numpy(flatten_last_obs).to(device)
                 flatten_new_obs = torch.from_numpy(flatten_new_obs).to(device)
-
-            # default action is stay at same position
-            if self.env_name == "MoonlanderWorldEnv":
-                default_action = torch.Tensor([[0]])
-            # random default action for gridworld env
-            elif self.env_name == "GridWorldEnv":
-                default_action = torch.randint(low=0, high=8, size=(1, 1), device=device)
-            # TODO: do this only after a warm-up phase of the forward model
-            ##### REWARD ESTIMATION #####
-            future_reward_estimation = get_reward_estimation_of_forward_model(
-                fm_network=self.fm_network,
-                obs=flatten_new_obs,
+            reward_with_future_reward_estimation_corrective = reward_estimation(
+                fm_network=self.fm_network, new_obs=flatten_new_obs, env_name=self.env_name,
+                rewards=deepcopy_of_rewards_for_corrective, prediction_error=prediction_error,
                 position_predicting=self.position_predicting,
-                default_action=torch.Tensor(
-                    [[0]]),
-                number_of_future_steps=10, maximum_number_of_objects=self.maximum_number_of_objects)
-            reward_with_future_reward_estimation_corrective = get_reward_with_future_reward_estimation_corrective(
-                rewards=deepcopy_of_rewards_for_corrective, future_reward_estimation=future_reward_estimation,
-                prediction_error=prediction_error)
+                number_of_future_steps=self.number_of_future_steps,
+                maximum_number_of_objects=self.maximum_number_of_objects)
 
         # fixme: reward_with_future_reward_estimation_corrective is not used
         return new_obs, rewards, dones, infos, prediction_error, reward_with_future_reward_estimation_corrective

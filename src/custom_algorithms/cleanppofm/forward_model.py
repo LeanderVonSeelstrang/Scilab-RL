@@ -14,7 +14,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class ProbabilisticSimpleForwardNet(nn.Module):
     def __init__(self, env, cfg):
         super().__init__()
-        hidden_size = cfg["hidden_size"]
+        # FIXME:
+        # hidden_size = cfg["hidden_size"]
+        hidden_size = 256
         if isinstance(env.observation_space, spaces.dict.Dict):
             self.obs_shape = np.sum(
                 [obs_space.shape for obs_space in env.observation_space.spaces.values()]

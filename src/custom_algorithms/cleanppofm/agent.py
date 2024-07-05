@@ -1,5 +1,4 @@
 import numpy as np
-import math
 import torch
 import torch.nn as nn
 from gymnasium import spaces
@@ -164,9 +163,6 @@ class Agent(nn.Module):
         #  but if you feed your cat vs dog classifier a picture containing both a cat and a dog,
         #  you probably want the model to give you a 50-50 split which is maximal entropy.
         # value of critic network, forward model prediction in normal distribution
-        # print("positions", positions)
-        # print("action", action)
-        # print("forward_model_prediction_normal_distribution", forward_model_prediction_normal_distribution.mean)
 
         return action.unsqueeze(0), distribution.log_prob(action), distribution.entropy(), self.critic(
             obs), forward_model_prediction_normal_distribution
