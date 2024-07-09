@@ -473,7 +473,7 @@ class CLEANPPO:
     @classmethod
     def load(cls, path, env, **kwargs):
         model = cls(env=env, **kwargs)
-        loaded_dict = torch.load(path)
+        loaded_dict = torch.load(path, map_location=torch.device(device))
         for k in loaded_dict:
             if k not in ["_policy"]:
                 model.__dict__[k] = loaded_dict[k]
