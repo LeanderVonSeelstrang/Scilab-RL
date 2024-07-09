@@ -79,7 +79,7 @@ class MetaEnvPretrained(gym.Env):
         # FIXME: this is an ugly hack to load the trained agents
         with open(
                 os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                             "../../../policies/dodge_01_07_rl_model_best"), "rb"
+                             "../../../policies/dodge_object_prediction_rl_model_best"), "rb"
         ) as file:
             print("start loading agents", file)
             self.trained_dodge_asteroids = CLEANPPOFM.load(path=file,
@@ -88,7 +88,7 @@ class MetaEnvPretrained(gym.Env):
             self.trained_dodge_asteroids.set_logger(logger=self.logger)
         with open(
                 os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                             "../../../policies/dodge_01_07_rl_model_best"), "rb"
+                             "../../../policies/collect_object_prediction_rl_model_best"), "rb"
         ) as file:
             # same model cannot be loaded twice -> copy does also not work
             self.trained_collect_asteroids = CLEANPPOFM.load(path=file,
@@ -211,7 +211,7 @@ class MetaEnvPretrained(gym.Env):
         inactive_reward_estimation_corrected_by_SoC = inactive_reward_estimation_corrected_by_SoC.item()
 
         belief_state = get_observation_of_position_and_object_positions(
-            inactive_belief_state_normal_distribution.mean[0][:-1].cpu().unsqueeze(0)).flatten().numpy()
+            inactive_belief_state_normal_distribution.mean[0][:-1].cpu().unsqueeze(0)).flatten().cpu().numpy()
         match action:
             case 0:
                 # dodge task
