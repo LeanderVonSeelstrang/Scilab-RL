@@ -168,10 +168,10 @@ class MetaEnvPretrained(gym.Env):
 
         ### ACTIVE TASK ###
         # predict next action
-        action_of_task_agent, _, _ = active_model.predict(np.expand_dims(active_last_state, 0), deterministic=True)
+        action_of_task_agent, _, _ = active_model.predict(active_last_state, deterministic=True)
         # get position and object positions of observation
         active_agent_and_object_positions_tensor = get_position_and_object_positions_of_observation(
-            torch.tensor([active_last_state], device=device))
+            torch.tensor(active_last_state, device=device))
         # forward model predictions once with state and action
         active_belief_state_normal_distribution = active_model.fm_network(active_agent_and_object_positions_tensor,
                                                                           torch.tensor([action_of_task_agent]).float())
@@ -187,7 +187,7 @@ class MetaEnvPretrained(gym.Env):
         _, _, inactive_is_done, inactive_info = inactive_model.env.step(torch.tensor([0], device=device))
         # get position and object positions of observation
         inactive_agent_and_object_positions_tensor = get_position_and_object_positions_of_observation(
-            torch.tensor([inactive_last_state], device=device))
+            torch.tensor(inactive_last_state, device=device))
         # forward model predictions once with state and action
         inactive_belief_state_normal_distribution = inactive_model.fm_network(
             inactive_agent_and_object_positions_tensor,
@@ -212,6 +212,7 @@ class MetaEnvPretrained(gym.Env):
 
         belief_state = get_observation_of_position_and_object_positions(
             inactive_belief_state_normal_distribution.mean[0][:-1].cpu().unsqueeze(0)).flatten().cpu().numpy()
+        belief_state = np.expand_dims(belief_state, 0)
         match action:
             case 0:
                 # dodge task
