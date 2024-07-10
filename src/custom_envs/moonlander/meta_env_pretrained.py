@@ -179,8 +179,8 @@ class MetaEnvPretrained(gym.Env):
         new_state, _, active_is_done, active_info, active_prediction_error, active_reward_estimation_corrected_by_SoC = active_model.step_in_env(
             actions=torch.tensor(action_of_task_agent).float(),
             forward_normal=active_belief_state_normal_distribution)
-
         active_SoC = 1 - active_prediction_error
+
         ### INACTIVE TASK ###
         # perform default action 0 in inactive task
         # only four return value because DummyVecEnv only returns observation, reward, done, info
@@ -203,7 +203,7 @@ class MetaEnvPretrained(gym.Env):
                                                                         rewards=
                                                                         inactive_belief_state_normal_distribution.mean[
                                                                             0][-1],
-                                                                        prediction_error=inactive_SoC,
+                                                                        prediction_error=(1 - inactive_SoC),
                                                                         # we already have the positions through the prediction
                                                                         position_predicting=False,
                                                                         number_of_future_steps=inactive_model.number_of_future_steps,
