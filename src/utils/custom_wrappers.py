@@ -17,6 +17,10 @@ from metaworld.envs import ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE as METAWORLD_ENVS
 from metaworld.envs.reward_utils import tolerance
 
 
+# for newer versions of metaworld
+# from metaworld.envs.mujoco.utils.reward_utils import tolerance
+
+
 def recursive_set_render_mode(env, mode):
     """
     Sets the render mode for the environment object and all environments that are part of the object.
@@ -24,13 +28,12 @@ def recursive_set_render_mode(env, mode):
     try:
         env.unwrapped.render_mode = mode
         env_dict = vars(env.unwrapped)
-        for k,v in env_dict.items():
+        for k, v in env_dict.items():
             if isinstance(v, MujocoEnv):
                 if k != "unwrapped":
                     recursive_set_render_mode(v, mode)
     except Exception as e:
         print(f"{e}. Error, no valid environment provided")
-
 
 
 class DisplayWrapper(gym.Wrapper):
@@ -40,15 +43,16 @@ class DisplayWrapper(gym.Wrapper):
     episode_trigger uses episode_id,
     episode_of_epoch_trigger uses epoch_id and episode_in_epoch_id
     """
+
     def __init__(
-        self,
-        env,
-        steps_per_epoch = None,
-        episode_in_epoch_trigger: Callable[[int], bool] = None,
-        episode_trigger: Callable[[int], bool] = None,
-        step_trigger: Callable[[int], bool] = None,
-        metric_keys = [],
-        logger = None,
+            self,
+            env,
+            steps_per_epoch=None,
+            episode_in_epoch_trigger: Callable[[int], bool] = None,
+            episode_trigger: Callable[[int], bool] = None,
+            step_trigger: Callable[[int], bool] = None,
+            metric_keys=[],
+            logger=None,
     ):
         super().__init__(env)
 
@@ -79,7 +83,6 @@ class DisplayWrapper(gym.Wrapper):
                                            env=self.env) if self.display_metrics else None
         self.logger = logger
         recursive_set_render_mode(self.env, 'human')
-
 
     def reset(self, **kwargs):
         observations = self.env.reset(**kwargs)
@@ -112,7 +115,7 @@ class DisplayWrapper(gym.Wrapper):
             if self.epoch_id > epoch_id_tmp:
                 self.episode_in_epoch_id = 0
         self.step_id += 1
-        self.step_in_episode_id +=1
+        self.step_in_episode_id += 1
         if not self.is_vector_env:
             if dones:
                 self.episode_id += 1
@@ -133,7 +136,7 @@ class DisplayWrapper(gym.Wrapper):
                     if th.is_tensor(self.curr_recorded_value):
                         self.curr_recorded_value = self.curr_recorded_value.cpu()
                     if len(self.animation.x_data[i]) > 0:
-                        self.animation.x_data[i].append(self.animation.x_data[i][-1]+1)
+                        self.animation.x_data[i].append(self.animation.x_data[i][-1] + 1)
                     else:
                         self.animation.x_data[i].append(self.step_in_episode_id)
                     self.animation.y_data[i].append(self.curr_recorded_value)
@@ -163,23 +166,23 @@ class DisplayWrapper(gym.Wrapper):
                 # reset data
                 self.animation.x_data = [[] for _ in range(len(self.metric_keys))]
                 self.animation.y_data = [[] for _ in range(len(self.metric_keys))]
-            #close metric displayer
+            # close metric displayer
         self.displaying = False
 
 
 class RecordVideo(gym.Wrapper):
     def __init__(
-        self,
-        env,
-        video_folder: str,
-        steps_per_epoch = None,
-        episode_in_epoch_trigger: Callable[[int], bool] = None,
-        episode_trigger: Callable[[int], bool] = None,
-        step_trigger: Callable[[int], bool] = None,
-        video_length: int = 0,
-        name_prefix: str = "rl-video",
-        metric_keys = [],
-        logger = None,
+            self,
+            env,
+            video_folder: str,
+            steps_per_epoch=None,
+            episode_in_epoch_trigger: Callable[[int], bool] = None,
+            episode_trigger: Callable[[int], bool] = None,
+            step_trigger: Callable[[int], bool] = None,
+            video_length: int = 0,
+            name_prefix: str = "rl-video",
+            metric_keys=[],
+            logger=None,
     ):
         super(RecordVideo, self).__init__(env)
 
@@ -213,7 +216,7 @@ class RecordVideo(gym.Wrapper):
 
         self.name_prefix = name_prefix
         episode_length = env.spec.max_episode_steps
-        assert episode_length <= video_length or video_length==0, "Video length (render_frames_per_clip in main.yaml) must be at least the number of steps in one episode or 0."
+        assert episode_length <= video_length or video_length == 0, "Video length (render_frames_per_clip in main.yaml) must be at least the number of steps in one episode or 0."
 
         self.video_length = video_length
         self.recording = False
@@ -284,7 +287,7 @@ class RecordVideo(gym.Wrapper):
             if self.epoch_id > epoch_id_tmp:
                 self.episode_in_epoch_id = 0
         self.step_id += 1
-        self.step_in_episode_id +=1
+        self.step_in_episode_id += 1
         if not self.is_vector_env:
             if dones:
                 self.episode_id += 1
@@ -301,7 +304,7 @@ class RecordVideo(gym.Wrapper):
                 for i in range(self.num_metrics):
                     self.curr_recorded_value = self.logger.name_to_value[self.metric_keys[i]]
                     if len(self.animation.x_data[i]) > 0:
-                        self.animation.x_data[i].append(self.animation.x_data[i][-1]+1)
+                        self.animation.x_data[i].append(self.animation.x_data[i][-1] + 1)
                     else:
                         self.animation.x_data[i].append(self.step_in_episode_id)
                     # self.animation.x_data[i].append(self.step_in_episode_id)
@@ -336,7 +339,7 @@ class RecordVideo(gym.Wrapper):
             # Metric stuff
             if self.record_metrics:
                 metrics_frames = len(self.animation.y_data[0])
-                assert render_frames==metrics_frames, "Error, number of frames of rendered video not the same as number of frames of metrics video."
+                assert render_frames == metrics_frames, "Error, number of frames of rendered video not the same as number of frames of metrics video."
                 self.animation.save_animation(self.base_path + ".metric")
                 self.animation.reset_fig()
                 # reset data
@@ -376,6 +379,7 @@ class RecordVideo(gym.Wrapper):
         joint_clip.write_videofile(self.base_path + ".joint.mp4")
         self.logger.record(f'{self.name_prefix}/video', f'{self.base_path}.joint.mp4')
 
+
 class MakeDictObs(gym.Wrapper):
     def __init__(self, env, dense=False):
         super().__init__(env)
@@ -412,6 +416,7 @@ class MakeDictObs(gym.Wrapper):
                 obj_to_target = abs(achieved_goal - desired_goal)
 
                 return (obj_to_target <= 0.02) - 1
+
             self.compute_reward = compute_reward
 
         elif isinstance(env, METAWORLD_ENVS["reach-v2-goal-observable"]):
@@ -438,6 +443,7 @@ class MakeDictObs(gym.Wrapper):
                 dg = obs[-3:]
                 ob = obs[3:-3]
                 return {"observation": ob, "achieved_goal": ag, "desired_goal": dg}
+
             self.obs_to_dict_obs = convert_obs
 
             hand_init_pos = self.env.unwrapped.hand_init_pos  # stays the same when env resets
@@ -454,6 +460,7 @@ class MakeDictObs(gym.Wrapper):
                     sigmoid="long_tail",
                 )
                 return reward * 10
+
             self.compute_reward = compute_reward
 
         elif isinstance(env, (METAWORLD_ENVS["push-v2-goal-observable"],
@@ -504,6 +511,7 @@ class MakeDictObs(gym.Wrapper):
                                               "compute_reward for HER is only implemented for sparse "
                                               "rewards, because the dense reward includes parts that are calculated "
                                               "from the current environment state.")
+
             self.compute_reward = compute_reward
 
         elif isinstance(env, (METAWORLD_ENVS["door-open-v2-goal-observable"],
@@ -543,6 +551,7 @@ class MakeDictObs(gym.Wrapper):
                                               "compute_reward for HER is only implemented for sparse "
                                               "rewards, because the dense reward includes parts that are calculated "
                                               "from the current environment state.")
+
             self.compute_reward = compute_reward
 
         elif isinstance(env, (METAWORLD_ENVS["peg-insert-side-v2-goal-observable"])):
@@ -581,6 +590,7 @@ class MakeDictObs(gym.Wrapper):
                 else:
                     raise NotImplementedError("for peg-insert-side-v2 "
                                               "compute_reward for HER is only implemented for sparse rewards.")
+
             self.compute_reward = compute_reward
 
         else:
