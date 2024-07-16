@@ -105,10 +105,12 @@ class ProbabilisticForwardNetPositionPredictionIncludingReward(nn.Module):
 
 
 class ProbabilisticForwardNetPositionPrediction(nn.Module):
-    def __init__(self, env, cfg):
+    def __init__(self, env, cfg, maximum_number_of_objects: int = 5):
         super().__init__()
         hidden_size = cfg["hidden_size"]
-        self.old_position_shape = 1
+        # 2 positions for the x, y coordinates of the agent
+        # + 2 positions for the x, y coordinates of each object (maximum_number_of_objects)
+        self.old_position_shape = 2 + 2 * maximum_number_of_objects
         self.action_shape = int(np.prod(env.action_space.shape))
 
         self.state_action_encoder = nn.Sequential(

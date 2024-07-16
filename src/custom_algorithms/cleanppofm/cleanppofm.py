@@ -16,10 +16,9 @@ from torch.nn import functional as F
 from custom_algorithms.cleanppofm.forward_model import ProbabilisticSimpleForwardNet, \
     ProbabilisticForwardNetPositionPrediction, ProbabilisticSimpleForwardNetIncludingReward, \
     ProbabilisticForwardNetPositionPredictionIncludingReward
-from custom_algorithms.cleanppofm.utils import flatten_obs, get_reward_estimation_of_forward_model, \
-    get_position_and_object_positions_of_observation, get_next_observation_gridworld, \
-    get_reward_with_future_reward_estimation_corrective, reward_estimation, \
-    calculate_prediction_error, get_next_observation_moonlander
+from custom_algorithms.cleanppofm.utils import flatten_obs, get_position_and_object_positions_of_observation, \
+    get_next_observation_gridworld, reward_estimation, reward_calculation, calculate_prediction_error, \
+    get_next_observation_moonlander
 from custom_algorithms.cleanppofm.agent import Agent
 from utils.custom_buffer import CustomDictRolloutBuffer as DictRolloutBuffer
 from utils.custom_buffer import CustomRolloutBuffer as RolloutBuffer
@@ -171,13 +170,6 @@ class CLEANPPOFM:
         # position predicting only possible for moonlander env
         if self.position_predicting and not self.env_name == "MoonlanderWorldEnv":
             raise NotImplementedError("Position predicting is only possible for the moonlander environment by now!")
-        # number of future steps only possible for reward predicting
-        if self.number_of_future_steps > 0 and not self.reward_predicting:
-            warnings.warn(
-                f"You have specified a number of future steps of {self.number_of_future_steps},"
-                f" but because you set the `reward_predicting` parameter to False,"
-                f" it does not have any effect.\n"
-            )
         if self.position_predicting:
             fm_cls = ProbabilisticForwardNetPositionPredictionIncludingReward if self.reward_predicting else \
                 ProbabilisticForwardNetPositionPrediction
@@ -663,6 +655,11 @@ class CLEANPPOFM:
                 position_predicting=self.position_predicting,
                 number_of_future_steps=self.number_of_future_steps,
                 maximum_number_of_objects=self.maximum_number_of_objects)
+        else:
+            reward_with_future_reward_estimation_corrective = reward_calculation(env=self.env, env_name=self.env_name,
+                                                                                 rewards=rewards,
+                                                                                 prediction_error=prediction_error,
+                                                                                 number_of_future_steps=self.number_of_future_steps)
 
         # fixme: reward_with_future_reward_estimation_corrective is not used
         return new_obs, rewards, dones, infos, prediction_error, reward_with_future_reward_estimation_corrective

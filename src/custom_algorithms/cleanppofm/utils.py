@@ -53,7 +53,7 @@ def layer_init(layer, std: np.float64 = np.sqrt(2), bias_const: float = 0.0) -> 
 
 def get_reward_estimation_of_forward_model(fm_network, obs: torch.Tensor,
                                            position_predicting: bool,
-                                           default_action: torch.Tensor = torch.Tensor([[0]]),
+                                           default_action: torch.Tensor = torch.Tensor([[1]]),
                                            number_of_future_steps: int = 10,
                                            maximum_number_of_objects: int = 5) -> float:
     """
@@ -123,7 +123,7 @@ def reward_estimation(fm_network, new_obs: np.array, env_name: str, rewards, pre
                       position_predicting: bool, number_of_future_steps: int = 10, maximum_number_of_objects: int = 5):
     # default action is stay at same position
     if env_name == "MoonlanderWorldEnv":
-        default_action = torch.Tensor([[0]])
+        default_action = torch.Tensor([[1]])
     # random default action for gridworld env
     elif env_name == "GridWorldEnv":
         default_action = torch.randint(low=0, high=8, size=(1, 1), device=device)
@@ -143,6 +143,43 @@ def reward_estimation(fm_network, new_obs: np.array, env_name: str, rewards, pre
         prediction_error=prediction_error)
 
     return reward_with_future_reward_estimation_corrective
+
+
+def reward_calculation(env, env_name: str, rewards, prediction_error: float, number_of_future_steps: int = 10):
+    """
+    Calculate the reward by using the reward model of the environment.
+    Args:
+        env: environment
+        env_name: name of the current environment
+        rewards: reward of last step
+        prediction_error: error between predicted and last actual observation
+        number_of_future_steps: number of future steps to predict
+
+    Returns:
+        reward with future reward calculation corrective
+    """
+    # default action is stay at same position
+    if env_name == "MoonlanderWorldEnv":
+        default_action = torch.Tensor([[1]])
+    # using reward model of other envs is not implemented by now
+    else:
+        raise ValueError(
+            "The current environment does not support the reward calculation through the actual environment.")
+
+    copied_env = copy.deepcopy(env)
+    # remove possible input noise in the environment
+    copied_env.env_method("set_input_noise", 0)
+    ##### CALCULATE NEXT REWARDS THROUGH ENVIRONMENT #####
+    summed_up_reward = 0
+    for i in range(number_of_future_steps):
+        _, rewards, _, _ = copied_env.step(default_action)
+        # add new reward to last reward
+        summed_up_reward += rewards
+
+    reward_with_future_reward_corrective = get_reward_with_future_reward_estimation_corrective(
+        rewards=rewards, future_reward_estimation=summed_up_reward,
+        prediction_error=prediction_error)
+    return reward_with_future_reward_corrective
 
 
 def get_position_and_object_positions_of_observation(obs: torch.Tensor,
