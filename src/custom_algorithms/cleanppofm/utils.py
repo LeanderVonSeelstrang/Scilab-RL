@@ -172,6 +172,7 @@ def reward_calculation(env, env_name: str, rewards, prediction_error: float, num
     ##### CALCULATE NEXT REWARDS THROUGH ENVIRONMENT #####
     summed_up_reward = 0
     for i in range(number_of_future_steps):
+        # FIXME: what happens when the environment is done?
         _, rewards, _, _ = copied_env.step(default_action)
         # add new reward to last reward
         summed_up_reward += rewards
@@ -244,7 +245,6 @@ def get_position_and_object_positions_of_observation(obs: torch.Tensor,
 
 def get_observation_of_position_and_object_positions(agent_and_object_positions: torch.Tensor) -> torch.Tensor:
     # tensor of (1,12)
-    # copy_of_agent_and_object_positions = copy.deepcopy(agent_and_object_positions)
     copy_of_agent_and_object_positions = agent_and_object_positions.clone().detach()
     # build empty obs
     matrix = np.zeros(shape=(10, 10 + 2), dtype=np.int16)
@@ -401,3 +401,144 @@ def calculate_prediction_error(env_name: str, env, next_obs, forward_model_predi
         raise ValueError("Environment not supported")
 
     return prediction_error
+
+
+def calculate_difficulty(env, policy, fm_network, logger, env_name: str, prediction_error: float,
+                         position_predicting: bool, maximum_number_of_objects: int = 5) -> float:
+    """
+    Calculate the difficulty of the environment by simulating the default trajectory
+    and the "optimal" trajectory the agent would choose.
+    Args:
+        env: environment
+        policy: agent policy to predict actions
+        fm_network: forward model network
+        logger: logger
+        env_name: name of the environment
+        prediction_error: error between predicted and last actual observation
+        position_predicting: if the forward model is predicting the position or actual observation
+        maximum_number_of_objects: the number of objects that are considered in the forward model prediction
+    Returns:
+        difficulty between 0 and 1
+    """
+    # default action is stay at same position
+    if env_name == "MoonlanderWorldEnv":
+        default_action = torch.Tensor([[1]])
+    # using reward model of other envs is not implemented by now
+    else:
+        raise ValueError(
+            "The current environment does not support the difficulty calculation.")
+    if not position_predicting:
+        raise NotImplementedError(
+            "Difficulty calculation is only implemented for predicting the position of the agent and objects.")
+    task = env.env_method("get_wrapper_attr", "task")[0]
+
+    # calculate the trajectory lengths through the prediction error
+    # we decide that the trajectory length is half the observation size of the environment when the prediction error is 0
+    observation_height = env.env_method("get_wrapper_attr", "observation_height")[0]
+    trajectory_length = - (observation_height / 2) * prediction_error + observation_height / 2
+
+    last_observation_default = np.expand_dims(env.env_method("get_wrapper_attr", "state")[0].flatten(), axis=0)
+    last_observation_optimal = copy.deepcopy(last_observation_default)
+
+    # simulate the default and optimal trajectory
+    copied_env_default = copy.deepcopy(env)
+    copied_env_optimal = copy.deepcopy(env)
+    # remove possible input noise in the environment
+    copied_env_default.env_method("set_input_noise", 0)
+    copied_env_optimal.env_method("set_input_noise", 0)
+
+    done_default = copied_env_default.env_method("is_done")[0]
+    done_optimal = copied_env_optimal.env_method("is_done")[0]
+
+    ##### CALCULATE NEXT REWARDS THROUGH ENVIRONMENT #####
+    summed_up_reward_default = 0
+    summed_up_reward_optimal = 0
+    # simulate at least one step
+    for i in range(max(int(trajectory_length), 1)):
+        if not done_default:
+            _, rewards_default, done_default, _ = copied_env_default.step(default_action)
+            normalized_reward_default = normalize_rewards(task=task, absolute_reward=rewards_default[0])
+            summed_up_reward_default += normalized_reward_default
+
+            # we manually predict the next state and set it in the env to calculate the reward
+            # predict next state
+            # positions for forward model
+            last_observation_default = get_position_and_object_positions_of_observation(
+                torch.tensor(last_observation_default, device=device),
+                maximum_number_of_objects=maximum_number_of_objects)
+            forward_model_prediction_normal_distribution_default = fm_network(last_observation_default, default_action)
+            # state for env
+            last_observation_default = np.expand_dims(get_observation_of_position_and_object_positions(
+                forward_model_prediction_normal_distribution_default.mean[0].cpu().unsqueeze(
+                    0)).flatten().cpu().numpy(), axis=0)
+
+            # set state in env (assume a forward model prediction without reward)
+            # environment assumes a numpy array as state
+            copied_env_default.env_method("set_state", last_observation_default)
+
+        if not done_optimal:
+            # get action
+            actions, _, _, _, _ = policy.get_action_and_value_and_forward_model_prediction(
+                fm_network=fm_network,
+                obs=torch.tensor(last_observation_optimal, device=device, dtype=torch.float32).clone().detach(),
+                logger=logger,
+                position_predicting=position_predicting,
+                maximum_number_of_objects=maximum_number_of_objects)
+            _, rewards_optimal, done_optimal, _ = copied_env_optimal.step(actions)
+            normalized_reward_optimal = normalize_rewards(task=task, absolute_reward=rewards_optimal[0])
+            summed_up_reward_optimal += normalized_reward_optimal
+
+            # we manually predict the next state and set it in the env to calculate the reward
+            # predict next state
+            # positions for forward model
+            last_observation_optimal = get_position_and_object_positions_of_observation(
+                torch.tensor(last_observation_optimal, device=device),
+                maximum_number_of_objects=maximum_number_of_objects)
+            forward_model_prediction_normal_distribution_optimal = fm_network(last_observation_optimal, actions.float())
+            # state for env
+            last_observation_optimal = np.expand_dims(get_observation_of_position_and_object_positions(
+                forward_model_prediction_normal_distribution_optimal.mean[0].cpu().unsqueeze(
+                    0)).flatten().cpu().numpy(), axis=0)
+
+            # set state in env (assume a forward model prediction without reward)
+            # environment assumes a numpy array as state
+            copied_env_optimal.env_method("set_state", last_observation_optimal)
+
+            # distance between the two trajectories
+    if summed_up_reward_default == 0 and summed_up_reward_optimal == 0:
+        # cannot divide by zero
+        # both trajectories are the same
+        difficulty = 0
+    else:
+        difficulty = (min(summed_up_reward_default, summed_up_reward_optimal)) / (
+            max(summed_up_reward_default, summed_up_reward_optimal))
+
+    return difficulty
+
+
+def normalize_rewards(task: str, absolute_reward) -> float:
+    # normalize reward with MinMaxScaler
+    if task == "dodge":
+        # normalize reward with MinMaxScaler: (reward - min) / (max - min)
+        # the maximum reward is 10 -> when no obstacles are in the area
+        # the minimum reward is ~-100 -> when the agent is completely surrounded by obstacles
+        # the minimum condition never happens, in general are most rewards between 0 and 10
+        # to not have a normalization, where 99% of the numbers are similar
+        # we choose to clip the smallest 1% -> which is a clipping from -100 to -3 -> clip to -3
+        if absolute_reward < -3:
+            absolute_reward = -3
+        normalized_reward_default = (absolute_reward - (-3)) / (10 - (-3))
+    elif task == "collect":
+        # normalize reward with MinMaxScaler: (reward - min) / (max - min)
+        # the maximum reward is ~350 -> when the agent is completely surrounded by coins
+        # the minimum reward is ~0 -> when no coins are in the area
+        # the maximum condition never happens, in general are most rewards between 0 and 60
+        # to not have a normalization, where 99% of the numbers are similar
+        # we choose to clip the highest 1% -> which is a clipping from 0 to 62 -> clip to 62
+        if absolute_reward > 62:
+            absolute_reward = 62
+        normalized_reward_default = (absolute_reward - 0) / (62 - 0)
+    else:
+        raise ValueError("Task {} not implemented".format(task))
+
+    return normalized_reward_default

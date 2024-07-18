@@ -18,7 +18,7 @@ from custom_algorithms.cleanppofm.forward_model import ProbabilisticSimpleForwar
     ProbabilisticForwardNetPositionPredictionIncludingReward
 from custom_algorithms.cleanppofm.utils import flatten_obs, get_position_and_object_positions_of_observation, \
     get_next_observation_gridworld, reward_estimation, reward_calculation, calculate_prediction_error, \
-    get_next_observation_moonlander
+    get_next_observation_moonlander, calculate_difficulty
 from custom_algorithms.cleanppofm.agent import Agent
 from utils.custom_buffer import CustomDictRolloutBuffer as DictRolloutBuffer
 from utils.custom_buffer import CustomRolloutBuffer as RolloutBuffer
@@ -641,6 +641,15 @@ class CLEANPPOFM:
                                                       position_predicting=self.position_predicting,
                                                       maximum_number_of_objects=self.maximum_number_of_objects)
         self.prediction_error = prediction_error
+
+        ##### CALCULATE DIFFICULTY #####
+        # FIXME: not used
+        difficulty = calculate_difficulty(env=self.env, policy=self.policy, fm_network=self.fm_network,
+                                          logger=self.logger, env_name=self.env_name,
+                                          prediction_error=self.prediction_error,
+                                          position_predicting=self.position_predicting,
+                                          maximum_number_of_objects=self.maximum_number_of_objects)
+        print("Difficulty: ", difficulty)
 
         if self.reward_predicting:
             ##### FLATTING OBSERVATIONS FOR FUTURE REWARD ESTIMATION #####

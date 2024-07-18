@@ -150,6 +150,8 @@ class MoonlanderWorldEnv(Env):
         # needed to read out the sizes of the moonlander world
         self.first_possible_x_position = size
         self.last_possible_x_position = world_config["x_width"] - size + 1
+        self.observation_height = agent_config["observation_height"]
+        self.task = task
 
         self.y_position_of_agent = agent_config["size"]
 
@@ -1134,3 +1136,6 @@ class MoonlanderWorldEnv(Env):
 
     def set_input_noise(self, new_input_noise: float) -> None:
         self.input_noise = new_input_noise
+
+    def set_state(self, new_state: np.ndarray) -> None:
+        self.state = new_state
