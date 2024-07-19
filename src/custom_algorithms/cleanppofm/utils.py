@@ -549,8 +549,8 @@ def normalize_rewards(task: str, absolute_reward) -> float:
         # to not have a normalization, where 99% of the numbers are similar
         # we choose to clip the smallest 1% -> which is a clipping from -100 to -3 -> clip to -3
         if absolute_reward < -3:
-            absolute_reward = -3
-        normalized_reward_default = (absolute_reward - (-3)) / (10 - (-3))
+            absolute_reward = np.array([-3])
+        normalized_reward = (absolute_reward - (-3)) / (10 - (-3))
     elif task == "collect":
         # normalize reward with MinMaxScaler: (reward - min) / (max - min)
         # the maximum reward is ~350 -> when the agent is completely surrounded by coins
@@ -559,9 +559,9 @@ def normalize_rewards(task: str, absolute_reward) -> float:
         # to not have a normalization, where 99% of the numbers are similar
         # we choose to clip the highest 1% -> which is a clipping from 0 to 62 -> clip to 62
         if absolute_reward > 62:
-            absolute_reward = 62
-        normalized_reward_default = (absolute_reward - 0) / (62 - 0)
+            absolute_reward = np.array([62])
+        normalized_reward = (absolute_reward - 0) / (62 - 0)
     else:
         raise ValueError("Task {} not implemented".format(task))
 
-    return normalized_reward_default
+    return normalized_reward

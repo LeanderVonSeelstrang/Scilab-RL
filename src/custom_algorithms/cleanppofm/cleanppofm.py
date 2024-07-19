@@ -638,7 +638,7 @@ class CLEANPPOFM:
         new_obs, rewards, dones, infos = self.env.step(actions)
         if self.normalized_rewards:
             task = self.env.env_method("get_wrapper_attr", "task")[0]
-            rewards = normalize_rewards(task=task, absolute_rewards=rewards)
+            rewards = normalize_rewards(task=task, absolute_reward=rewards)
         deepcopy_of_rewards_for_corrective = copy.deepcopy(rewards)
 
         ##### CALCULATING PREDICTION ERROR #####
