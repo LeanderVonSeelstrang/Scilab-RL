@@ -18,7 +18,7 @@ from custom_algorithms.cleanppofm.forward_model import ProbabilisticSimpleForwar
     ProbabilisticForwardNetPositionPredictionIncludingReward
 from custom_algorithms.cleanppofm.utils import flatten_obs, get_position_and_object_positions_of_observation, \
     get_next_observation_gridworld, reward_estimation, reward_calculation, calculate_prediction_error, \
-    get_next_observation_moonlander, calculate_difficulty
+    get_next_observation_moonlander, calculate_difficulty, normalize_rewards
 from custom_algorithms.cleanppofm.agent import Agent
 from utils.custom_buffer import CustomDictRolloutBuffer as DictRolloutBuffer
 from utils.custom_buffer import CustomRolloutBuffer as RolloutBuffer
@@ -80,6 +80,7 @@ class CLEANPPOFM:
             fm_parameters: dict = None,
             position_predicting: bool = False,
             reward_predicting: bool = False,
+            normalized_rewards: bool = False,
             number_of_future_steps: int = 10,
             fm_trained_with_input_noise: bool = True,
             input_noise_on: bool = False,
@@ -150,6 +151,8 @@ class CLEANPPOFM:
         self.position_predicting = position_predicting
         # boolean if the forward model should also predict the reward
         self.reward_predicting = reward_predicting
+        # boolean if the rewards are normalized
+        self.normalized_rewards = normalized_rewards
         # number of future steps for the reward predicting forward model
         self.number_of_future_steps = number_of_future_steps
         # boolean if the training data for the forward model is generated with input noise or not
@@ -159,7 +162,7 @@ class CLEANPPOFM:
         # maximal number of objects considered in the forward model
         self.maximum_number_of_objects = maximum_number_of_objects
         # prediction error of the prediction of the forward model and the actual next observation
-        self.prediction_error = 1
+        self.soc = 1
 
         # get the env name as described here: https://github.com/DLR-RM/stable-baselines3/blob/master/docs/guide/vec_envs.rst
         # Note: you should use vec_env.env_method("get_wrapper_attr", "attribute_name") in Gymnasium v1.0
@@ -630,8 +633,12 @@ class CLEANPPOFM:
             input_noise = int(round(input_noise, 0))
         self.env.env_method("set_input_noise", input_noise)
 
+        ##### STEP IN ENVIRONMENT #####
         # dones = terminated or truncated
         new_obs, rewards, dones, infos = self.env.step(actions)
+        if self.normalized_rewards:
+            task = self.env.env_method("get_wrapper_attr", "task")[0]
+            rewards = normalize_rewards(task=task, absolute_rewards=rewards)
         deepcopy_of_rewards_for_corrective = copy.deepcopy(rewards)
 
         ##### CALCULATING PREDICTION ERROR #####
@@ -640,16 +647,19 @@ class CLEANPPOFM:
                                                       forward_model_prediction_normal_distribution=forward_normal,
                                                       position_predicting=self.position_predicting,
                                                       maximum_number_of_objects=self.maximum_number_of_objects)
-        self.prediction_error = prediction_error
+        self.soc = prediction_error
 
-        ##### CALCULATE DIFFICULTY #####
-        # FIXME: not used
+        ##### CALCULATING DIFFICULTY #####
         difficulty = calculate_difficulty(env=self.env, policy=self.policy, fm_network=self.fm_network,
                                           logger=self.logger, env_name=self.env_name,
-                                          prediction_error=self.prediction_error,
+                                          prediction_error=prediction_error,
                                           position_predicting=self.position_predicting,
-                                          maximum_number_of_objects=self.maximum_number_of_objects)
-        print("Difficulty: ", difficulty)
+                                          maximum_number_of_objects=self.maximum_number_of_objects,
+                                          reward_predicting=self.reward_predicting)
+
+        ##### CALCULATING SOC #####
+        # soc = mean of prediction error and difficulty
+        self.soc = 1 - ((prediction_error + difficulty) / 2)
 
         if self.reward_predicting:
             ##### FLATTING OBSERVATIONS FOR FUTURE REWARD ESTIMATION #####
@@ -670,7 +680,7 @@ class CLEANPPOFM:
                                                                                  prediction_error=prediction_error,
                                                                                  number_of_future_steps=self.number_of_future_steps)
 
-        # fixme: reward_with_future_reward_estimation_corrective is not used
+        # fixme: reward_with_future_reward_estimation_corrective is not used + SoC is not used
         return new_obs, rewards, dones, infos, prediction_error, reward_with_future_reward_estimation_corrective
 
     def save(

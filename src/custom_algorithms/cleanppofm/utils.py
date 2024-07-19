@@ -403,8 +403,9 @@ def calculate_prediction_error(env_name: str, env, next_obs, forward_model_predi
     return prediction_error
 
 
-def calculate_difficulty(env, policy, fm_network, logger, env_name: str, prediction_error: float,
-                         position_predicting: bool, maximum_number_of_objects: int = 5) -> float:
+def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
+                         prediction_error: float, position_predicting: bool, maximum_number_of_objects: int = 5,
+                         reward_predicting: bool = False) -> float:
     """
     Calculate the difficulty of the environment by simulating the default trajectory
     and the "optimal" trajectory the agent would choose.
@@ -417,6 +418,7 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str, predict
         prediction_error: error between predicted and last actual observation
         position_predicting: if the forward model is predicting the position or actual observation
         maximum_number_of_objects: the number of objects that are considered in the forward model prediction
+        reward_predicting: if the forward model is predicting the reward or the environment
     Returns:
         difficulty between 0 and 1
     """
@@ -443,6 +445,7 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str, predict
     # simulate the default and optimal trajectory
     copied_env_default = copy.deepcopy(env)
     copied_env_optimal = copy.deepcopy(env)
+
     # remove possible input noise in the environment
     copied_env_default.env_method("set_input_noise", 0)
     copied_env_optimal.env_method("set_input_noise", 0)
@@ -456,23 +459,33 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str, predict
     # simulate at least one step
     for i in range(max(int(trajectory_length), 1)):
         if not done_default:
-            _, rewards_default, done_default, _ = copied_env_default.step(default_action)
-            normalized_reward_default = normalize_rewards(task=task, absolute_reward=rewards_default[0])
-            summed_up_reward_default += normalized_reward_default
-
-            # we manually predict the next state and set it in the env to calculate the reward
-            # predict next state
+            # we manually predict the next state
             # positions for forward model
             last_observation_default = get_position_and_object_positions_of_observation(
                 torch.tensor(last_observation_default, device=device),
                 maximum_number_of_objects=maximum_number_of_objects)
             forward_model_prediction_normal_distribution_default = fm_network(last_observation_default, default_action)
-            # state for env
-            last_observation_default = np.expand_dims(get_observation_of_position_and_object_positions(
-                forward_model_prediction_normal_distribution_default.mean[0].cpu().unsqueeze(
-                    0)).flatten().cpu().numpy(), axis=0)
 
-            # set state in env (assume a forward model prediction without reward)
+            # get reward from forward model prediction or environment
+            if reward_predicting:
+                # state for env
+                last_observation_default = np.expand_dims(get_observation_of_position_and_object_positions(
+                    forward_model_prediction_normal_distribution_default.mean[0][:-1].cpu().unsqueeze(
+                        0)).flatten().cpu().numpy(), axis=0)
+                rewards_default = np.expand_dims(forward_model_prediction_normal_distribution_default.mean[0][
+                                                     -1].cpu().detach().numpy(), axis=0)
+            else:
+                # state for env
+                last_observation_default = np.expand_dims(get_observation_of_position_and_object_positions(
+                    forward_model_prediction_normal_distribution_default.mean[0].cpu().unsqueeze(
+                        0)).flatten().cpu().numpy(), axis=0)
+                _, rewards_default, done_default, _ = copied_env_default.step(default_action)
+
+            # normalize reward
+            normalized_reward_default = normalize_rewards(task=task, absolute_reward=rewards_default[0])
+            summed_up_reward_default += normalized_reward_default
+
+            # set state in env
             # environment assumes a numpy array as state
             copied_env_default.env_method("set_state", last_observation_default)
 
@@ -484,23 +497,33 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str, predict
                 logger=logger,
                 position_predicting=position_predicting,
                 maximum_number_of_objects=maximum_number_of_objects)
-            _, rewards_optimal, done_optimal, _ = copied_env_optimal.step(actions)
-            normalized_reward_optimal = normalize_rewards(task=task, absolute_reward=rewards_optimal[0])
-            summed_up_reward_optimal += normalized_reward_optimal
 
-            # we manually predict the next state and set it in the env to calculate the reward
-            # predict next state
-            # positions for forward model
+            # we manually predict the next state
             last_observation_optimal = get_position_and_object_positions_of_observation(
                 torch.tensor(last_observation_optimal, device=device),
                 maximum_number_of_objects=maximum_number_of_objects)
             forward_model_prediction_normal_distribution_optimal = fm_network(last_observation_optimal, actions.float())
-            # state for env
-            last_observation_optimal = np.expand_dims(get_observation_of_position_and_object_positions(
-                forward_model_prediction_normal_distribution_optimal.mean[0].cpu().unsqueeze(
-                    0)).flatten().cpu().numpy(), axis=0)
 
-            # set state in env (assume a forward model prediction without reward)
+            # get reward from forward model prediction or environment
+            if reward_predicting:
+                # state for env
+                last_observation_optimal = np.expand_dims(get_observation_of_position_and_object_positions(
+                    forward_model_prediction_normal_distribution_optimal.mean[0][:-1].cpu().unsqueeze(
+                        0)).flatten().cpu().numpy(), axis=0)
+                rewards_optimal = np.expand_dims(forward_model_prediction_normal_distribution_optimal.mean[0][
+                                                     -1].cpu().detach().numpy(), axis=0)
+            else:
+                # state for env
+                last_observation_optimal = np.expand_dims(get_observation_of_position_and_object_positions(
+                    forward_model_prediction_normal_distribution_optimal.mean[0].cpu().unsqueeze(
+                        0)).flatten().cpu().numpy(), axis=0)
+                _, rewards_optimal, done_optimal, _ = copied_env_optimal.step(actions)
+
+            # normalize reward
+            normalized_reward_optimal = normalize_rewards(task=task, absolute_reward=rewards_optimal[0])
+            summed_up_reward_optimal += normalized_reward_optimal
+
+            # set state in env
             # environment assumes a numpy array as state
             copied_env_optimal.env_method("set_state", last_observation_optimal)
 
