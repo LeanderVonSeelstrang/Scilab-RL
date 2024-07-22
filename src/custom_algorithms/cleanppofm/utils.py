@@ -536,7 +536,8 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
         difficulty = (min(summed_up_reward_default, summed_up_reward_optimal)) / (
             max(summed_up_reward_default, summed_up_reward_optimal))
 
-    return difficulty
+    # difficulty is high if the rewards are quite similar, but difficulty should be the other way around -> 1 - difficulty
+    return 1 - difficulty
 
 
 def normalize_rewards(task: str, absolute_reward) -> float:
