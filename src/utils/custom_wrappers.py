@@ -1,3 +1,4 @@
+import copy
 import os
 import torch as th
 import subprocess
@@ -168,6 +169,16 @@ class DisplayWrapper(gym.Wrapper):
                 self.animation.y_data = [[] for _ in range(len(self.metric_keys))]
             # close metric displayer
         self.displaying = False
+
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        obj = cls.__new__(cls)
+        memo[id(self)] = obj
+        for k, v in self.__dict__.items():
+            if k in ["env"]:
+                setattr(obj, k, copy.deepcopy(v, memo))
+            pass
+        return obj
 
 
 class RecordVideo(gym.Wrapper):
@@ -378,6 +389,16 @@ class RecordVideo(gym.Wrapper):
         joint_clip = clips_array([[render_clip, metric_clip]])
         joint_clip.write_videofile(self.base_path + ".joint.mp4")
         self.logger.record(f'{self.name_prefix}/video', f'{self.base_path}.joint.mp4')
+
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        obj = cls.__new__(cls)
+        memo[id(self)] = obj
+        for k, v in self.__dict__.items():
+            if k in ["env"]:
+                setattr(obj, k, copy.deepcopy(v, memo))
+            pass
+        return obj
 
 
 class MakeDictObs(gym.Wrapper):

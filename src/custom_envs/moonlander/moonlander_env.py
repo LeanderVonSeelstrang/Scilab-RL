@@ -1139,3 +1139,14 @@ class MoonlanderWorldEnv(Env):
 
     def set_state(self, new_state: np.ndarray) -> None:
         self.state = new_state
+
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        obj = cls.__new__(cls)
+        memo[id(self)] = obj
+        for k, v in self.__dict__.items():
+            if k in ["fig_mb", "ax_mb", "im_mb"]:
+                v = dict()
+            setattr(obj, k, copy.deepcopy(v, memo))
+            pass
+        return obj
