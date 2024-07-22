@@ -560,6 +560,9 @@ def normalize_rewards(task: str, absolute_reward) -> float:
         # we choose to clip the highest 1% -> which is a clipping from 0 to 62 -> clip to 62
         if absolute_reward > 62:
             absolute_reward = np.array([62])
+        # it is possible that the reward is slightly negative (e.g. -0.0000001), which breaks our normalization
+        elif absolute_reward < 0:
+            absolute_reward = np.array([0])
         normalized_reward = (absolute_reward - 0) / (62 - 0)
     else:
         raise ValueError("Task {} not implemented".format(task))

@@ -398,7 +398,7 @@ class CLEANPPOFM:
             elif isinstance(self.action_space, spaces.Discrete):
                 clipped_actions = actions[0]
 
-            new_obs, rewards, dones, infos, prediction_error, reward_with_future_reward_estimation_corrective = self.step_in_env(
+            new_obs, rewards, dones, infos, prediction_error, difficulty, soc, reward_with_future_reward_estimation_corrective = self.step_in_env(
                 actions=clipped_actions, forward_normal=forward_normal)
 
             # FIXME: is it possible that multiple actions are taken here?
@@ -412,6 +412,10 @@ class CLEANPPOFM:
                                         reward_with_future_reward_estimation_corrective.mean())
             self.logger.record("train/prediction_error", prediction_error)
             self.logger.record_mean("train/prediction_error_mean", prediction_error)
+            self.logger.record("train/difficulty", difficulty)
+            self.logger.record_mean("train/difficulty_mean", difficulty)
+            self.logger.record("train/soc", soc)
+            self.logger.record_mean("train/soc_mean", soc)
             self.logger.record("train/rollout_rewards_step", float(rewards.mean()))
             self.logger.record_mean("train/rollout_rewards_mean", float(rewards.mean()))
 
@@ -592,7 +596,7 @@ class CLEANPPOFM:
                 position_predicting=self.position_predicting, maximum_number_of_objects=self.maximum_number_of_objects)
         return action.cpu().numpy(), state, forward_model_prediction_normal_distribution
 
-    def step_in_env(self, actions, forward_normal) -> tuple[np.ndarray, float, float, bool, dict, float]:
+    def step_in_env(self, actions, forward_normal) -> tuple[np.ndarray, float, bool, dict, float, float, float, float]:
         """
         Step in the environment with the given actions and the forward model prediction.
         This includes the displaying of the forward model prediction and the calculation of the prediction error.
@@ -623,7 +627,6 @@ class CLEANPPOFM:
             # same below for input noise
             self.env.env_method("set_forward_model_prediction", forward_normal.mean[0][:-1].cpu().unsqueeze(0))
 
-        ##### STEP IN ENVIRONMENT #####
         # if input noise is applied!
         input_noise = 0
         if self.input_noise_on and not actions[0] == 0:
@@ -681,7 +684,7 @@ class CLEANPPOFM:
                                                                                  number_of_future_steps=self.number_of_future_steps)
 
         # fixme: reward_with_future_reward_estimation_corrective is not used + SoC is not used
-        return new_obs, rewards, dones, infos, prediction_error, reward_with_future_reward_estimation_corrective
+        return new_obs, rewards, dones, infos, prediction_error, difficulty, self.soc, reward_with_future_reward_estimation_corrective
 
     def save(
             self,

@@ -105,7 +105,7 @@ def evaluate_policy(
         ### custom code
         actions, states, forward_normal = model.predict(observations, state=states, deterministic=deterministic)
 
-        observations, rewards, dones, infos, prediction_error, reward_with_future_reward_estimation_corrective = model.step_in_env(
+        observations, rewards, dones, infos, prediction_error, difficulty, soc, reward_with_future_reward_estimation_corrective = model.step_in_env(
             actions=actions,
             forward_normal=forward_normal)
 
@@ -118,6 +118,10 @@ def evaluate_policy(
                                reward_with_future_reward_estimation_corrective.mean())
         logger.record("eval/prediction_error", prediction_error)
         logger.record_mean("eval/prediction_error_mean", prediction_error)
+        logger.record("eval/difficulty", difficulty)
+        logger.record_mean("eval/difficulty_mean", difficulty)
+        logger.record("eval/soc", soc)
+        logger.record_mean("eval/soc_mean", soc)
         # already logged in custom callback
         logger.record("eval/rollout_rewards_step", float(rewards.mean()))
         logger.record_mean("eval/rollout_rewards_mean", float(rewards.mean()))
