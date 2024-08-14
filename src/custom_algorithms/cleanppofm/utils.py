@@ -123,7 +123,7 @@ def reward_estimation(fm_network, new_obs: np.array, env_name: str, rewards, pre
                       position_predicting: bool, number_of_future_steps: int = 10, maximum_number_of_objects: int = 5):
     # default action is stay at same position
     if env_name == "MoonlanderWorldEnv":
-        default_action = torch.Tensor([[1]])
+        default_action = torch.tensor([[1]], device=device)
     # random default action for gridworld env
     elif env_name == "GridWorldEnv":
         default_action = torch.randint(low=0, high=8, size=(1, 1), device=device)
@@ -470,7 +470,7 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
     """
     # default action is stay at same position
     if env_name == "MoonlanderWorldEnv":
-        default_action = torch.Tensor([[1]])
+        default_action = torch.tensor([[1]]).to(device)
     # using reward model of other envs is not implemented by now
     else:
         raise ValueError(
