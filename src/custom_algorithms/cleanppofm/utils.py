@@ -243,6 +243,56 @@ def get_position_and_object_positions_of_observation(obs: torch.Tensor,
     return agent_and_object_positions_tensor
 
 
+def get_next_whole_observation(next_observations: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
+    """
+    Calculate the next observation in the moonlander environment manually to exclude random observations through input noise.
+    Args:
+        next_observations: next observations
+        actions: actions
+
+    Returns:
+        next observation in the moonlander environment without input noise
+
+    """
+    # object in observation is marked with 2 or 3
+    search_value = -100
+    if 2 in next_observations:
+        search_value = 2
+    else:
+        search_value = 3
+
+    # deep copy of next_observation
+    next_observations_copy = next_observations.detach().clone()
+    # remove agent and objects
+    next_observations_copy[next_observations_copy == 1] = 0
+    next_observations_copy[next_observations_copy == 2] = 0
+
+    # get x coordinates of agent for each batch element
+    x_index_of_agent = torch.nonzero(next_observations == 1, as_tuple=True)[1]
+    # get x, y coordinates of objects for each batch element (index of batch element in element_in_batch)
+    element_in_batch, indices_of_objects = torch.nonzero(next_observations == search_value, as_tuple=True)
+    # get x and y coordinate of object
+    x_coordinate_tensor = indices_of_objects % 12
+    y_coordinate_tensor = torch.floor(indices_of_objects / 12)
+
+    new_y_coordinate_tensor = y_coordinate_tensor - 1
+    new_indices_of_objects = ((new_y_coordinate_tensor * 12) + x_coordinate_tensor).int()
+
+    # remove negative y coordinates (object flew out of the grid)
+    valid_mask = new_indices_of_objects >= 0
+    valid_element_in_batch = element_in_batch[valid_mask]
+    valid_new_indices_of_objects = new_indices_of_objects[valid_mask]
+
+    # add objects to next observation
+    next_observations_copy[valid_element_in_batch, valid_new_indices_of_objects] = 2
+
+    # add agent to next observation
+    new_x_index_of_agent = torch.clamp(x_index_of_agent + (actions - 1), min=1, max=10)
+    next_observations_copy[torch.arange(next_observations.shape[0]), new_x_index_of_agent] = 1
+
+    return next_observations_copy
+
+
 def get_observation_of_position_and_object_positions(agent_and_object_positions: torch.Tensor) -> torch.Tensor:
     # tensor of (1,12)
     copy_of_agent_and_object_positions = agent_and_object_positions.clone().detach()
@@ -306,7 +356,7 @@ def get_next_observation_gridworld(observations: torch.Tensor, actions: torch.Te
     return agent_location_without_input_noise
 
 
-def get_next_observation_moonlander(observations: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
+def get_next_position_observation_moonlander(observations: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
     """
     Calculate the next observation in the moonlander environment manually to exclude random observations through input noise.
     Args:
@@ -376,27 +426,23 @@ def calculate_prediction_error(env_name: str, env, next_obs, forward_model_predi
         prediction_error = (math.sqrt(torch.sum((predicted_location - next_obs) ** 2))) / max_distance_in_gridworld
     elif env_name == "MoonlanderWorldEnv":
         # we just care for the x position of the moonlander agent, because the y position is always equally to the size of the agent
-        if position_predicting:
-            positions = get_position_and_object_positions_of_observation(next_obs,
-                                                                         maximum_number_of_objects=maximum_number_of_objects)
+        # independently of using the whole obs or the position prediction, we use the position predictions to calculate the prediction error
+        positions = get_position_and_object_positions_of_observation(next_obs,
+                                                                     maximum_number_of_objects=maximum_number_of_objects)
 
-            # Smallest x position of the agent is the size of the agent
-            # Biggest x position of the agent is the width of the moonlander world - the size of the agent
-            # Note: you should use vec_env.env_method("get_wrapper_attr", "attribute_name") in Gymnasium v1.0
-            first_possible_x_position = env.env_method("get_wrapper_attr", "first_possible_x_position")[0]
-            last_possible_x_position = env.env_method("get_wrapper_attr", "last_possible_x_position")[0]
-            max_distance_in_moonlander_world = math.sqrt(
-                (last_possible_x_position - first_possible_x_position) ** 2)
-            predicted_x_position = torch.tensor([min(max(first_possible_x_position,
-                                                         forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[
-                                                             0][0]),
-                                                     last_possible_x_position)], device=device)
-            prediction_error = (math.sqrt(
-                torch.sum((predicted_x_position - positions[0][0]) ** 2))) / max_distance_in_moonlander_world
-        # TODO: implement prediction error calculation for moonlander world env with predicting whole observation
-        else:
-            raise NotImplementedError(
-                "Prediction error calculation not implemented for MoonlanderWorldEnv with predicting whole observation!")
+        # Smallest x position of the agent is the size of the agent
+        # Biggest x position of the agent is the width of the moonlander world - the size of the agent
+        # Note: you should use vec_env.env_method("get_wrapper_attr", "attribute_name") in Gymnasium v1.0
+        first_possible_x_position = env.env_method("get_wrapper_attr", "first_possible_x_position")[0]
+        last_possible_x_position = env.env_method("get_wrapper_attr", "last_possible_x_position")[0]
+        max_distance_in_moonlander_world = math.sqrt(
+            (last_possible_x_position - first_possible_x_position) ** 2)
+        predicted_x_position = torch.tensor([min(max(first_possible_x_position,
+                                                     forward_model_prediction_normal_distribution.mean.cpu().detach().numpy()[
+                                                         0][0]),
+                                                 last_possible_x_position)], device=device)
+        prediction_error = (math.sqrt(
+            torch.sum((predicted_x_position - positions[0][0]) ** 2))) / max_distance_in_moonlander_world
     else:
         raise ValueError("Environment not supported")
 
@@ -429,9 +475,6 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
     else:
         raise ValueError(
             "The current environment does not support the difficulty calculation.")
-    if not position_predicting:
-        raise NotImplementedError(
-            "Difficulty calculation is only implemented for predicting the position of the agent and objects.")
     task = env.env_method("get_wrapper_attr", "task")[0]
 
     # calculate the trajectory lengths through the prediction error
@@ -461,9 +504,13 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
         if not done_default:
             # we manually predict the next state
             # positions for forward model
-            last_observation_default = get_position_and_object_positions_of_observation(
-                torch.tensor(last_observation_default, device=device),
-                maximum_number_of_objects=maximum_number_of_objects)
+            if position_predicting:
+                last_observation_default = get_position_and_object_positions_of_observation(
+                    torch.tensor(last_observation_default, device=device),
+                    maximum_number_of_objects=maximum_number_of_objects)
+            else:
+                last_observation_default = torch.tensor(last_observation_default, device=device,
+                                                        dtype=torch.float32).detach().clone()
             forward_model_prediction_normal_distribution_default = fm_network(last_observation_default, default_action)
 
             # get reward from forward model prediction or environment
@@ -482,7 +529,7 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
                 _, rewards_default, done_default, _ = copied_env_default.step(default_action)
 
             # normalize reward
-            normalized_reward_default = normalize_rewards(task=task, absolute_reward=rewards_default[0])
+            normalized_reward_default = normalize_rewards(task=task, absolute_reward=rewards_default)
             summed_up_reward_default += normalized_reward_default
 
             # set state in env
@@ -499,9 +546,13 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
                 maximum_number_of_objects=maximum_number_of_objects)
 
             # we manually predict the next state
-            last_observation_optimal = get_position_and_object_positions_of_observation(
-                torch.tensor(last_observation_optimal, device=device),
-                maximum_number_of_objects=maximum_number_of_objects)
+            if position_predicting:
+                last_observation_optimal = get_position_and_object_positions_of_observation(
+                    torch.tensor(last_observation_optimal, device=device),
+                    maximum_number_of_objects=maximum_number_of_objects)
+            else:
+                last_observation_optimal = torch.tensor(last_observation_optimal, device=device,
+                                                        dtype=torch.float32).detach().clone()
             forward_model_prediction_normal_distribution_optimal = fm_network(last_observation_optimal, actions.float())
 
             # get reward from forward model prediction or environment
@@ -520,18 +571,20 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
                 _, rewards_optimal, done_optimal, _ = copied_env_optimal.step(actions)
 
             # normalize reward
-            normalized_reward_optimal = normalize_rewards(task=task, absolute_reward=rewards_optimal[0])
+            normalized_reward_optimal = normalize_rewards(task=task, absolute_reward=rewards_optimal)
             summed_up_reward_optimal += normalized_reward_optimal
 
             # set state in env
             # environment assumes a numpy array as state
             copied_env_optimal.env_method("set_state", last_observation_optimal)
 
-            # distance between the two trajectories
-    if summed_up_reward_default == 0 and summed_up_reward_optimal == 0:
+    rounded_summed_up_reward_default = np.round(summed_up_reward_default, 2)
+    rounded_summed_up_reward_optimal = np.round(summed_up_reward_optimal, 2)
+    # distance between the two trajectories
+    if rounded_summed_up_reward_default == 0 and rounded_summed_up_reward_optimal == 0:
         # cannot divide by zero
         # both trajectories are the same
-        difficulty = 0
+        difficulty = 1
     else:
         difficulty = (min(summed_up_reward_default, summed_up_reward_optimal)) / (
             max(summed_up_reward_default, summed_up_reward_optimal))

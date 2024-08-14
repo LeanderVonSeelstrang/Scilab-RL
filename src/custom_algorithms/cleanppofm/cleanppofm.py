@@ -18,7 +18,7 @@ from custom_algorithms.cleanppofm.forward_model import ProbabilisticSimpleForwar
     ProbabilisticForwardNetPositionPredictionIncludingReward
 from custom_algorithms.cleanppofm.utils import flatten_obs, get_position_and_object_positions_of_observation, \
     get_next_observation_gridworld, reward_estimation, reward_calculation, calculate_prediction_error, \
-    get_next_observation_moonlander, calculate_difficulty, normalize_rewards
+    get_next_position_observation_moonlander, calculate_difficulty, normalize_rewards, get_next_whole_observation
 from custom_algorithms.cleanppofm.agent import Agent
 from utils.custom_buffer import CustomDictRolloutBuffer as DictRolloutBuffer
 from utils.custom_buffer import CustomRolloutBuffer as RolloutBuffer
@@ -528,24 +528,26 @@ class CLEANPPOFM:
 
         # gridworld or moonlander without position predicting
         if not self.position_predicting:
-            if not self.fm_trained_with_input_noise:
-                agent_location_without_input_noise = get_next_observation_gridworld(observations=observations,
-                                                                                    actions=actions)
+            next_observations_duplicated = copy.deepcopy(next_observations)
 
-                next_observations_formatted = agent_location_without_input_noise if not self.reward_predicting else torch.cat(
-                    (agent_location_without_input_noise, rewards.unsqueeze(dim=1)), dim=1)
-            # default case: observation optional with reward
-            else:
-                next_observations_formatted = next_observations if not self.reward_predicting else torch.cat(
-                    (next_observations, rewards.unsqueeze(dim=1)), dim=1)
-        # moonlander
+            # create next observations without input noise
+            if self.env_name == "MoonlanderWorldEnv" and not self.fm_trained_with_input_noise:
+                next_observations_duplicated = get_next_whole_observation(next_observations=next_observations,
+                                                                          actions=actions)
+            elif self.env_name == "GridWorldEnv" and not self.fm_trained_with_input_noise:
+                next_observations_duplicated = get_next_observation_gridworld(observations=observations,
+                                                                              actions=actions)
+
+            next_observations_formatted = next_observations_duplicated if not self.reward_predicting else torch.cat(
+                (next_observations, rewards), dim=1)
+        # position predicting only for moonlander
         else:
             # get position out of observation
             observations = get_position_and_object_positions_of_observation(observations,
                                                                             maximum_number_of_objects=self.maximum_number_of_objects)
             if not self.fm_trained_with_input_noise:
-                next_observations_formatted = get_next_observation_moonlander(observations=observations,
-                                                                              actions=actions)
+                next_observations_formatted = get_next_position_observation_moonlander(observations=observations,
+                                                                                       actions=actions)
             else:
                 next_observations_formatted = get_position_and_object_positions_of_observation(next_observations,
                                                                                                maximum_number_of_objects=self.maximum_number_of_objects)
