@@ -237,8 +237,9 @@ def get_position_and_object_positions_of_observation(obs: torch.Tensor,
                                                                                                           maximum_number_of_objects)]
             agent_and_object_positions.append(x_y_coordinates)
 
-    agent_and_object_positions_tensor = torch.flatten(torch.tensor(agent_and_object_positions, device=device),
-                                                      start_dim=1)
+    agent_and_object_positions_tensor = torch.flatten(
+        torch.tensor(agent_and_object_positions, device=device, dtype=torch.float32),
+        start_dim=1)
 
     return agent_and_object_positions_tensor
 
