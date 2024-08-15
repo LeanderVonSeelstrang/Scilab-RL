@@ -396,7 +396,7 @@ def get_next_position_observation_moonlander(observations: torch.Tensor, actions
 
 
 def calculate_prediction_error(env_name: str, env, next_obs, forward_model_prediction_normal_distribution: torch.normal,
-                               position_predicting: bool, maximum_number_of_objects: int = 5) -> float:
+                               maximum_number_of_objects: int = 5) -> float:
     """
     Calculate the prediction error between the next obs and the forward model prediction.
     Args:
@@ -404,7 +404,6 @@ def calculate_prediction_error(env_name: str, env, next_obs, forward_model_predi
         env: environment
         next_obs: observation after actually executing the action
         forward_model_prediction_normal_distribution: prediction of next observation by forward model
-        position_predicting: if the forward model is predicting the position or actual observation
         maximum_number_of_objects: the number of objects that are considered in the forward model prediction
 
     Returns:

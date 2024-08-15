@@ -9,6 +9,7 @@ from stable_baselines3.common import base_class
 from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv, VecMonitor, is_vecenv_wrapped
 
 from utils.custom_wrappers import DisplayWrapper, RecordVideo
+from custom_algorithms.cleanppofm.utils import get_position_and_object_positions_of_observation
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -104,10 +105,16 @@ def evaluate_policy(
 
         ### custom code
         actions, states, forward_normal = model.predict(observations, state=states, deterministic=deterministic)
+        # for logging: get last position, predicted position and new position
+        position = get_position_and_object_positions_of_observation(torch.tensor(observations))[0][0]
+        predicted_x_position = min(max(1, forward_normal.mean.cpu().detach().numpy()[0][0]), 10)
+        expected_new_positon = min(max(1, position + (actions[0] - 1)), 10)
 
         observations, rewards, dones, infos, prediction_error, difficulty, soc, reward_with_future_reward_estimation_corrective = model.step_in_env(
             actions=actions,
             forward_normal=forward_normal)
+
+        new_position = get_position_and_object_positions_of_observation(torch.tensor(observations))[0][0]
 
         if model.reward_predicting:
             logger.record("eval/predicted_rewards", float(forward_normal.mean[:, -1].mean()))
@@ -122,6 +129,11 @@ def evaluate_policy(
         logger.record_mean("eval/difficulty_mean", difficulty)
         logger.record("eval/soc", soc)
         logger.record_mean("eval/soc_mean", soc)
+        logger.record("eval/action", actions[0])
+        logger.record("eval/last_position", position)
+        logger.record("eval/expected_new_position", expected_new_positon)
+        logger.record("eval/predicted_x_position", predicted_x_position)
+        logger.record("eval/new_position", new_position)
         # already logged in custom callback
         logger.record("eval/rollout_rewards_step", float(rewards.mean()))
         logger.record_mean("eval/rollout_rewards_mean", float(rewards.mean()))

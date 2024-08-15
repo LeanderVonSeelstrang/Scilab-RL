@@ -650,7 +650,6 @@ class CLEANPPOFM:
         prediction_error = calculate_prediction_error(env_name=self.env_name, env=self.env,
                                                       next_obs=torch.tensor(new_obs, device=device),
                                                       forward_model_prediction_normal_distribution=forward_normal,
-                                                      position_predicting=self.position_predicting,
                                                       maximum_number_of_objects=self.maximum_number_of_objects)
         self.soc = prediction_error
 
