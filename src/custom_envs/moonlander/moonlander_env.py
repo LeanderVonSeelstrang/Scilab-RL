@@ -29,7 +29,8 @@ class MoonlanderWorldEnv(Env):
         "render_fps": 10,
     }
 
-    def __init__(self, task: str = "dodge", reward_function: str = "pos_neg"):
+    def __init__(self, task: str = "dodge", reward_function: str = "pos_neg",
+                 list_of_object_dict_lists: List[Dict] = None):
         """
         initialises the environment
         Args:
@@ -210,15 +211,19 @@ class MoonlanderWorldEnv(Env):
             number_of_objects = None
 
         ### OBJECTS
-        object_dict_list = hlp.create_list_of_object_dicts(
-            object_range_list=object_range_list,
-            object_size=agent_config["size"],
-            world_x_width=world_config["x_width"],
-            level_difficulty=world_config["difficulty"],
-            normalized_object_placement=objects_config["normalized_placement"],
-            allow_overlapping_objects=objects_config["allow_overlap"],
-            number_of_objects=number_of_objects,
-        )
+        self.list_of_object_dict_lists = list_of_object_dict_lists
+        if self.list_of_object_dict_lists is None or len(self.list_of_object_dict_lists) <= self.episode_counter:
+            object_dict_list = hlp.create_list_of_object_dicts(
+                object_range_list=object_range_list,
+                object_size=agent_config["size"],
+                world_x_width=world_config["x_width"],
+                level_difficulty=world_config["difficulty"],
+                normalized_object_placement=objects_config["normalized_placement"],
+                allow_overlapping_objects=objects_config["allow_overlap"],
+                number_of_objects=number_of_objects,
+            )
+        else:
+            object_dict_list = self.list_of_object_dict_lists[self.episode_counter]
         self.object_dict_list = object_dict_list
 
         ### WALLS
@@ -1057,16 +1062,21 @@ class MoonlanderWorldEnv(Env):
             number_of_objects = 15
         else:
             number_of_objects = None
+
         ### OBJECTS
-        self.object_dict_list = hlp.create_list_of_object_dicts(
-            object_range_list=object_range_list,
-            object_size=agent_config["size"],
-            world_x_width=world_config["x_width"],
-            level_difficulty=world_config["difficulty"],
-            normalized_object_placement=objects_config["normalized_placement"],
-            allow_overlapping_objects=objects_config["allow_overlap"],
-            number_of_objects=number_of_objects,
-        )
+        if self.list_of_object_dict_lists is None or len(self.list_of_object_dict_lists) <= self.episode_counter:
+            object_dict_list = hlp.create_list_of_object_dicts(
+                object_range_list=object_range_list,
+                object_size=agent_config["size"],
+                world_x_width=world_config["x_width"],
+                level_difficulty=world_config["difficulty"],
+                normalized_object_placement=objects_config["normalized_placement"],
+                allow_overlapping_objects=objects_config["allow_overlap"],
+                number_of_objects=number_of_objects,
+            )
+        else:
+            object_dict_list = self.list_of_object_dict_lists[self.episode_counter]
+        self.object_dict_list = object_dict_list
 
         ### WALLS --> always the same with the same game settings
 

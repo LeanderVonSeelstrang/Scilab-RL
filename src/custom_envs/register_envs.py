@@ -1,6 +1,9 @@
 """
 All custom environments must be registered here, otherwise they won't be found.
 """
+import csv
+import ast
+from custom_envs import ROOT_DIR
 from gymnasium.envs.registration import register
 from metaworld.envs import ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
 from utils.custom_wrappers import MakeDictObs
@@ -173,6 +176,23 @@ def register_custom_envs():
     register(id="MoonlanderWorld-collect-pos_neg-v0",
              entry_point="custom_envs.moonlander.moonlander_env:MoonlanderWorldEnv",
              kwargs={'task': 'collect', 'reward_function': 'pos_neg'},
+             max_episode_steps=500)
+
+    filename = "easy_object_list" + ".csv"
+    list_of_object_dict_lists = []
+    with open(ROOT_DIR / "moonlander" / filename, "r") as file:
+        lines = csv.reader(file)
+        for line in lines:
+            # first element is index
+            # second element is the object list
+            # form string to list of dictionaries
+            list_of_object_dict_lists.append(ast.literal_eval(line[1]))
+    print("list_of_object_dict_lists", type(list_of_object_dict_lists), list_of_object_dict_lists)
+
+    register(id="MoonlanderWorld-collect-gaussian-benchmark-v0",
+             entry_point="custom_envs.moonlander.moonlander_env:MoonlanderWorldEnv",
+             kwargs={'task': 'collect', 'reward_function': 'gaussian',
+                     'list_of_object_dict_lists': list_of_object_dict_lists},
              max_episode_steps=500)
 
     register(id="MetaEnv-simple-v0",
