@@ -294,11 +294,12 @@ def get_next_whole_observation(next_observations: torch.Tensor, actions: torch.T
     return next_observations_copy
 
 
-def get_observation_of_position_and_object_positions(agent_and_object_positions: torch.Tensor) -> torch.Tensor:
+def get_observation_of_position_and_object_positions(agent_and_object_positions: torch.Tensor, observation_height: int,
+                                                     observation_width: int) -> torch.Tensor:
     # tensor of (1,12)
     copy_of_agent_and_object_positions = agent_and_object_positions.clone().detach()
     # build empty obs
-    matrix = np.zeros(shape=(10, 10 + 2), dtype=np.int16)
+    matrix = np.zeros(shape=(observation_height, observation_width + 2), dtype=np.int16)
 
     # add objects
     counter = 2
@@ -306,14 +307,15 @@ def get_observation_of_position_and_object_positions(agent_and_object_positions:
         # objects can be predicted in wall but will be overwritten by wall
         # objects can be predicted in agent but will be overwritten by agent
         # -> also catches empty objects at position 0,0
-        matrix[max(0, min(int(copy_of_agent_and_object_positions[0][counter + 1]), 9)), max(0, min(int(
-            copy_of_agent_and_object_positions[0][counter]), 11))] = 2
+        matrix[
+            max(0, min(int(copy_of_agent_and_object_positions[0][counter + 1]), observation_width - 1)), max(0, min(int(
+                copy_of_agent_and_object_positions[0][counter]), observation_width + 1))] = 2
         counter += 2
 
     # add agent
     # first element is the y position of the agent, second element is the x position of the agent
-    matrix[max(0, min(int(copy_of_agent_and_object_positions[0][1]), 9)), max(1, min(int(
-        copy_of_agent_and_object_positions[0][0]), 10))] = 1
+    matrix[max(0, min(int(copy_of_agent_and_object_positions[0][1]), observation_width - 1)), max(1, min(int(
+        copy_of_agent_and_object_positions[0][0]), observation_width))] = 1
 
     # add wall
     matrix[:, 0] = -1
@@ -480,6 +482,7 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
     # calculate the trajectory lengths through the prediction error
     # we decide that the trajectory length is half the observation size of the environment when the prediction error is 0
     observation_height = env.env_method("get_wrapper_attr", "observation_height")[0]
+    observation_width = env.env_method("get_wrapper_attr", "observation_width")[0]
     trajectory_length = - (observation_height / 2) * prediction_error + observation_height / 2
 
     last_observation_default = np.expand_dims(env.env_method("get_wrapper_attr", "state")[0].flatten(), axis=0)
@@ -516,16 +519,20 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
             # get reward from forward model prediction or environment
             if reward_predicting:
                 # state for env
-                last_observation_default = np.expand_dims(get_observation_of_position_and_object_positions(
+                last_observation_default = np.expand_dims(
+                    get_observation_of_position_and_object_positions(agent_and_object_positions=
                     forward_model_prediction_normal_distribution_default.mean[0][:-1].cpu().unsqueeze(
-                        0)).flatten().cpu().numpy(), axis=0)
+                        0), observation_height=observation_height,
+                        observation_width=observation_width).flatten().cpu().numpy(), axis=0)
                 rewards_default = np.expand_dims(forward_model_prediction_normal_distribution_default.mean[0][
                                                      -1].cpu().detach().numpy(), axis=0)
             else:
                 # state for env
-                last_observation_default = np.expand_dims(get_observation_of_position_and_object_positions(
+                last_observation_default = np.expand_dims(
+                    get_observation_of_position_and_object_positions(agent_and_object_positions=
                     forward_model_prediction_normal_distribution_default.mean[0].cpu().unsqueeze(
-                        0)).flatten().cpu().numpy(), axis=0)
+                        0), observation_height=observation_height,
+                        observation_width=observation_width).flatten().cpu().numpy(), axis=0)
                 _, rewards_default, done_default, _ = copied_env_default.step(default_action)
 
             # normalize reward
@@ -558,16 +565,20 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
             # get reward from forward model prediction or environment
             if reward_predicting:
                 # state for env
-                last_observation_optimal = np.expand_dims(get_observation_of_position_and_object_positions(
+                last_observation_optimal = np.expand_dims(
+                    get_observation_of_position_and_object_positions(agent_and_object_positions=
                     forward_model_prediction_normal_distribution_optimal.mean[0][:-1].cpu().unsqueeze(
-                        0)).flatten().cpu().numpy(), axis=0)
+                        0), observation_height=observation_height,
+                        observation_width=observation_width).flatten().cpu().numpy(), axis=0)
                 rewards_optimal = np.expand_dims(forward_model_prediction_normal_distribution_optimal.mean[0][
                                                      -1].cpu().detach().numpy(), axis=0)
             else:
                 # state for env
-                last_observation_optimal = np.expand_dims(get_observation_of_position_and_object_positions(
+                last_observation_optimal = np.expand_dims(
+                    get_observation_of_position_and_object_positions(agent_and_object_positions=
                     forward_model_prediction_normal_distribution_optimal.mean[0].cpu().unsqueeze(
-                        0)).flatten().cpu().numpy(), axis=0)
+                        0), observation_height=observation_height,
+                        observation_width=observation_width).flatten().cpu().numpy(), axis=0)
                 _, rewards_optimal, done_optimal, _ = copied_env_optimal.step(actions)
 
             # normalize reward
