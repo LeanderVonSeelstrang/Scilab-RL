@@ -619,7 +619,12 @@ class CLEANPPOFM:
         # modify the env attributes as described here:
         # https://github.com/DLR-RM/stable-baselines3/blob/master/docs/guide/vec_envs.rst
         if not self.reward_predicting:
-            self.env.set_attr("forward_model_prediction", forward_normal.mean.cpu())
+            # FIXME
+            # this does not work
+            # self.env.set_attr("forward_model_prediction", forward_normal.mean.cpu())
+            # but this throws a warning?
+            # same below for input noise
+            self.env.env_method("set_forward_model_prediction", forward_normal.mean.cpu())
         # remove reward because it is not needed to display the predicted observation
         else:
             # FIXME
