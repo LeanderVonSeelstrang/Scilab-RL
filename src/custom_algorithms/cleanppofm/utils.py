@@ -244,7 +244,8 @@ def get_position_and_object_positions_of_observation(obs: torch.Tensor,
     return agent_and_object_positions_tensor
 
 
-def get_next_whole_observation(next_observations: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
+def get_next_whole_observation(next_observations: torch.Tensor, actions: torch.Tensor, observation_width: int,
+                               observation_height: int) -> torch.Tensor:
     """
     Calculate the next observation in the moonlander environment manually to exclude random observations through input noise.
     Args:
@@ -256,7 +257,6 @@ def get_next_whole_observation(next_observations: torch.Tensor, actions: torch.T
 
     """
     # object in observation is marked with 2 or 3
-    search_value = -100
     if 2 in next_observations:
         search_value = 2
     else:
@@ -273,11 +273,11 @@ def get_next_whole_observation(next_observations: torch.Tensor, actions: torch.T
     # get x, y coordinates of objects for each batch element (index of batch element in element_in_batch)
     element_in_batch, indices_of_objects = torch.nonzero(next_observations == search_value, as_tuple=True)
     # get x and y coordinate of object
-    x_coordinate_tensor = indices_of_objects % 12
-    y_coordinate_tensor = torch.floor(indices_of_objects / 12)
+    x_coordinate_tensor = indices_of_objects % (observation_width + 2)
+    y_coordinate_tensor = torch.floor(indices_of_objects / (observation_height + 2))
 
     new_y_coordinate_tensor = y_coordinate_tensor - 1
-    new_indices_of_objects = ((new_y_coordinate_tensor * 12) + x_coordinate_tensor).int()
+    new_indices_of_objects = ((new_y_coordinate_tensor * (observation_width + 2)) + x_coordinate_tensor).int()
 
     # remove negative y coordinates (object flew out of the grid)
     valid_mask = new_indices_of_objects >= 0
@@ -288,7 +288,7 @@ def get_next_whole_observation(next_observations: torch.Tensor, actions: torch.T
     next_observations_copy[valid_element_in_batch, valid_new_indices_of_objects] = 2
 
     # add agent to next observation
-    new_x_index_of_agent = torch.clamp(x_index_of_agent + (actions - 1), min=1, max=10)
+    new_x_index_of_agent = torch.clamp(x_index_of_agent + (actions - 1), min=1, max=observation_width)
     next_observations_copy[torch.arange(next_observations.shape[0]), new_x_index_of_agent] = 1
 
     return next_observations_copy
@@ -303,6 +303,7 @@ def get_observation_of_position_and_object_positions(agent_and_object_positions:
 
     # add objects
     counter = 2
+    # FIXME: this does not work for envs with odd observation size
     while counter < len(copy_of_agent_and_object_positions[0]):
         # objects can be predicted in wall but will be overwritten by wall
         # objects can be predicted in agent but will be overwritten by agent

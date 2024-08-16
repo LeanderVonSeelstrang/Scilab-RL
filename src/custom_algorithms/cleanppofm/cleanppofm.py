@@ -532,8 +532,12 @@ class CLEANPPOFM:
 
             # create next observations without input noise
             if self.env_name == "MoonlanderWorldEnv" and not self.fm_trained_with_input_noise:
+                observation_height = self.env.env_method("get_wrapper_attr", "observation_height")[0]
+                observation_width = self.env.env_method("get_wrapper_attr", "observation_width")[0]
                 next_observations_duplicated = get_next_whole_observation(next_observations=next_observations,
-                                                                          actions=actions)
+                                                                          actions=actions,
+                                                                          observation_width=observation_width,
+                                                                          observation_height=observation_height)
             elif self.env_name == "GridWorldEnv" and not self.fm_trained_with_input_noise:
                 next_observations_duplicated = get_next_observation_gridworld(observations=observations,
                                                                               actions=actions)
