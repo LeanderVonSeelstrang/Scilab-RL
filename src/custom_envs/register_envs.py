@@ -178,21 +178,62 @@ def register_custom_envs():
              kwargs={'task': 'collect', 'reward_function': 'pos_neg'},
              max_episode_steps=500)
 
-    filename = "easy_object_list" + ".csv"
-    list_of_object_dict_lists = []
-    with open(ROOT_DIR / "moonlander" / filename, "r") as file:
-        lines = csv.reader(file)
-        for line in lines:
-            # first element is index
-            # second element is the object list
-            # form string to list of dictionaries
-            list_of_object_dict_lists.append(ast.literal_eval(line[1]))
-    print("list_of_object_dict_lists", type(list_of_object_dict_lists), list_of_object_dict_lists)
+    filename_small = "hard_object_list_10_times_10.csv"
+    filename_collect_easy = "collect_easy_object_list_30_times_40.csv"
+    filename_collect_hard = "collect_hard_object_list_30_times_40.csv"
+    filename_dodge_easy = "dodge_easy_object_list_30_times_40.csv"
+    filename_dodge_hard = "dodge_hard_object_list_30_times_40.csv"
 
-    register(id="MoonlanderWorld-collect-gaussian-benchmark-v0",
+    list_of_filenames = [filename_small, filename_collect_easy, filename_collect_hard, filename_dodge_easy,
+                         filename_dodge_hard]
+    dict_of_filename_to_object_dict_list = {}
+    for filename in list_of_filenames:
+        list_of_object_dict_lists = []
+        with open(ROOT_DIR / "moonlander" / filename, "r") as file:
+            lines = csv.reader(file)
+            for line in lines:
+                # first element is index
+                # second element is the object list
+                # form string to list of dictionaries
+                list_of_object_dict_lists.append(ast.literal_eval(line[1]))
+        dict_of_filename_to_object_dict_list[filename] = list_of_object_dict_lists
+
+    # BENCHMARKS
+    register(id="MoonlanderWorld-collect-gaussian-benchmark-small-v0",
              entry_point="custom_envs.moonlander.moonlander_env:MoonlanderWorldEnv",
              kwargs={'task': 'collect', 'reward_function': 'gaussian',
-                     'list_of_object_dict_lists': list_of_object_dict_lists},
+                     'list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
+                         "hard_object_list_10_times_10.csv"]},
+             max_episode_steps=500)
+    register(id="MoonlanderWorld-dodge-gaussian-benchmark-small-v0",
+             entry_point="custom_envs.moonlander.moonlander_env:MoonlanderWorldEnv",
+             kwargs={'task': 'dodge', 'reward_function': 'gaussian',
+                     'list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
+                         "hard_object_list_10_times_10.csv"]},
+             max_episode_steps=500)
+    register(id="MoonlanderWorld-collect-gaussian-benchmark-easy-v0",
+             entry_point="custom_envs.moonlander.moonlander_env:MoonlanderWorldEnv",
+             kwargs={'task': 'collect', 'reward_function': 'gaussian',
+                     'list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
+                         "collect_easy_object_list_30_times_40.csv"]},
+             max_episode_steps=500)
+    register(id="MoonlanderWorld-collect-gaussian-benchmark-hard-v0",
+             entry_point="custom_envs.moonlander.moonlander_env:MoonlanderWorldEnv",
+             kwargs={'task': 'collect', 'reward_function': 'gaussian',
+                     'list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
+                         "collect_hard_object_list_30_times_40.csv"]},
+             max_episode_steps=500)
+    register(id="MoonlanderWorld-dodge-gaussian-benchmark-easy-v0",
+             entry_point="custom_envs.moonlander.moonlander_env:MoonlanderWorldEnv",
+             kwargs={'task': 'dodge', 'reward_function': 'gaussian',
+                     'list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
+                         "dodge_easy_object_list_30_times_40.csv"]},
+             max_episode_steps=500)
+    register(id="MoonlanderWorld-dodge-gaussian-benchmark-hard-v0",
+             entry_point="custom_envs.moonlander.moonlander_env:MoonlanderWorldEnv",
+             kwargs={'task': 'dodge', 'reward_function': 'gaussian',
+                     'list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
+                         "dodge_hard_object_list_30_times_40.csv"]},
              max_episode_steps=500)
 
     register(id="MetaEnv-simple-v0",
