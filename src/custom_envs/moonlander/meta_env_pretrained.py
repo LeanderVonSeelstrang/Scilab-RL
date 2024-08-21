@@ -13,7 +13,8 @@ from stable_baselines3.common.env_util import make_vec_env
 np.set_printoptions(threshold=sys.maxsize)
 
 from custom_algorithms.cleanppofm.cleanppofm import CLEANPPOFM
-from custom_algorithms.cleanppofm.utils import reward_estimation, get_position_and_object_positions_of_observation, \
+from custom_algorithms.cleanppofm.utils import get_summed_up_reward_of_env_or_fm_with_predicted_states_of_fm, \
+    get_position_and_object_positions_of_observation, \
     get_observation_of_position_and_object_positions
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -26,7 +27,7 @@ class MetaEnvPretrained(gym.Env):
         "render_fps": 10,
     }
 
-    def __init__(self, reward_function: str = "gaussian"):
+    def __init__(self):
         self.ROOT_DIR = "."
         config_path_dodge_asteroids = os.path.join(os.path.dirname(os.path.realpath(__file__)), "standard_config.yaml")
         config_path_collect_asteroids = os.path.join(os.path.dirname(os.path.realpath(__file__)),
@@ -107,6 +108,11 @@ class MetaEnvPretrained(gym.Env):
                 and self.trained_dodge_asteroids.maximum_number_of_objects == self.trained_collect_asteroids.maximum_number_of_objects):
             raise ValueError("Models used different configurations during training")
 
+        # because dodge and collect use the same configuration, we can use one of them
+        self.observation_height = self.trained_dodge_asteroids.env.env_method("get_wrapper_attr", "observation_height")[
+            0]
+        self.observation_width = self.trained_dodge_asteroids.env.env_method("get_wrapper_attr", "observation_width")[0]
+
         # the state could possibly be a belief state of the forward model
         # only one return value because DummyVecEnv only returns one observation
         self.state_of_dodge_asteroids = self.trained_dodge_asteroids.env.reset()
@@ -150,16 +156,16 @@ class MetaEnvPretrained(gym.Env):
                 active_model = self.trained_dodge_asteroids
                 active_last_state = self.state_of_dodge_asteroids
                 inactive_model = self.trained_collect_asteroids
-                inactive_SoC = self.SoC_collect
                 inactive_last_state = self.state_of_collect_asteroids
+                inactive_SoC = self.SoC_collect
                 self.current_task = 0
             case 1:
                 # collect task
                 active_model = self.trained_collect_asteroids
                 active_last_state = self.state_of_collect_asteroids
                 inactive_model = self.trained_dodge_asteroids
-                inactive_SoC = self.SoC_dodge
                 inactive_last_state = self.state_of_dodge_asteroids
+                inactive_SoC = self.SoC_dodge
                 self.current_task = 1
 
             # If an exact match is not confirmed, this last case will be used if provided
@@ -176,43 +182,49 @@ class MetaEnvPretrained(gym.Env):
         active_belief_state_normal_distribution = active_model.fm_network(active_agent_and_object_positions_tensor,
                                                                           torch.tensor([action_of_task_agent]).float())
         # perform action & SoC calculation & reward estimation corrected by SoC
-        new_state, _, active_is_done, active_info, active_prediction_error, active_reward_estimation_corrected_by_SoC = active_model.step_in_env(
+        new_state, active_reward, active_is_done, active_info, active_prediction_error, active_difficulty, active_SoC, active_reward_estimation_corrected_by_SoC = active_model.step_in_env(
             actions=torch.tensor(action_of_task_agent).float(),
             forward_normal=active_belief_state_normal_distribution)
-        active_SoC = 1 - active_prediction_error
 
         ### INACTIVE TASK ###
-        # perform default action 0 in inactive task
+        # perform default action 1 in inactive task
         # only four return value because DummyVecEnv only returns observation, reward, done, info
-        _, _, inactive_is_done, inactive_info = inactive_model.env.step(torch.tensor([0], device=device))
+        # but meta agent does not see actual state and reward
+        _, _, inactive_is_done, inactive_info = inactive_model.env.step(torch.tensor([1], device=device))
         # get position and object positions of observation
         inactive_agent_and_object_positions_tensor = get_position_and_object_positions_of_observation(
             torch.tensor(inactive_last_state, device=device))
-        # forward model predictions once with state and action
+        # forward model predictions once with state and action to get next belief state
         inactive_belief_state_normal_distribution = inactive_model.fm_network(
             inactive_agent_and_object_positions_tensor,
-            torch.tensor([[0]]).float())
+            torch.tensor([[1]]).float())
+        # get new inactive state from forward model
+        belief_state = get_observation_of_position_and_object_positions(agent_and_object_positions=
+                                                                        inactive_belief_state_normal_distribution.mean[
+                                                                            0][:-1].cpu().unsqueeze(0),
+                                                                        observation_height=self.observation_height,
+                                                                        observation_width=self.observation_width).flatten().cpu().numpy()
+        belief_state = np.expand_dims(belief_state, 0)
         # SoC update --> degrade SoC by 0.1
         inactive_SoC = min(max(0, inactive_SoC - 0.1), 1)
+        # simulate future n steps
+        # FIXME: for now it is hardcoded 5 steps + can be deleted in cleanppofm?
+        # reward estimation -> predict next state -> get reward of environment
+        inactive_summed_up_rewards = get_summed_up_reward_of_env_or_fm_with_predicted_states_of_fm(
+            env=inactive_model.env,
+            fm_network=inactive_model.fm_network,
+            last_observation=
+            inactive_belief_state_normal_distribution.mean[
+                0][:-1].unsqueeze(0),
+            reward_from_env=True,
+            env_name="MoonlanderWorldEnv",
+            position_predicting=True,
+            number_of_future_steps=inactive_model.number_of_future_steps,
+            maximum_number_of_objects=inactive_model.maximum_number_of_objects)
         # reward estimation corrected by SoC
-        inactive_reward_estimation_corrected_by_SoC = reward_estimation(fm_network=inactive_model.fm_network,
-                                                                        new_obs=
-                                                                        inactive_belief_state_normal_distribution.mean[
-                                                                            0][:-1].unsqueeze(0),
-                                                                        env_name="MoonlanderWorldEnv",
-                                                                        rewards=
-                                                                        inactive_belief_state_normal_distribution.mean[
-                                                                            0][-1],
-                                                                        prediction_error=(1 - inactive_SoC),
-                                                                        # we already have the positions through the prediction
-                                                                        position_predicting=False,
-                                                                        number_of_future_steps=inactive_model.number_of_future_steps,
-                                                                        maximum_number_of_objects=inactive_model.maximum_number_of_objects)
-        inactive_reward_estimation_corrected_by_SoC = inactive_reward_estimation_corrected_by_SoC.item()
+        # TODO: degrade reward further when not knowing anything
+        inactive_reward_estimation_corrected_by_SoC = (inactive_summed_up_rewards + inactive_SoC) / 2
 
-        belief_state = get_observation_of_position_and_object_positions(
-            inactive_belief_state_normal_distribution.mean[0][:-1].cpu().unsqueeze(0)).flatten().cpu().numpy()
-        belief_state = np.expand_dims(belief_state, 0)
         match action:
             case 0:
                 # dodge task

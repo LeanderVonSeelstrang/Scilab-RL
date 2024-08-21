@@ -236,7 +236,7 @@ def register_custom_envs():
                          "dodge_hard_object_list_30_times_40.csv"]},
              max_episode_steps=500)
 
-    register(id="MetaEnv-simple-v0",
+    register(id="MetaEnv-v0",
              entry_point="custom_envs.moonlander.meta_env:MetaEnv",
              kwargs={'reward_function': 'simple'},
              max_episode_steps=500)

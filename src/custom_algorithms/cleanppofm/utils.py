@@ -89,6 +89,140 @@ def get_reward_estimation_of_forward_model(fm_network, obs: torch.Tensor,
     return reward_estimation
 
 
+# FIXME: what is about position predicting and not?
+def get_reward_of_environment(env, env_name: str, number_of_future_steps: int = 10):
+    """
+    Calculate the reward by using the reward model of the environment.
+    Args:
+        env: environment
+        env_name: name of the current environment
+        rewards: reward of last step
+        prediction_error: error between predicted and last actual observation
+        number_of_future_steps: number of future steps to predict
+
+    Returns:
+        summed up rewards
+    """
+    # default action is stay at same position
+    if env_name == "MoonlanderWorldEnv":
+        default_action = torch.Tensor([[1]])
+    # using reward model of other envs is not implemented by now
+    else:
+        raise ValueError(
+            "The current environment does not support the reward calculation through the actual environment.")
+
+    copied_env = copy.deepcopy(env)
+    # remove possible input noise in the environment
+    copied_env.env_method("set_input_noise", 0)
+    ##### CALCULATE NEXT REWARDS THROUGH ENVIRONMENT #####
+    summed_up_reward = 0
+    for i in range(number_of_future_steps):
+        # FIXME: what happens when the environment is done?
+        _, rewards, _, _ = copied_env.step(default_action)
+        # add new reward to last reward
+        summed_up_reward += rewards
+
+    return summed_up_reward
+
+
+def get_summed_up_reward_of_env_or_fm_with_predicted_states_of_fm(env, fm_network, last_observation: torch.Tensor,
+                                                                  reward_from_env: bool,
+                                                                  position_predicting: bool, env_name: str,
+                                                                  number_of_future_steps: int = 10,
+                                                                  maximum_number_of_objects: int = 5) -> float:
+    """
+    Get the reward of the forward model prediction or environment through predicted states of the forward model
+     for number_of_future_steps steps.
+    Args:
+        env: environment
+        fm_network: forward model network
+        last_observation: last known observation
+        reward_from_env: boolean if the reward is calculated from the environment or the forward model
+        position_predicting: boolean if the forward model is predicting the position or actual observation
+        env_name: name of the current environment
+        number_of_future_steps: number of future steps to predict
+        maximum_number_of_objects: the number of objects that are considered in the forward model prediction
+
+    Returns:
+        summed up reward of the forward model or environment for number_of_future_steps steps
+
+    """
+    # default action is stay at same position
+    if env_name == "MoonlanderWorldEnv":
+        default_action = torch.tensor([[1]]).to(device)
+    # using reward model of other envs is not implemented by now
+    else:
+        raise ValueError(
+            f"The current environment does not support the reward calculation for {number_of_future_steps} steps.")
+    task = env.env_method("get_wrapper_attr", "task")[0]
+
+    observation_height = env.env_method("get_wrapper_attr", "observation_height")[0]
+    observation_width = env.env_method("get_wrapper_attr", "observation_width")[0]
+
+    # last_observation = np.expand_dims(env.env_method("get_wrapper_attr", "state")[0].flatten(), axis=0)
+
+    # simulate the default and optimal trajectory
+    copied_env = copy.deepcopy(env)
+
+    # set last_observation in env
+    # environment assumes a numpy array as state
+    copied_env.env_method("set_state", last_observation)
+
+    # remove possible input noise in the environment
+    copied_env.env_method("set_input_noise", 0)
+
+    done = copied_env.env_method("is_done")[0]
+
+    # first obs are positions, then you have to change back at the end of the loop to positions
+
+    summed_up_reward = 0
+    for i in range(number_of_future_steps):
+        if not done:
+            # we manually predict the next state
+            # positions for forward model
+            if not position_predicting:
+                # FIXME: not tested
+                last_observation = torch.tensor(last_observation, device=device,
+                                                dtype=torch.float32).detach().clone()
+            forward_model_prediction_normal_distribution = fm_network(last_observation, default_action)
+
+            # get reward from forward model prediction or environment
+            if not reward_from_env:
+                rewards = np.expand_dims(forward_model_prediction_normal_distribution.mean[0][
+                                             -1].cpu().detach().numpy(), axis=0)
+                # remove reward from new predicted obs
+                last_observation = torch.clamp(
+                    torch.round(forward_model_prediction_normal_distribution.mean[0][:-1].unsqueeze(dim=0)),
+                    min=0,
+                    max=4)
+            else:
+                _, rewards, done, _ = copied_env.step(default_action)
+                # define state for env
+                # FIXME: only when reward is predicted by the forward model
+                last_observation = np.expand_dims(
+                    get_observation_of_position_and_object_positions(agent_and_object_positions=
+                    forward_model_prediction_normal_distribution.mean[0][:-1].cpu().unsqueeze(
+                        0), observation_height=observation_height,
+                        observation_width=observation_width).flatten().cpu().numpy(), axis=0)
+                # set state in env
+                # environment assumes a numpy array as state
+                copied_env.env_method("set_state", last_observation)
+
+                if position_predicting:
+                    # form whole observation to tensor
+                    last_observation = torch.tensor(last_observation, device=device,
+                                                    dtype=torch.float32).detach().clone()
+                    # form whole observation to positions
+                    last_observation = get_position_and_object_positions_of_observation(last_observation,
+                                                                                        maximum_number_of_objects=maximum_number_of_objects)
+
+            # normalize reward
+            normalized_reward = normalize_rewards(task=task, absolute_reward=rewards)
+            summed_up_reward += normalized_reward
+
+    return summed_up_reward
+
+
 def get_reward_with_future_reward_estimation_corrective(rewards: torch.Tensor, future_reward_estimation: float,
                                                         prediction_error: float) -> torch.Tensor:
     """
@@ -454,7 +588,7 @@ def calculate_prediction_error(env_name: str, env, next_obs, forward_model_predi
 
 def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
                          prediction_error: float, position_predicting: bool, maximum_number_of_objects: int = 5,
-                         reward_predicting: bool = False) -> float:
+                         reward_predicting: bool = False) -> tuple[float, float]:
     """
     Calculate the difficulty of the environment by simulating the default trajectory
     and the "optimal" trajectory the agent would choose.
@@ -470,6 +604,7 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
         reward_predicting: if the forward model is predicting the reward or the environment
     Returns:
         difficulty between 0 and 1
+        summed up rewards when executing the default action (trajectory length is calculated by prediction error)
     """
     # default action is stay at same position
     if env_name == "MoonlanderWorldEnv":
@@ -602,7 +737,7 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
             max(summed_up_reward_default, summed_up_reward_optimal))
 
     # difficulty is high if the rewards are quite similar, but difficulty should be the other way around -> 1 - difficulty
-    return 1 - difficulty
+    return 1 - difficulty, summed_up_reward_default
 
 
 def normalize_rewards(task: str, absolute_reward) -> float:

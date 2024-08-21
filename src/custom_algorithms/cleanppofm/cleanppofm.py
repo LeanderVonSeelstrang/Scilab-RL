@@ -614,10 +614,12 @@ class CLEANPPOFM:
         Returns:
             new_obs: new observation
             rewards: rewards
-            reward_with_future_reward_estimation_corrective: reward corrected by prediction error
             dones: if the episode is done
             infos: additional information
             prediction_error: calculated prediction error
+            difficulty: calculated difficulty
+            soc: calculated sense of control
+            reward_with_future_reward_estimation_corrective: reward corrected by prediction error
         """
         ##### DISPLAYING THE FORWARD MODEL PREDICTION #####
         # modify the env attributes as described here:
@@ -640,7 +642,7 @@ class CLEANPPOFM:
 
         # if input noise is applied!
         input_noise = 0
-        if self.input_noise_on and not actions[0] == 0:
+        if self.input_noise_on and not actions[0] == 1:
             mu = 0
             sigma = 1.5
             input_noise = np.random.normal(loc=mu, scale=sigma)
@@ -653,7 +655,6 @@ class CLEANPPOFM:
         if self.normalized_rewards:
             task = self.env.env_method("get_wrapper_attr", "task")[0]
             rewards = normalize_rewards(task=task, absolute_reward=rewards)
-        deepcopy_of_rewards_for_corrective = copy.deepcopy(rewards)
 
         ##### CALCULATING PREDICTION ERROR #####
         prediction_error = calculate_prediction_error(env_name=self.env_name, env=self.env,
@@ -663,38 +664,25 @@ class CLEANPPOFM:
         self.soc = prediction_error
 
         ##### CALCULATING DIFFICULTY #####
-        difficulty = calculate_difficulty(env=self.env, policy=self.policy, fm_network=self.fm_network,
-                                          logger=self.logger, env_name=self.env_name,
-                                          prediction_error=prediction_error,
-                                          position_predicting=self.position_predicting,
-                                          maximum_number_of_objects=self.maximum_number_of_objects,
-                                          reward_predicting=self.reward_predicting)
+        difficulty, summed_up_rewards_default = calculate_difficulty(env=self.env, policy=self.policy,
+                                                                     fm_network=self.fm_network,
+                                                                     logger=self.logger, env_name=self.env_name,
+                                                                     prediction_error=prediction_error,
+                                                                     position_predicting=self.position_predicting,
+                                                                     maximum_number_of_objects=self.maximum_number_of_objects,
+                                                                     reward_predicting=self.reward_predicting)
 
         ##### CALCULATING SOC #####
+        # prediction error is high, if the prediction and actual observation do not match
+        # difficulty is high if the rewards of the optimal trajectory are quite different to the rewards of the default trajectory
         # soc = mean of prediction error and difficulty
         self.soc = 1 - ((prediction_error + difficulty) / 2)
 
-        if self.reward_predicting:
-            ##### FLATTING OBSERVATIONS FOR FUTURE REWARD ESTIMATION #####
-            flatten_new_obs = new_obs
-            if isinstance(self.env.observation_space, spaces.Dict):
-                flatten_new_obs = flatten_obs(flatten_new_obs)
-            else:
-                flatten_new_obs = torch.from_numpy(flatten_new_obs).to(device)
-            reward_with_future_reward_estimation_corrective = reward_estimation(
-                fm_network=self.fm_network, new_obs=flatten_new_obs, env_name=self.env_name,
-                rewards=deepcopy_of_rewards_for_corrective, prediction_error=prediction_error,
-                position_predicting=self.position_predicting,
-                number_of_future_steps=self.number_of_future_steps,
-                maximum_number_of_objects=self.maximum_number_of_objects)
-        else:
-            reward_with_future_reward_estimation_corrective = reward_calculation(env=self.env, env_name=self.env_name,
-                                                                                 rewards=rewards,
-                                                                                 prediction_error=prediction_error,
-                                                                                 number_of_future_steps=self.number_of_future_steps)
+        ##### CALCULATE REWARD ESTIMATION FOR DEFAULT TRAJECTORY CORRECTED BY SOC #####
+        reward_estimation = (summed_up_rewards_default + self.soc) / 2
 
         # fixme: reward_with_future_reward_estimation_corrective is not used + SoC is not used
-        return new_obs, rewards, dones, infos, prediction_error, difficulty, self.soc, reward_with_future_reward_estimation_corrective
+        return new_obs, rewards, dones, infos, prediction_error, difficulty, self.soc, reward_estimation
 
     def save(
             self,

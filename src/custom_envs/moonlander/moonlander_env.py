@@ -1158,6 +1158,10 @@ class MoonlanderWorldEnv(Env):
         for k, v in self.__dict__.items():
             if k in ["fig_mb", "ax_mb", "im_mb"]:
                 v = dict()
-            setattr(obj, k, copy.deepcopy(v, memo))
+            # detach needed, otherwise deepcopy would not work
+            if torch.is_tensor(v):
+                setattr(obj, k, copy.deepcopy(v.detach(), memo))
+            else:
+                setattr(obj, k, copy.deepcopy(v, memo))
             pass
         return obj
