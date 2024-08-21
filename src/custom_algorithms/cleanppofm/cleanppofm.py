@@ -652,16 +652,12 @@ class CLEANPPOFM:
         ##### STEP IN ENVIRONMENT #####
         # dones = terminated or truncated
         new_obs, rewards, dones, infos = self.env.step(actions)
-        if self.normalized_rewards:
-            task = self.env.env_method("get_wrapper_attr", "task")[0]
-            rewards = normalize_rewards(task=task, absolute_reward=rewards)
 
         ##### CALCULATING PREDICTION ERROR #####
         prediction_error = calculate_prediction_error(env_name=self.env_name, env=self.env,
                                                       next_obs=torch.tensor(new_obs, device=device),
                                                       forward_model_prediction_normal_distribution=forward_normal,
                                                       maximum_number_of_objects=self.maximum_number_of_objects)
-        self.soc = prediction_error
 
         ##### CALCULATING DIFFICULTY #####
         difficulty, summed_up_rewards_default = calculate_difficulty(env=self.env, policy=self.policy,
@@ -677,6 +673,14 @@ class CLEANPPOFM:
         # difficulty is high if the rewards of the optimal trajectory are quite different to the rewards of the default trajectory
         # soc = mean of prediction error and difficulty
         self.soc = 1 - ((prediction_error + difficulty) / 2)
+
+        task = self.env.env_method("get_wrapper_attr", "task")[0]
+        # normalize actual reward
+        rewards_normalized = normalize_rewards(task=task, absolute_reward=rewards)
+        # add normalized reward to summed up rewards + normalize by mean
+        summed_up_rewards_default = (rewards_normalized + summed_up_rewards_default) / 2
+        if self.normalized_rewards:
+            rewards = rewards_normalized
 
         ##### CALCULATE REWARD ESTIMATION FOR DEFAULT TRAJECTORY CORRECTED BY SOC #####
         reward_estimation = (summed_up_rewards_default + self.soc) / 2

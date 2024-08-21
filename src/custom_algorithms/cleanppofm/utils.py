@@ -220,7 +220,8 @@ def get_summed_up_reward_of_env_or_fm_with_predicted_states_of_fm(env, fm_networ
             normalized_reward = normalize_rewards(task=task, absolute_reward=rewards)
             summed_up_reward += normalized_reward
 
-    return summed_up_reward
+    # normalize with mean of summed_up_reward
+    return summed_up_reward / number_of_future_steps
 
 
 def get_reward_with_future_reward_estimation_corrective(rewards: torch.Tensor, future_reward_estimation: float,
@@ -443,14 +444,21 @@ def get_observation_of_position_and_object_positions(agent_and_object_positions:
         # objects can be predicted in agent but will be overwritten by agent
         # -> also catches empty objects at position 0,0
         matrix[
-            max(0, min(int(copy_of_agent_and_object_positions[0][counter + 1]), observation_width - 1)), max(0, min(int(
-                copy_of_agent_and_object_positions[0][counter]), observation_width + 1))] = 2
+            max(0,
+                min(int(torch.round(copy_of_agent_and_object_positions[0][counter + 1])), observation_width - 1)), max(
+                0,
+                min(int(torch.round(
+                    copy_of_agent_and_object_positions[
+                        0][
+                        counter])),
+                    observation_width + 1))] = 2
         counter += 2
 
     # add agent
     # first element is the y position of the agent, second element is the x position of the agent
-    matrix[max(0, min(int(copy_of_agent_and_object_positions[0][1]), observation_width - 1)), max(1, min(int(
-        copy_of_agent_and_object_positions[0][0]), observation_width))] = 1
+    matrix[
+        max(0, min(int(torch.round(copy_of_agent_and_object_positions[0][1])), observation_width - 1)), max(1, min(int(
+            torch.round(copy_of_agent_and_object_positions[0][0])), observation_width))] = 1
 
     # add wall
     matrix[:, 0] = -1
@@ -639,7 +647,7 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
     summed_up_reward_default = 0
     summed_up_reward_optimal = 0
     # simulate at least one step
-    for i in range(max(int(trajectory_length), 1)):
+    for i in range(max(round(trajectory_length), 1)):
         if not done_default:
             # we manually predict the next state
             # positions for forward model
@@ -736,8 +744,10 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
         difficulty = (min(summed_up_reward_default, summed_up_reward_optimal)) / (
             max(summed_up_reward_default, summed_up_reward_optimal))
 
+    # get a mean reward between 0 and 1
+    summed_up_reward_default_normalized = summed_up_reward_default / (max(round(trajectory_length), 1))
     # difficulty is high if the rewards are quite similar, but difficulty should be the other way around -> 1 - difficulty
-    return 1 - difficulty, summed_up_reward_default
+    return 1 - difficulty, summed_up_reward_default_normalized
 
 
 def normalize_rewards(task: str, absolute_reward) -> float:

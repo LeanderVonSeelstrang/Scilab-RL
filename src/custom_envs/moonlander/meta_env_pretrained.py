@@ -125,8 +125,8 @@ class MetaEnvPretrained(gym.Env):
             axis=1,
         ).flatten()
 
-        self.SoC_dodge = 0
-        self.SoC_collect = 0
+        self.SoC_dodge = 1
+        self.SoC_collect = 1
 
         # for rendering
         plt.ion()
@@ -139,7 +139,6 @@ class MetaEnvPretrained(gym.Env):
         # counter
         self.episode_counter = 0
         self.step_counter = 0
-        self.switch_counter = 0
         self.counter_without_switch = 0
         self.last_action = 0
 
@@ -221,15 +220,17 @@ class MetaEnvPretrained(gym.Env):
             reward_from_env=True,
             env_name="MoonlanderWorldEnv",
             position_predicting=True,
-            number_of_future_steps=inactive_model.number_of_future_steps,
+            # FIXME: this is hardcoded and should be deleted in cleanppofm --> meta env decision
+            number_of_future_steps=5,
             maximum_number_of_objects=inactive_model.maximum_number_of_objects)
         # degrade reward further when not knowing anything
-        inactive_summed_up_rewards = min(max(0, inactive_summed_up_rewards - (self.counter_without_switch * 0.1), 1))
+        # inactive_summed_up_rewards is a numpy array
         if self.last_action == action:
             self.counter_without_switch += 1
         else:
             self.counter_without_switch = 0
             self.last_action = action
+        inactive_summed_up_rewards = min(max(0, inactive_summed_up_rewards - (self.counter_without_switch * 0.1)), 1)
         # reward estimation corrected by SoC
         inactive_reward_estimation_corrected_by_SoC = (inactive_summed_up_rewards + inactive_SoC) / 2
 
@@ -325,7 +326,12 @@ class MetaEnvPretrained(gym.Env):
             axis=1,
         ).flatten()
 
+        self.SoC_dodge = 1
+        self.SoC_collect = 1
+
         # counter
         self.episode_counter += 1
         self.step_counter = 0
+        self.counter_without_switch = 0
+        self.last_action = 0
         return self.state, {}
