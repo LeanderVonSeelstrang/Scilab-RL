@@ -140,6 +140,8 @@ class MetaEnvPretrained(gym.Env):
         self.episode_counter = 0
         self.step_counter = 0
         self.switch_counter = 0
+        self.counter_without_switch = 0
+        self.last_action = 0
 
     def step(self, action: int):
         """
@@ -221,8 +223,14 @@ class MetaEnvPretrained(gym.Env):
             position_predicting=True,
             number_of_future_steps=inactive_model.number_of_future_steps,
             maximum_number_of_objects=inactive_model.maximum_number_of_objects)
+        # degrade reward further when not knowing anything
+        inactive_summed_up_rewards = min(max(0, inactive_summed_up_rewards - (self.counter_without_switch * 0.1), 1))
+        if self.last_action == action:
+            self.counter_without_switch += 1
+        else:
+            self.counter_without_switch = 0
+            self.last_action = action
         # reward estimation corrected by SoC
-        # TODO: degrade reward further when not knowing anything
         inactive_reward_estimation_corrected_by_SoC = (inactive_summed_up_rewards + inactive_SoC) / 2
 
         match action:
