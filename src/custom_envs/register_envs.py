@@ -179,13 +179,14 @@ def register_custom_envs():
              max_episode_steps=500)
 
     filename_small = "hard_object_list_10_times_10.csv"
+    filename_small_1 = "hard_object_list_10_times_10_1.csv"
     filename_collect_easy = "collect_easy_object_list_30_times_40.csv"
     filename_collect_hard = "collect_hard_object_list_30_times_40.csv"
     filename_dodge_easy = "dodge_easy_object_list_30_times_40.csv"
     filename_dodge_hard = "dodge_hard_object_list_30_times_40.csv"
 
-    list_of_filenames = [filename_small, filename_collect_easy, filename_collect_hard, filename_dodge_easy,
-                         filename_dodge_hard]
+    list_of_filenames = [filename_small, filename_small_1, filename_collect_easy, filename_collect_hard,
+                         filename_dodge_easy, filename_dodge_hard]
     dict_of_filename_to_object_dict_list = {}
     for filename in list_of_filenames:
         list_of_object_dict_lists = []
@@ -251,6 +252,41 @@ def register_custom_envs():
 
     register(id="MetaEnv-pretrained-v0",
              entry_point="custom_envs.moonlander.meta_env_pretrained:MetaEnvPretrained",
+             max_episode_steps=500)
+    register(id="MetaEnv-pretrained-benchmark-small-v0",
+             entry_point="custom_envs.moonlander.meta_env_pretrained:MetaEnvPretrained",
+             kwargs={'dodge_list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
+                 "hard_object_list_10_times_10.csv"],
+                     'collect_list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
+                         "hard_object_list_10_times_10_1.csv"]},
+             max_episode_steps=500)
+    register(id="MetaEnv-pretrained-benchmark-easy-easy-v0",
+             entry_point="custom_envs.moonlander.meta_env_pretrained:MetaEnvPretrained",
+             kwargs={'dodge_list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
+                 "dodge_easy_object_list_30_times_40.csv"],
+                     'collect_list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
+                         "collect_easy_object_list_30_times_40.csv"]},
+             max_episode_steps=500)
+    register(id="MetaEnv-pretrained-benchmark-easy-hard-v0",
+             entry_point="custom_envs.moonlander.meta_env_pretrained:MetaEnvPretrained",
+             kwargs={'dodge_list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
+                 "dodge_easy_object_list_30_times_40.csv"],
+                     'collect_list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
+                         "collect_hard_object_list_30_times_40.csv"]},
+             max_episode_steps=500)
+    register(id="MetaEnv-pretrained-benchmark-hard-easy-v0",
+             entry_point="custom_envs.moonlander.meta_env_pretrained:MetaEnvPretrained",
+             kwargs={'dodge_list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
+                 "dodge_hard_object_list_30_times_40.csv"],
+                     'collect_list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
+                         "collect_easy_object_list_30_times_40.csv"]},
+             max_episode_steps=500)
+    register(id="MetaEnv-pretrained-benchmark-hard-hard-v0",
+             entry_point="custom_envs.moonlander.meta_env_pretrained:MetaEnvPretrained",
+             kwargs={'dodge_list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
+                 "dodge_hard_object_list_30_times_40.csv"],
+                     'collect_list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
+                         "collect_hard_object_list_30_times_40.csv"]},
              max_episode_steps=500)
 
     register(id="GridworldEnv-v0",

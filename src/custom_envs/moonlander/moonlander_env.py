@@ -1151,6 +1151,9 @@ class MoonlanderWorldEnv(Env):
     def set_state(self, new_state: np.ndarray) -> None:
         self.state = new_state
 
+    def set_object_dict_list(self, object_dict_list: List[Dict]) -> None:
+        self.object_dict_list = object_dict_list
+
     def __deepcopy__(self, memo):
         cls = self.__class__
         obj = cls.__new__(cls)

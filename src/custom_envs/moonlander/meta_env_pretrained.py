@@ -1,6 +1,7 @@
 import copy
 import os
 import sys
+from typing import List, Dict
 import torch
 import gymnasium as gym
 import numpy as np
@@ -27,7 +28,8 @@ class MetaEnvPretrained(gym.Env):
         "render_fps": 10,
     }
 
-    def __init__(self):
+    def __init__(self, dodge_list_of_object_dict_lists: List[Dict] = None,
+                 collect_list_of_object_dict_lists: List[Dict] = None):
         self.ROOT_DIR = "."
         config_path_dodge_asteroids = os.path.join(os.path.dirname(os.path.realpath(__file__)), "standard_config.yaml")
         config_path_collect_asteroids = os.path.join(os.path.dirname(os.path.realpath(__file__)),
@@ -141,6 +143,18 @@ class MetaEnvPretrained(gym.Env):
         self.step_counter = 0
         self.counter_without_switch = 0
         self.last_action = 0
+
+        # when using benchmark, the object positions are predefined and should be set in moonlander env
+        self.dodge_list_of_object_dict_lists = dodge_list_of_object_dict_lists
+        self.collect_list_of_object_dict_lists = collect_list_of_object_dict_lists
+        if self.dodge_list_of_object_dict_lists is not None and self.episode_counter <= len(
+                self.dodge_list_of_object_dict_lists):
+            self.trained_dodge_asteroids.env.env_method("set_object_dict_list",
+                                                        self.dodge_list_of_object_dict_lists[self.episode_counter])
+        if self.collect_list_of_object_dict_lists is not None and self.episode_counter <= len(
+                self.collect_list_of_object_dict_lists):
+            self.trained_collect_asteroids.env.env_method("set_object_dict_list",
+                                                          self.collect_list_of_object_dict_lists[self.episode_counter])
 
     def step(self, action: int):
         """
@@ -334,4 +348,14 @@ class MetaEnvPretrained(gym.Env):
         self.step_counter = 0
         self.counter_without_switch = 0
         self.last_action = 0
+
+        # when using benchmark, the object positions are predefined and should be set in moonlander env
+        if self.dodge_list_of_object_dict_lists is not None and self.episode_counter <= len(
+                self.dodge_list_of_object_dict_lists):
+            self.trained_dodge_asteroids.env.env_method("set_object_dict_list",
+                                                        self.dodge_list_of_object_dict_lists[self.episode_counter])
+        if self.collect_list_of_object_dict_lists is not None and self.episode_counter <= len(
+                self.collect_list_of_object_dict_lists):
+            self.trained_collect_asteroids.env.env_method("set_object_dict_list",
+                                                          self.collect_list_of_object_dict_lists[self.episode_counter])
         return self.state, {}
