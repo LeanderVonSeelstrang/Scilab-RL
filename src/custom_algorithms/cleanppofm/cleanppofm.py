@@ -1,4 +1,5 @@
 import copy
+import math
 import io
 import pathlib
 import warnings
@@ -188,6 +189,8 @@ class CLEANPPOFM:
             # lr=self.fm_parameters["learning_rate"]
             lr=0.001
         )
+        self.fm_best_loss = math.inf
+        self.best_model = copy.deepcopy(self.fm_network.state_dict())
         self.logger = None
 
         self._setup_model()
@@ -398,7 +401,7 @@ class CLEANPPOFM:
             elif isinstance(self.action_space, spaces.Discrete):
                 clipped_actions = actions[0]
 
-            new_obs, rewards, dones, infos, prediction_error, difficulty, soc, reward_with_future_reward_estimation_corrective = self.step_in_env(
+            new_obs, rewards, dones, infos, prediction_error, difficulty, soc, reward_with_future_reward_estimation_corrective, _ = self.step_in_env(
                 actions=clipped_actions, forward_normal=forward_normal)
 
             # FIXME: is it possible that multiple actions are taken here?
@@ -567,6 +570,13 @@ class CLEANPPOFM:
         fw_loss = -forward_model_prediction_normal_distribution.log_prob(next_observations_formatted)
         loss = fw_loss.mean()
 
+        # Track best performance, and save the model's state
+        if loss < self.fm_best_loss:
+            self.fm_best_loss = loss
+            model_path = 'best_model'
+            torch.save(self.fm_network.state_dict(), model_path)
+            self.best_model = copy.deepcopy(self.fm_network.state_dict())
+
         self.logger.record("fm/fw_loss", loss.item())
         self.fm_optimizer.zero_grad()
         loss.backward()
@@ -602,7 +612,8 @@ class CLEANPPOFM:
                 position_predicting=self.position_predicting, maximum_number_of_objects=self.maximum_number_of_objects)
         return action.cpu().numpy(), state, forward_model_prediction_normal_distribution
 
-    def step_in_env(self, actions, forward_normal) -> tuple[np.ndarray, float, bool, dict, float, float, float, float]:
+    def step_in_env(self, actions, forward_normal) -> tuple[
+        np.ndarray, float, bool, dict, float, float, float, float, int]:
         """
         Step in the environment with the given actions and the forward model prediction.
         This includes the displaying of the forward model prediction and the calculation of the prediction error.
@@ -620,6 +631,7 @@ class CLEANPPOFM:
             difficulty: calculated difficulty
             soc: calculated sense of control
             reward_with_future_reward_estimation_corrective: reward corrected by prediction error
+            input_noise: applied input noise
         """
         ##### DISPLAYING THE FORWARD MODEL PREDICTION #####
         # modify the env attributes as described here:
@@ -685,8 +697,8 @@ class CLEANPPOFM:
         ##### CALCULATE REWARD ESTIMATION FOR DEFAULT TRAJECTORY CORRECTED BY SOC #####
         reward_estimation = (summed_up_rewards_default + self.soc) / 2
 
-        # fixme: reward_with_future_reward_estimation_corrective is not used + SoC is not used
-        return new_obs, rewards, dones, infos, prediction_error, difficulty, self.soc, reward_estimation
+        # input noise only for debugging
+        return new_obs, rewards, dones, infos, prediction_error, difficulty, self.soc, reward_estimation, input_noise
 
     def save(
             self,
@@ -699,7 +711,8 @@ class CLEANPPOFM:
             del data[to_exclude]
         # save network parameters
         data["_policy"] = self.policy.state_dict()
-        data["_fm"] = self.fm_network.state_dict()
+        # changed to save the best forward model
+        data["_fm"] = self.best_model
         torch.save(data, path)
 
     @classmethod
