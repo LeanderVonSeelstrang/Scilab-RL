@@ -82,7 +82,7 @@ class MetaEnvPretrained(gym.Env):
         # FIXME: this is an ugly hack to load the trained agents
         with open(
                 os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                             "../../../policies/dodge_object_prediction_rl_model_best"), "rb"
+                             "../../../policies/dodge_best_fm_23_08_rl_model_best"), "rb"
         ) as file:
             print("start loading agents", file)
             self.trained_dodge_asteroids = CLEANPPOFM.load(path=file,
@@ -91,7 +91,7 @@ class MetaEnvPretrained(gym.Env):
             self.trained_dodge_asteroids.set_logger(logger=self.logger)
         with open(
                 os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                             "../../../policies/collect_object_prediction_rl_model_best"), "rb"
+                             "../../../policies/collect_best_fm_23_08_rl_model_best"), "rb"
         ) as file:
             # same model cannot be loaded twice -> copy does also not work
             self.trained_collect_asteroids = CLEANPPOFM.load(path=file,
@@ -197,7 +197,7 @@ class MetaEnvPretrained(gym.Env):
         active_belief_state_normal_distribution = active_model.fm_network(active_agent_and_object_positions_tensor,
                                                                           torch.tensor([action_of_task_agent]).float())
         # perform action & SoC calculation & reward estimation corrected by SoC
-        new_state, active_reward, active_is_done, active_info, active_prediction_error, active_difficulty, active_SoC, active_reward_estimation_corrected_by_SoC = active_model.step_in_env(
+        new_state, active_reward, active_is_done, active_info, active_prediction_error, active_difficulty, active_SoC, active_reward_estimation_corrected_by_SoC, input_noise = active_model.step_in_env(
             actions=torch.tensor(action_of_task_agent).float(),
             forward_normal=active_belief_state_normal_distribution)
 
@@ -259,6 +259,20 @@ class MetaEnvPretrained(gym.Env):
                 info_collect = inactive_info
                 reward_collect = inactive_reward_estimation_corrected_by_SoC
                 self.SoC_collect = inactive_SoC
+                # for debugging
+                last_dodge_position = int(active_agent_and_object_positions_tensor[0][0])
+                last_collect_position = int(inactive_agent_and_object_positions_tensor[0][0])
+                dodge_action = action_of_task_agent
+                collect_action = 1
+                next_dodge_position = int(
+                    get_position_and_object_positions_of_observation(torch.tensor(new_state, device=device))[0][0])
+                next_collect_position = int(
+                    get_position_and_object_positions_of_observation(torch.tensor(belief_state, device=device))[0][0])
+                predicted_next_dodge_position = round(
+                    min(max(1, active_belief_state_normal_distribution.mean.cpu().detach().numpy()[0][0]), 10))
+                predicted_next_collect_position = round(
+                    min(max(1, inactive_belief_state_normal_distribution.mean.cpu().detach().numpy()[0][0]), 10))
+                print("hey")
             case 1:
                 # collect task
                 self.state_of_dodge_asteroids = belief_state
@@ -269,6 +283,19 @@ class MetaEnvPretrained(gym.Env):
                 info_collect = active_info
                 reward_collect = active_reward_estimation_corrected_by_SoC
                 self.SoC_collect = active_SoC
+                # for debugging
+                last_dodge_position = int(inactive_agent_and_object_positions_tensor[0][0])
+                last_collect_position = int(active_agent_and_object_positions_tensor[0][0])
+                dodge_action = 1
+                collect_action = action_of_task_agent
+                next_dodge_position = int(
+                    get_position_and_object_positions_of_observation(torch.tensor(belief_state, device=device))[0][0])
+                next_collect_position = int(
+                    get_position_and_object_positions_of_observation(torch.tensor(new_state, device=device))[0][0])
+                predicted_next_dodge_position = round(
+                    min(max(1, inactive_belief_state_normal_distribution.mean.cpu().detach().numpy()[0][0]), 10))
+                predicted_next_collect_position = round(
+                    min(max(1, active_belief_state_normal_distribution.mean.cpu().detach().numpy()[0][0]), 10))
             case _:
                 raise ValueError("action must be 0, 1")
 
@@ -282,7 +309,14 @@ class MetaEnvPretrained(gym.Env):
 
         self.step_counter += 1
         info = {"info_dodge": info_dodge, "info_collect": info_collect, "reward_dodge": reward_dodge,
-                "reward_collect": reward_collect}
+                "reward_collect": reward_collect, "action_meta": action, "dodge_position_before": last_dodge_position,
+                "collect_position_before": last_collect_position, "dodge_action": dodge_action,
+                "collect_action": collect_action, "input_noise": input_noise,
+                "dodge_next_position": next_dodge_position, "collect_next_position": next_collect_position,
+                "predicted_dodge_next_position": predicted_next_dodge_position,
+                "predicted_collect_next_position": predicted_next_collect_position,
+                "prediction_error": active_prediction_error, "difficulty": active_difficulty,
+                "SoC_dodge": self.SoC_dodge, "SoC_collect": self.SoC_collect}
         return (
             self.state,
             active_reward_estimation_corrected_by_SoC + inactive_reward_estimation_corrected_by_SoC,
