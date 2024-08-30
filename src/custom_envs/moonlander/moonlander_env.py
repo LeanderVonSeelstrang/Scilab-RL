@@ -154,6 +154,7 @@ class MoonlanderWorldEnv(Env):
         self.observation_height = agent_config["observation_height"]
         self.observation_width = world_config["x_width"]
         self.task = task
+        self.size = size
 
         self.y_position_of_agent = agent_config["size"]
 

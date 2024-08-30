@@ -132,8 +132,12 @@ class Agent(nn.Module):
         # formal_normal_action in form of tensor([[action]])
         # get position of last state out of the observation --> moonlander specific implementation
         if position_predicting:
+            observation_width = self.env.env_method("get_wrapper_attr", "observation_width")[0]
+            agent_size = self.env.env_method("get_wrapper_attr", "size")[0]
             positions = get_position_and_object_positions_of_observation(obs,
-                                                                         maximum_number_of_objects=maximum_number_of_objects)
+                                                                         maximum_number_of_objects=maximum_number_of_objects,
+                                                                         observation_width=observation_width,
+                                                                         agent_size=agent_size)
             forward_model_prediction_normal_distribution = fm_network(positions, forward_normal_action.float())
         else:
             forward_model_prediction_normal_distribution = fm_network(obs, forward_normal_action.float())

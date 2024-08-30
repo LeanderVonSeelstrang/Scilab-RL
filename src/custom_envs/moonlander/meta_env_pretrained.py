@@ -114,6 +114,7 @@ class MetaEnvPretrained(gym.Env):
         self.observation_height = self.trained_dodge_asteroids.env.env_method("get_wrapper_attr", "observation_height")[
             0]
         self.observation_width = self.trained_dodge_asteroids.env.env_method("get_wrapper_attr", "observation_width")[0]
+        self.agent_size = self.trained_dodge_asteroids.env.env_method("get_wrapper_attr", "size")[0]
 
         # the state could possibly be a belief state of the forward model
         # only one return value because DummyVecEnv only returns one observation
@@ -192,7 +193,8 @@ class MetaEnvPretrained(gym.Env):
         action_of_task_agent, _, _ = active_model.predict(active_last_state, deterministic=True)
         # get position and object positions of observation
         active_agent_and_object_positions_tensor = get_position_and_object_positions_of_observation(
-            torch.tensor(active_last_state, device=device))
+            torch.tensor(active_last_state, device=device), observation_width=self.observation_width,
+            agent_size=self.agent_size)
         # forward model predictions once with state and action
         active_belief_state_normal_distribution = active_model.fm_network(active_agent_and_object_positions_tensor,
                                                                           torch.tensor([action_of_task_agent]).float())
@@ -208,7 +210,8 @@ class MetaEnvPretrained(gym.Env):
         _, _, inactive_is_done, inactive_info = inactive_model.env.step(torch.tensor([1], device=device))
         # get position and object positions of observation
         inactive_agent_and_object_positions_tensor = get_position_and_object_positions_of_observation(
-            torch.tensor(inactive_last_state, device=device))
+            torch.tensor(inactive_last_state, device=device), observation_width=self.observation_width,
+            agent_size=self.agent_size)
         # forward model predictions once with state and action to get next belief state
         inactive_belief_state_normal_distribution = inactive_model.fm_network(
             inactive_agent_and_object_positions_tensor,
@@ -218,7 +221,11 @@ class MetaEnvPretrained(gym.Env):
                                                                         inactive_belief_state_normal_distribution.mean[
                                                                             0][:-1].cpu().unsqueeze(0),
                                                                         observation_height=self.observation_height,
-                                                                        observation_width=self.observation_width).flatten().cpu().numpy()
+                                                                        observation_width=self.observation_width,
+                                                                        agent_size=self.agent_size,
+                                                                        task=inactive_model.env.env_method(
+                                                                            "get_wrapper_attr", "task")[
+                                                                            0]).flatten().cpu().numpy()
         belief_state = np.expand_dims(belief_state, 0)
         # SoC update --> degrade SoC by 0.1
         inactive_SoC = min(max(0, inactive_SoC - 0.1), 1)
@@ -265,14 +272,17 @@ class MetaEnvPretrained(gym.Env):
                 dodge_action = action_of_task_agent
                 collect_action = 1
                 next_dodge_position = int(
-                    get_position_and_object_positions_of_observation(torch.tensor(new_state, device=device))[0][0])
+                    get_position_and_object_positions_of_observation(torch.tensor(new_state, device=device),
+                                                                     observation_width=self.observation_width,
+                                                                     agent_size=self.agent_size)[0][0])
                 next_collect_position = int(
-                    get_position_and_object_positions_of_observation(torch.tensor(belief_state, device=device))[0][0])
+                    get_position_and_object_positions_of_observation(torch.tensor(belief_state, device=device),
+                                                                     observation_width=self.observation_width,
+                                                                     agent_size=self.agent_size)[0][0])
                 predicted_next_dodge_position = round(
                     min(max(1, active_belief_state_normal_distribution.mean.cpu().detach().numpy()[0][0]), 10))
                 predicted_next_collect_position = round(
                     min(max(1, inactive_belief_state_normal_distribution.mean.cpu().detach().numpy()[0][0]), 10))
-                print("hey")
             case 1:
                 # collect task
                 self.state_of_dodge_asteroids = belief_state
@@ -289,9 +299,13 @@ class MetaEnvPretrained(gym.Env):
                 dodge_action = 1
                 collect_action = action_of_task_agent
                 next_dodge_position = int(
-                    get_position_and_object_positions_of_observation(torch.tensor(belief_state, device=device))[0][0])
+                    get_position_and_object_positions_of_observation(torch.tensor(belief_state, device=device),
+                                                                     observation_width=self.observation_width,
+                                                                     agent_size=self.agent_size)[0][0])
                 next_collect_position = int(
-                    get_position_and_object_positions_of_observation(torch.tensor(new_state, device=device))[0][0])
+                    get_position_and_object_positions_of_observation(torch.tensor(new_state, device=device),
+                                                                     observation_width=self.observation_width,
+                                                                     agent_size=self.agent_size)[0][0])
                 predicted_next_dodge_position = round(
                     min(max(1, inactive_belief_state_normal_distribution.mean.cpu().detach().numpy()[0][0]), 10))
                 predicted_next_collect_position = round(

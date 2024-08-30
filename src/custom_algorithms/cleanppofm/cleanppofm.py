@@ -524,6 +524,10 @@ class CLEANPPOFM:
             observations = flatten_obs(observations)
             next_observations = flatten_obs(next_observations)
 
+        observation_height = self.env.env_method("get_wrapper_attr", "observation_height")[0]
+        observation_width = self.env.env_method("get_wrapper_attr", "observation_width")[0]
+        agent_size = self.env.env_method("get_wrapper_attr", "size")[0]
+
         ##### FORMAT OBSERVATION FOR FORWARD MODEL #####
         # 1. with or without reward (line 572)
         # 2. with or without position predicting (moonlander)
@@ -535,8 +539,6 @@ class CLEANPPOFM:
 
             # create next observations without input noise
             if self.env_name == "MoonlanderWorldEnv" and not self.fm_trained_with_input_noise:
-                observation_height = self.env.env_method("get_wrapper_attr", "observation_height")[0]
-                observation_width = self.env.env_method("get_wrapper_attr", "observation_width")[0]
                 next_observations_duplicated = get_next_whole_observation(next_observations=next_observations,
                                                                           actions=actions,
                                                                           observation_width=observation_width,
@@ -551,13 +553,17 @@ class CLEANPPOFM:
         else:
             # get position out of observation
             observations = get_position_and_object_positions_of_observation(observations,
-                                                                            maximum_number_of_objects=self.maximum_number_of_objects)
+                                                                            maximum_number_of_objects=self.maximum_number_of_objects,
+                                                                            observation_width=observation_width,
+                                                                            agent_size=agent_size)
             if not self.fm_trained_with_input_noise:
                 next_observations_formatted = get_next_position_observation_moonlander(observations=observations,
                                                                                        actions=actions)
             else:
                 next_observations_formatted = get_position_and_object_positions_of_observation(next_observations,
-                                                                                               maximum_number_of_objects=self.maximum_number_of_objects)
+                                                                                               maximum_number_of_objects=self.maximum_number_of_objects,
+                                                                                               observation_width=observation_width,
+                                                                                               agent_size=agent_size)
             if self.reward_predicting:
                 next_observations_formatted = torch.cat((next_observations_formatted, rewards), dim=1)
 

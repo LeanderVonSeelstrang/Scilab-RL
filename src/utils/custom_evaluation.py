@@ -105,7 +105,11 @@ def evaluate_policy(
         ### custom code
         actions, states, forward_normal = model.predict(observations, state=states, deterministic=deterministic)
         # for logging: get last position, predicted position and new position
-        position = get_position_and_object_positions_of_observation(torch.tensor(observations))[0][0]
+        observation_width = env.env_method("get_wrapper_attr", "observation_width")[0]
+        agent_size = env.env_method("get_wrapper_attr", "size")[0]
+        position = get_position_and_object_positions_of_observation(obs=torch.tensor(observations),
+                                                                    observation_width=observation_width,
+                                                                    agent_size=agent_size)[0][0]
         predicted_x_position = min(max(1, forward_normal.mean.cpu().detach().numpy()[0][0]), 10)
         expected_new_positon = min(max(1, position + (actions[0] - 1)), 10)
 
@@ -113,7 +117,9 @@ def evaluate_policy(
             actions=actions,
             forward_normal=forward_normal)
 
-        new_position = get_position_and_object_positions_of_observation(torch.tensor(observations))[0][0]
+        new_position = get_position_and_object_positions_of_observation(torch.tensor(observations),
+                                                                        observation_width=observation_width,
+                                                                        agent_size=agent_size)[0][0]
 
         if model.reward_predicting:
             logger.record("eval/predicted_rewards", float(forward_normal.mean[:, -1].mean()))

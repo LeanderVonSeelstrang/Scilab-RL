@@ -72,6 +72,7 @@ def get_reward_estimation_of_forward_model(fm_network, obs: torch.Tensor,
     """
     # the first obs is a matrix, the following obs are just the positions
     if position_predicting:
+        # FIXME: missing observation height and width and agent size -> currently not used
         obs = get_position_and_object_positions_of_observation(obs,
                                                                maximum_number_of_objects=maximum_number_of_objects)
 
@@ -158,6 +159,7 @@ def get_summed_up_reward_of_env_or_fm_with_predicted_states_of_fm(env, fm_networ
 
     observation_height = env.env_method("get_wrapper_attr", "observation_height")[0]
     observation_width = env.env_method("get_wrapper_attr", "observation_width")[0]
+    agent_size = env.env_method("get_wrapper_attr", "size")[0]
 
     # last_observation = np.expand_dims(env.env_method("get_wrapper_attr", "state")[0].flatten(), axis=0)
 
@@ -203,7 +205,8 @@ def get_summed_up_reward_of_env_or_fm_with_predicted_states_of_fm(env, fm_networ
                     get_observation_of_position_and_object_positions(agent_and_object_positions=
                     forward_model_prediction_normal_distribution.mean[0][:-1].cpu().unsqueeze(
                         0), observation_height=observation_height,
-                        observation_width=observation_width).flatten().cpu().numpy(), axis=0)
+                        observation_width=observation_width, agent_size=agent_size, task=task).flatten().cpu().numpy(),
+                    axis=0)
                 # set state in env
                 # environment assumes a numpy array as state
                 copied_env.env_method("set_state", last_observation)
@@ -214,7 +217,9 @@ def get_summed_up_reward_of_env_or_fm_with_predicted_states_of_fm(env, fm_networ
                                                     dtype=torch.float32).detach().clone()
                     # form whole observation to positions
                     last_observation = get_position_and_object_positions_of_observation(last_observation,
-                                                                                        maximum_number_of_objects=maximum_number_of_objects)
+                                                                                        maximum_number_of_objects=maximum_number_of_objects,
+                                                                                        observation_width=observation_width,
+                                                                                        agent_size=agent_size)
 
             # normalize reward
             normalized_reward = normalize_rewards(task=task, absolute_reward=rewards)
@@ -319,12 +324,16 @@ def reward_calculation(env, env_name: str, rewards, prediction_error: float, num
 
 
 def get_position_and_object_positions_of_observation(obs: torch.Tensor,
-                                                     maximum_number_of_objects: int = 5) -> torch.Tensor:
+                                                     maximum_number_of_objects: int = 5,
+                                                     observation_width: int = 12,
+                                                     agent_size: int = 1) -> torch.Tensor:
     """
     Get the position of the agent and up to maximum_number_of_objects objects in the observation.
     Args:
         obs: observation
         maximum_number_of_objects: the number of objects that are considered in the observation
+        observation_width: width of the observation
+        agent_size: size of the agent in the observation
         # FIXME: note, these are the first objects you get, when going down in the obs and going from left to right
         # FIXME: these are not necessary the nearest objects to the agent
 
@@ -345,15 +354,31 @@ def get_position_and_object_positions_of_observation(obs: torch.Tensor,
             else:
                 search_value = 3
             x_y_coordinates = []
-            indices_with_two_or_three = np.where(obs_element.cpu() == search_value)[0]
+
+            if agent_size == 1:
+                indices_with_two_or_three = np.where(obs_element.cpu() == search_value)[0]
+            elif agent_size == 2:
+                # Find indices where three consecutive ones occur
+                indices_with_two_or_three = np.where(
+                    (obs_element.cpu()[:-2] == search_value) & (obs_element.cpu()[1:-1] == search_value) & (
+                            obs_element.cpu()[2:] == search_value))[0]
+                # check if it has an object above
+                indices_with_two_or_three = indices_with_two_or_three[
+                    np.isin(indices_with_two_or_three - 42, indices_with_two_or_three)]
+                # check if it has an object below
+                indices_with_two_or_three = indices_with_two_or_three[
+                    np.isin(indices_with_two_or_three + 42, indices_with_two_or_three)]
+            else:
+                raise ValueError("Agent size not supported.")
 
             for index in indices_with_two_or_three:
                 # break if we have enough objects
                 if current_number_of_objects_in_list >= maximum_number_of_objects:
                     break
                 # get x and y coordinate of object
-                x_coordinate = index % 12
-                y_coordinate = math.floor(index / 12)
+                # +2 because of the walls
+                x_coordinate = index % (observation_width + 2)
+                y_coordinate = math.floor(index / observation_width)
                 x_y_coordinates.append([x_coordinate, y_coordinate])
                 current_number_of_objects_in_list += 1
 
@@ -363,13 +388,12 @@ def get_position_and_object_positions_of_observation(obs: torch.Tensor,
                 current_number_of_objects_in_list += 1
 
             # add agent to object positions
-            x_y_coordinates = [[first_index_with_one % 12, math.floor(first_index_with_one / 12)]] + x_y_coordinates
+            x_y_coordinates = [[first_index_with_one + agent_size - 1, 0]] + x_y_coordinates
             agent_and_object_positions.append(x_y_coordinates)
         else:  # no object in observation
             # add agent to object positions + zeros for objects
-            x_y_coordinates = [[first_index_with_one % 12, math.floor(first_index_with_one / 12)]] + [[0, 0] for i in
-                                                                                                      range(
-                                                                                                          maximum_number_of_objects)]
+            x_y_coordinates = [[first_index_with_one + agent_size - 1, 0]] + [[0, 0] for i in
+                                                                              range(maximum_number_of_objects)]
             agent_and_object_positions.append(x_y_coordinates)
 
     agent_and_object_positions_tensor = torch.flatten(
@@ -430,35 +454,47 @@ def get_next_whole_observation(next_observations: torch.Tensor, actions: torch.T
 
 
 def get_observation_of_position_and_object_positions(agent_and_object_positions: torch.Tensor, observation_height: int,
-                                                     observation_width: int) -> torch.Tensor:
-    # tensor of (1,12)
+                                                     observation_width: int, agent_size: int,
+                                                     task: str) -> torch.Tensor:
+    # tensor of (1,12) or (1, 1260)
     copy_of_agent_and_object_positions = agent_and_object_positions.clone().detach()
     # build empty obs
     matrix = np.zeros(shape=(observation_height, observation_width + 2), dtype=np.int16)
 
+    if task == "dodge":
+        object_value = 3
+    elif task == "collect":
+        object_value = 2
+    else:
+        raise ValueError("Task not supported.")
+
     # add objects
     counter = 2
-    # FIXME: this does not work for envs with odd observation size
     while counter < len(copy_of_agent_and_object_positions[0]):
-        # objects can be predicted in wall but will be overwritten by wall
-        # objects can be predicted in agent but will be overwritten by agent
-        # -> also catches empty objects at position 0,0
-        matrix[
-            max(0,
-                min(int(torch.round(copy_of_agent_and_object_positions[0][counter + 1])), observation_width - 1)), max(
-                0,
-                min(int(torch.round(
-                    copy_of_agent_and_object_positions[
-                        0][
-                        counter])),
-                    observation_width + 1))] = 2
+        x_position_of_object = int(torch.round(copy_of_agent_and_object_positions[0][counter]))
+        if agent_size <= x_position_of_object <= observation_width + 2 - agent_size:
+            matrix[
+            max(0, min(observation_height - (2 * agent_size - 1),
+                       int(torch.round(
+                           copy_of_agent_and_object_positions[0][counter + 1]) - agent_size + 1))):  # y start of object
+            max(2 * agent_size - 2,
+                min(29, int(torch.round(copy_of_agent_and_object_positions[0][counter + 1]) + agent_size - 1))) + 1,
+            # y end of object
+            x_position_of_object - agent_size + 1:  # x start of agent
+            x_position_of_object + agent_size] = object_value  # x end of agent
         counter += 2
 
     # add agent
     # first element is the y position of the agent, second element is the x position of the agent
     matrix[
-        max(0, min(int(torch.round(copy_of_agent_and_object_positions[0][1])), observation_width - 1)), max(1, min(int(
-            torch.round(copy_of_agent_and_object_positions[0][0])), observation_width))] = 1
+    max(0, min(observation_height - (2 * agent_size - 1),
+               int(torch.round(copy_of_agent_and_object_positions[0][1]) - agent_size + 1))):  # y start of agent
+    max(2 * agent_size - 2, min(29, int(torch.round(copy_of_agent_and_object_positions[0][1]) + agent_size - 1))) + 1,
+    # y end of agent
+    max(1, min(observation_width + 2 - (2 * agent_size - 1),
+               int(torch.round(copy_of_agent_and_object_positions[0][0]) - agent_size + 1))):  # x start of agent
+    max(2 * agent_size - 1,
+        min(41, int(torch.round(copy_of_agent_and_object_positions[0][0]) + agent_size - 1))) + 1] = 1  # x end of agent
 
     # add wall
     matrix[:, 0] = -1
@@ -554,6 +590,8 @@ def calculate_prediction_error(env_name: str, env, next_obs, forward_model_predi
     Returns:
         prediction error between the next obs and the forward model prediction
     """
+    observation_width = env.env_method("get_wrapper_attr", "observation_width")[0]
+    agent_size = env.env_method("get_wrapper_attr", "size")[0]
     ##### CALCULATE PREDICTION ERROR #####
     # prediction error version one -> standard deviation
     # prediction_error = forward_normal.stddev.mean().item()
@@ -573,7 +611,9 @@ def calculate_prediction_error(env_name: str, env, next_obs, forward_model_predi
         # we just care for the x position of the moonlander agent, because the y position is always equally to the size of the agent
         # independently of using the whole obs or the position prediction, we use the position predictions to calculate the prediction error
         positions = get_position_and_object_positions_of_observation(next_obs,
-                                                                     maximum_number_of_objects=maximum_number_of_objects)
+                                                                     maximum_number_of_objects=maximum_number_of_objects,
+                                                                     observation_width=observation_width,
+                                                                     agent_size=agent_size)
 
         # Smallest x position of the agent is the size of the agent
         # Biggest x position of the agent is the width of the moonlander world - the size of the agent
@@ -627,6 +667,7 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
     # we decide that the trajectory length is half the observation size of the environment when the prediction error is 0
     observation_height = env.env_method("get_wrapper_attr", "observation_height")[0]
     observation_width = env.env_method("get_wrapper_attr", "observation_width")[0]
+    agent_size = env.env_method("get_wrapper_attr", "size")[0]
     trajectory_length = - (observation_height / 2) * prediction_error + observation_height / 2
 
     last_observation_default = np.expand_dims(env.env_method("get_wrapper_attr", "state")[0].flatten(), axis=0)
@@ -654,7 +695,8 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
             if position_predicting:
                 last_observation_default = get_position_and_object_positions_of_observation(
                     torch.tensor(last_observation_default, device=device),
-                    maximum_number_of_objects=maximum_number_of_objects)
+                    maximum_number_of_objects=maximum_number_of_objects,
+                    observation_width=observation_width, agent_size=agent_size)
             else:
                 last_observation_default = torch.tensor(last_observation_default, device=device,
                                                         dtype=torch.float32).detach().clone()
@@ -667,7 +709,8 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
                     get_observation_of_position_and_object_positions(agent_and_object_positions=
                     forward_model_prediction_normal_distribution_default.mean[0][:-1].cpu().unsqueeze(
                         0), observation_height=observation_height,
-                        observation_width=observation_width).flatten().cpu().numpy(), axis=0)
+                        observation_width=observation_width, agent_size=agent_size, task=task).flatten().cpu().numpy(),
+                    axis=0)
                 rewards_default = np.expand_dims(forward_model_prediction_normal_distribution_default.mean[0][
                                                      -1].cpu().detach().numpy(), axis=0)
             else:
@@ -676,7 +719,8 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
                     get_observation_of_position_and_object_positions(agent_and_object_positions=
                     forward_model_prediction_normal_distribution_default.mean[0].cpu().unsqueeze(
                         0), observation_height=observation_height,
-                        observation_width=observation_width).flatten().cpu().numpy(), axis=0)
+                        observation_width=observation_width, agent_size=agent_size, task=task).flatten().cpu().numpy(),
+                    axis=0)
                 _, rewards_default, done_default, _ = copied_env_default.step(default_action)
 
             # normalize reward
@@ -700,7 +744,8 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
             if position_predicting:
                 last_observation_optimal = get_position_and_object_positions_of_observation(
                     torch.tensor(last_observation_optimal, device=device),
-                    maximum_number_of_objects=maximum_number_of_objects)
+                    maximum_number_of_objects=maximum_number_of_objects,
+                    observation_width=observation_width, agent_size=agent_size)
             else:
                 last_observation_optimal = torch.tensor(last_observation_optimal, device=device,
                                                         dtype=torch.float32).detach().clone()
@@ -713,7 +758,8 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
                     get_observation_of_position_and_object_positions(agent_and_object_positions=
                     forward_model_prediction_normal_distribution_optimal.mean[0][:-1].cpu().unsqueeze(
                         0), observation_height=observation_height,
-                        observation_width=observation_width).flatten().cpu().numpy(), axis=0)
+                        observation_width=observation_width, agent_size=agent_size, task=task).flatten().cpu().numpy(),
+                    axis=0)
                 rewards_optimal = np.expand_dims(forward_model_prediction_normal_distribution_optimal.mean[0][
                                                      -1].cpu().detach().numpy(), axis=0)
             else:
@@ -722,7 +768,8 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
                     get_observation_of_position_and_object_positions(agent_and_object_positions=
                     forward_model_prediction_normal_distribution_optimal.mean[0].cpu().unsqueeze(
                         0), observation_height=observation_height,
-                        observation_width=observation_width).flatten().cpu().numpy(), axis=0)
+                        observation_width=observation_width, agent_size=agent_size, task=task).flatten().cpu().numpy(),
+                    axis=0)
                 _, rewards_optimal, done_optimal, _ = copied_env_optimal.step(actions)
 
             # normalize reward

@@ -1,7 +1,7 @@
 world:
   # Dimensions of the world (width excludes walls)
-  x_width: 10
-  y_height: 100
+  x_width: 40
+  y_height: 500
   # Difficulty (empty, easy, middle, hard) scaling the number of objects and drifts
   difficulty: hard
   # whether ranges where a funnel can possibly occur should be created
@@ -33,9 +33,9 @@ agent:
   # Size of the agent. A size of 1 corresponds to the agent taking up one cell,
   # a size of 2 corresponds to the agent taking up a 3x3 square, etc.
   # Note: Size also affects objects
-  size: 1
+  size: 2
   # Number of cells that the observation contains
-  observation_height: 10
+  observation_height: 30
   # Fixed initial position for testing
   initial_x_position:
 
