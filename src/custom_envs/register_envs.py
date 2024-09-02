@@ -141,7 +141,12 @@ def register_custom_envs():
     #     kwargs=kwargs,
     #     max_episode_steps=700,
     # )
-
+    kwargs = {'reward_type': 'sparse'}
+    register(id="FetchPlaceOnTable-v2",
+             entry_point="custom_envs.fetch.pick_and_place_table:MujocoFetchPickAndPlaceOnTableEnv",
+             kwargs=kwargs,
+             max_episode_steps=50,
+             )
     register(id='Reach1DOF-v0',
              entry_point='custom_envs.reach1dof.reach1dof_env:Reach1DOFEnv',
              max_episode_steps=50)
