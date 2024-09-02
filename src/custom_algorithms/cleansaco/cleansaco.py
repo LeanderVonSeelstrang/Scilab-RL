@@ -123,8 +123,10 @@ def kl_divergence(p, q):
 
 
 class MCNORM:
-    def __init__(self, history_length=400000, max_percentile=94, min_percentile=1):
-        self.rewards = []
+    def __init__(self, history_length=400000, max_percentile=94, min_percentile=1, set_min_norm=0, set_max_norm=1):
+        self.set_min_norm = set_min_norm
+        self.set_max_norm = set_max_norm
+        self.mc_rewards = []
         self.max_percentile = max_percentile
         self.min_percentile = min_percentile
         self.history_length = history_length
@@ -132,17 +134,17 @@ class MCNORM:
     def update(self, value):
         if torch.is_tensor(value):
             value = value.cpu().item()
-        self.rewards.append(value)
+        self.mc_rewards.append(value)
 
-        if len(self.rewards) > self.history_length:
-            self.rewards.pop(0)
+        if len(self.mc_rewards) > self.history_length:
+            self.mc_rewards.pop(0)
 
     def normalize(self, value):
-        if len(self.rewards) == 0:
+        if len(self.mc_rewards) == 0:
             return value
 
-        median = np.median(self.rewards)
-        std_dev = np.std(self.rewards)
+        median = np.median(self.mc_rewards)
+        std_dev = np.std(self.mc_rewards)
 
         if std_dev == 0:
             std_dev = 1e-8
@@ -152,20 +154,20 @@ class MCNORM:
         normalized_value = (value - median) / std_dev
 
         if np.isnan(normalized_value):
-            normalized_value = 0.0
+            normalized_value = self.set_min_norm
 
-        # min_norm = (np.min(self.rewards) - median) / std_dev
-        min_norm = (np.percentile(self.rewards, self.min_percentile) - median) / std_dev  # for symmetry 6, better set it to 0
-        max_norm = (np.percentile(self.rewards, self.max_percentile) - median) / std_dev  # best empirical fit 94
+        # min_norm = (np.min(self.mc_rewards) - median) / std_dev
+        min_norm = (np.percentile(self.mc_rewards, self.min_percentile) - median) / std_dev  # for symmetry 6, better set it to 0
+        max_norm = (np.percentile(self.mc_rewards, self.max_percentile) - median) / std_dev  # best empirical fit 94
 
         # Avoid potential NaNs
         if np.isnan(min_norm) or np.isnan(max_norm) or min_norm == max_norm:
-            return 0
+            return self.set_min_norm
 
         if normalized_value > max_norm:
-            return 1
+            return self.set_max_norm
         if normalized_value < min_norm:
-            return 0
+            return self.set_min_norm
 
         # Scale and shift to the range [-1, 0]
         scaled_value = (normalized_value - min_norm) * (1 / (max_norm - min_norm))
@@ -174,6 +176,8 @@ class MCNORM:
 
         if np.isnan(scaled_value):
             scaled_value = 0 # -1.0
+
+        scaled_value = scaled_value * (self.set_max_norm - self.set_min_norm) + self.set_min_norm
 
         return scaled_value
 
@@ -261,7 +265,9 @@ class CLEANSACO:
             mc_alpha: float = 0.5,
             max_percentile: float = 94,
             min_percentile: float = 1,
-            mc_lr=0.0003
+            mc_lr=0.0003,
+            set_min_norm=0,
+            set_max_norm=1
     ):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -281,7 +287,8 @@ class CLEANSACO:
         self.mc_lr = mc_lr
         self.mc_alpha = mc_alpha  # Weight for the MC reward
         self.mc_normalizer = MCNORM(max_percentile=self.max_percentile,
-                                    min_percentile=self.min_percentile)
+                                    min_percentile=self.min_percentile,
+                                    set_min_norm=set_min_norm, set_max_norm=set_max_norm)
 
         self.env = env
         if isinstance(self.env.action_space, spaces.Box):
