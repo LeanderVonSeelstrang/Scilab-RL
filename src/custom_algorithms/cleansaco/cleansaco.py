@@ -154,7 +154,7 @@ class MCNORM:
         normalized_value = (value - median) / std_dev
 
         if np.isnan(normalized_value):
-            normalized_value = self.set_min_norm
+            normalized_value = 0.0
 
         # min_norm = (np.min(self.mc_rewards) - median) / std_dev
         min_norm = (np.percentile(self.mc_rewards, self.min_percentile) - median) / std_dev  # for symmetry 6, better set it to 0

@@ -32,5 +32,5 @@ log_act_step: False
 
 # The normalization bounds for the intrinsic mc-based rewards. 
   They should be the same as the rewards coming from the environment.
-set_min_norm: 0
-set_max_norm: 1
+set_min_norm: -1
+set_max_norm: 0
