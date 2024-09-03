@@ -28,7 +28,8 @@ class MetaEnvPretrained(gym.Env):
         "render_fps": 10,
     }
 
-    def __init__(self, dodge_list_of_object_dict_lists: List[Dict] = None,
+    def __init__(self, dodge_best_model_name: str, collect_best_model_name: str,
+                 dodge_list_of_object_dict_lists: List[Dict] = None,
                  collect_list_of_object_dict_lists: List[Dict] = None):
         self.ROOT_DIR = "."
         config_path_dodge_asteroids = os.path.join(os.path.dirname(os.path.realpath(__file__)), "standard_config.yaml")
@@ -59,7 +60,7 @@ class MetaEnvPretrained(gym.Env):
         self.action_space = gym.spaces.Discrete(2)
 
         ### OBSERVATION SPACE ###
-        # 10x12 grid for each task
+        # 10x12 or 30x42 grid for each task
         self.y_position_of_agent = agent_config["size"]
         self.following_observations_size = min(
             agent_config["observation_height"],
@@ -82,7 +83,7 @@ class MetaEnvPretrained(gym.Env):
         # FIXME: this is an ugly hack to load the trained agents
         with open(
                 os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                             "../../../policies/dodge_best_fm_23_08_rl_model_best"), "rb"
+                             f"../../../policies/{dodge_best_model_name}"), "rb"
         ) as file:
             print("start loading agents", file)
             self.trained_dodge_asteroids = CLEANPPOFM.load(path=file,
@@ -91,7 +92,7 @@ class MetaEnvPretrained(gym.Env):
             self.trained_dodge_asteroids.set_logger(logger=self.logger)
         with open(
                 os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                             "../../../policies/collect_best_fm_23_08_rl_model_best"), "rb"
+                             f"../../../policies/{collect_best_model_name}"), "rb"
         ) as file:
             # same model cannot be loaded twice -> copy does also not work
             self.trained_collect_asteroids = CLEANPPOFM.load(path=file,
@@ -124,7 +125,8 @@ class MetaEnvPretrained(gym.Env):
         # concatenate states (possibly belief states)
         self.current_task = 0
         self.state = np.concatenate(
-            (self.state_of_dodge_asteroids.reshape(10, 12), self.state_of_collect_asteroids.reshape(10, 12)),
+            (self.state_of_dodge_asteroids.reshape(self.observation_height, self.observation_width + 2),
+             self.state_of_collect_asteroids.reshape(self.observation_height, self.observation_width + 2)),
             axis=1,
         ).flatten()
 
@@ -134,7 +136,7 @@ class MetaEnvPretrained(gym.Env):
         # for rendering
         plt.ion()
         self.fig, self.ax = plt.subplots()
-        eximg = np.zeros((10, 24))
+        eximg = np.zeros((self.observation_height, self.observation_width * 2 + 4))
         eximg[0] = -10
         eximg[1] = 5
         self.im = self.ax.imshow(eximg)
@@ -280,9 +282,12 @@ class MetaEnvPretrained(gym.Env):
                                                                      observation_width=self.observation_width,
                                                                      agent_size=self.agent_size)[0][0])
                 predicted_next_dodge_position = round(
-                    min(max(1, active_belief_state_normal_distribution.mean.cpu().detach().numpy()[0][0]), 10))
+                    min(max(self.agent_size, active_belief_state_normal_distribution.mean.cpu().detach().numpy()[0][0]),
+                        self.observation_width - self.agent_size + 1))
                 predicted_next_collect_position = round(
-                    min(max(1, inactive_belief_state_normal_distribution.mean.cpu().detach().numpy()[0][0]), 10))
+                    min(max(self.agent_size,
+                            inactive_belief_state_normal_distribution.mean.cpu().detach().numpy()[0][0]),
+                        self.observation_width - self.agent_size + 1))
             case 1:
                 # collect task
                 self.state_of_dodge_asteroids = belief_state
@@ -315,8 +320,8 @@ class MetaEnvPretrained(gym.Env):
 
         self.state = np.concatenate(
             (
-                self.state_of_dodge_asteroids.reshape(10, 12),
-                self.state_of_collect_asteroids.reshape(10, 12),
+                self.state_of_dodge_asteroids.reshape(self.observation_height, self.observation_width + 2),
+                self.state_of_collect_asteroids.reshape(self.observation_height, self.observation_width + 2),
             ),
             axis=1,
         ).flatten()
@@ -340,30 +345,29 @@ class MetaEnvPretrained(gym.Env):
         )
 
     def render(self):
-        observation = copy.deepcopy(self.state).reshape(10, 24)
+        observation = copy.deepcopy(self.state).reshape(self.observation_height, self.observation_width * 2 + 4)
         # place frame around current task
         if self.current_task == 0:
             first_fill_value = -10
             second_fill_value = -1
-            row = np.array(
-                [[-10, -10, -10, -10, -10, -10, -10, -10, -10, -10, -10, -10, -10, -10, -1, -1, -1, -1, -1, -1, -1, -1,
-                  -1, -1,
-                  -1, -1, -1, -1]])
+            tmp = np.array([-10, -1])
+            # +2 for walls + 2 for frame
+            row = np.expand_dims(np.repeat(tmp, self.observation_width + 4), axis=0)
         else:
             first_fill_value = -1
             second_fill_value = -10
-            row = np.array(
-                [[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -10, -10, -10, -10, -10, -10, -10, -10,
-                  -10, -10, -10, -10, -10, -10]])
+            tmp = np.array([-1, -10])
+            # +2 for walls + 2 for frame
+            row = np.expand_dims(np.repeat(tmp, self.observation_width + 4), axis=0)
 
         observation = np.concatenate(
             (
-                np.full((10, 1), first_fill_value),
-                observation[:, :12],
-                np.full((10, 1), first_fill_value),
-                np.full((10, 1), second_fill_value),
-                observation[:, 12:],
-                np.full((10, 1), second_fill_value)),
+                np.full((self.observation_height, 1), first_fill_value),
+                observation[:, :self.observation_width + 2],
+                np.full((self.observation_height, 1), first_fill_value),
+                np.full((self.observation_height, 1), second_fill_value),
+                observation[:, self.observation_width + 2:],
+                np.full((self.observation_height, 1), second_fill_value)),
             axis=1)
         observation = np.concatenate((row, observation, row), axis=0)
 
@@ -384,7 +388,8 @@ class MetaEnvPretrained(gym.Env):
         # concatenate states (possibly belief states)
         self.current_task = 0
         self.state = np.concatenate(
-            (self.state_of_dodge_asteroids.reshape(10, 12), self.state_of_collect_asteroids.reshape(10, 12)),
+            (self.state_of_dodge_asteroids.reshape(self.observation_height, self.observation_width + 2),
+             self.state_of_collect_asteroids.reshape(self.observation_height, self.observation_width + 2)),
             axis=1,
         ).flatten()
 

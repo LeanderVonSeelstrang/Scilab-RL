@@ -250,41 +250,58 @@ def register_custom_envs():
              kwargs={'reward_function': 'pos_neg'},
              max_episode_steps=500)
 
-    register(id="MetaEnv-pretrained-v0",
+    register(id="MetaEnv-pretrained-small-v0",
              entry_point="custom_envs.moonlander.meta_env_pretrained:MetaEnvPretrained",
+             kwargs={'dodge_best_model_name': "dodge_best_fm_23_08_rl_model_best",
+                     'collect_best_model_name': "collect_best_fm_23_08_rl_model_best"},
+             max_episode_steps=500)
+    register(id="MetaEnv-pretrained-human-v0",
+             entry_point="custom_envs.moonlander.meta_env_pretrained:MetaEnvPretrained",
+             kwargs={'dodge_best_model_name': "dodge_human_size_hard_rl_model_best",
+                     'collect_best_model_name': "collect_human_size_hard_rl_model_best"},
              max_episode_steps=500)
     register(id="MetaEnv-pretrained-benchmark-small-v0",
              entry_point="custom_envs.moonlander.meta_env_pretrained:MetaEnvPretrained",
-             kwargs={'dodge_list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
-                 "hard_object_list_10_times_10.csv"],
+             kwargs={'dodge_best_model_name': "dodge_best_fm_23_08_rl_model_best",
+                     'collect_best_model_name': "collect_best_fm_23_08_rl_model_best",
+                     'dodge_list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
+                         "hard_object_list_10_times_10.csv"],
                      'collect_list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
                          "hard_object_list_10_times_10_1.csv"]},
              max_episode_steps=500)
     register(id="MetaEnv-pretrained-benchmark-easy-easy-v0",
              entry_point="custom_envs.moonlander.meta_env_pretrained:MetaEnvPretrained",
-             kwargs={'dodge_list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
-                 "dodge_easy_object_list_30_times_40.csv"],
+             kwargs={'dodge_best_model_name': "dodge_human_size_hard_rl_model_best",
+                     'collect_best_model_name': "collect_human_size_hard_rl_model_best",
+                     'dodge_list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
+                         "dodge_easy_object_list_30_times_40.csv"],
                      'collect_list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
                          "collect_easy_object_list_30_times_40.csv"]},
              max_episode_steps=500)
     register(id="MetaEnv-pretrained-benchmark-easy-hard-v0",
              entry_point="custom_envs.moonlander.meta_env_pretrained:MetaEnvPretrained",
-             kwargs={'dodge_list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
-                 "dodge_easy_object_list_30_times_40.csv"],
+             kwargs={'dodge_best_model_name': "dodge_human_size_hard_rl_model_best",
+                     'collect_best_model_name': "collect_human_size_hard_rl_model_best",
+                     'dodge_list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
+                         "dodge_easy_object_list_30_times_40.csv"],
                      'collect_list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
                          "collect_hard_object_list_30_times_40.csv"]},
              max_episode_steps=500)
     register(id="MetaEnv-pretrained-benchmark-hard-easy-v0",
              entry_point="custom_envs.moonlander.meta_env_pretrained:MetaEnvPretrained",
-             kwargs={'dodge_list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
-                 "dodge_hard_object_list_30_times_40.csv"],
+             kwargs={'dodge_best_model_name': "dodge_human_size_hard_rl_model_best",
+                     'collect_best_model_name': "collect_human_size_hard_rl_model_best",
+                     'dodge_list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
+                         "dodge_hard_object_list_30_times_40.csv"],
                      'collect_list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
                          "collect_easy_object_list_30_times_40.csv"]},
              max_episode_steps=500)
     register(id="MetaEnv-pretrained-benchmark-hard-hard-v0",
              entry_point="custom_envs.moonlander.meta_env_pretrained:MetaEnvPretrained",
-             kwargs={'dodge_list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
-                 "dodge_hard_object_list_30_times_40.csv"],
+             kwargs={'dodge_best_model_name': "dodge_human_size_hard_rl_model_best",
+                     'collect_best_model_name': "collect_human_size_hard_rl_model_best",
+                     'dodge_list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
+                         "dodge_hard_object_list_30_times_40.csv"],
                      'collect_list_of_object_dict_lists': dict_of_filename_to_object_dict_list[
                          "collect_hard_object_list_30_times_40.csv"]},
              max_episode_steps=500)

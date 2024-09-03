@@ -324,7 +324,9 @@ def reward_calculation(env, env_name: str, rewards, prediction_error: float, num
 
 
 def get_position_and_object_positions_of_observation(obs: torch.Tensor,
-                                                     maximum_number_of_objects: int = 5,
+                                                     # FIXME: sometimes the default value is used and we cannot use the value defined in the yaml file
+                                                     # quickfix: change here the number to 5 (for small environments) and to 10 (for human environments)
+                                                     maximum_number_of_objects: int = 10,
                                                      observation_width: int = 12,
                                                      agent_size: int = 1) -> torch.Tensor:
     """
