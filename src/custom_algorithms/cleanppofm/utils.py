@@ -472,29 +472,34 @@ def get_observation_of_position_and_object_positions(agent_and_object_positions:
     counter = 2
     while counter < len(copy_of_agent_and_object_positions[0]):
         x_position_of_object = int(torch.round(copy_of_agent_and_object_positions[0][counter]))
-        if agent_size <= x_position_of_object <= observation_width + 2 - agent_size:
+        if agent_size <= x_position_of_object <= observation_width + 1 - agent_size:
             matrix[
             max(0, min(observation_height - (2 * agent_size - 1),
                        int(torch.round(
                            copy_of_agent_and_object_positions[0][counter + 1]) - agent_size + 1))):  # y start of object
-            max(2 * agent_size - 2,
-                min(29, int(torch.round(copy_of_agent_and_object_positions[0][counter + 1]) + agent_size - 1))) + 1,
-            # y end of object
-            x_position_of_object - agent_size + 1:  # x start of agent
-            x_position_of_object + agent_size] = object_value  # x end of agent
+            max(2 * agent_size - 2, min(observation_height - 1, int(torch.round(
+                copy_of_agent_and_object_positions[0][counter + 1]) + agent_size - 1))) + 1,  # y end of object
+            x_position_of_object - agent_size + 1:  # x start of object
+            x_position_of_object + agent_size] = object_value  # x end of object
         counter += 2
 
     # add agent
+    x_position_of_agent = int(torch.round(copy_of_agent_and_object_positions[0][0]))
+    # make sure that the agent is within the matrix
+    if x_position_of_agent < agent_size:
+        x_position_of_agent = agent_size
+    elif x_position_of_agent > observation_width + 1 - agent_size:
+        x_position_of_agent = observation_width + 1 - agent_size
+
     # first element is the y position of the agent, second element is the x position of the agent
     matrix[
     max(0, min(observation_height - (2 * agent_size - 1),
                int(torch.round(copy_of_agent_and_object_positions[0][1]) - agent_size + 1))):  # y start of agent
-    max(2 * agent_size - 2, min(29, int(torch.round(copy_of_agent_and_object_positions[0][1]) + agent_size - 1))) + 1,
+    max(2 * agent_size - 2,
+        min(observation_height - 1, int(torch.round(copy_of_agent_and_object_positions[0][1]) + agent_size - 1))) + 1,
     # y end of agent
-    max(1, min(observation_width + 2 - (2 * agent_size - 1),
-               int(torch.round(copy_of_agent_and_object_positions[0][0]) - agent_size + 1))):  # x start of agent
-    max(2 * agent_size - 1,
-        min(41, int(torch.round(copy_of_agent_and_object_positions[0][0]) + agent_size - 1))) + 1] = 1  # x end of agent
+    x_position_of_agent - agent_size + 1:  # x start of agent
+    x_position_of_agent + agent_size] = 1  # x end of agent
 
     # add wall
     matrix[:, 0] = -1
