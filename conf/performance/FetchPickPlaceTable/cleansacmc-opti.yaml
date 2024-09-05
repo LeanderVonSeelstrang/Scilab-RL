@@ -22,12 +22,14 @@ algorithm:
   set_min_norm: -1
   set_max_norm: 0
   action_scale_factor: 1.0
-  learning_rate: 0.0002
-  gamma: 0.91
-  tau: 0.007
-  replay_buffer_kwargs:
-    n_sampled_goal: 4
-    goal_selection_strategy: 'future'
+  learning_rate: !!float 1e-3
+  ent_coef: auto
+  buffer_size: 1_000_000
+  learning_starts: 100
+  batch_size: 2048
+  gamma: 0.95
+  tau: 0.05
+  n_critics: 2
 
 hydra:
   sweeper:
