@@ -18,7 +18,7 @@ render_metrics_test: ['eval/rollout_rewards_step', 'mc/i_reward', 'mc/kld', 'act
 render_frames_per_clip: 200
 
 algorithm:
-  name: 'cleansac'
+  name: 'cleansacmc'
   learning_rate: 0.00023
   ent_coef: auto
   buffer_size: 1_000_000
