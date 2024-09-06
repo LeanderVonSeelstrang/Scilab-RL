@@ -19,8 +19,8 @@ render_frames_per_clip: 200
 
 algorithm:
   use_her: True
-  set_min_norm: -1
-  set_max_norm: 0
+  set_min_norm: 0
+  set_max_norm: 1
   learning_rate: 0.00023
   ent_coef: auto
   buffer_size: 1_000_000
