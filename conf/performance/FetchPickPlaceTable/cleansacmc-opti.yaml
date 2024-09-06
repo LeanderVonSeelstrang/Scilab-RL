@@ -4,7 +4,7 @@ defaults:
   - override /algorithm: cleansacmc
 
 n_epochs: 100
-eval_after_n_steps: 4000
+eval_after_n_steps: 2000
 early_stop_threshold: 0.6
 early_stop_data_column: 'eval/success_rate'
 hyperopt_criterion: 'train/rollout_rewards_mean'
@@ -21,15 +21,14 @@ algorithm:
   use_her: True
   set_min_norm: -1
   set_max_norm: 0
-  action_scale_factor: 1.0
-  learning_rate: !!float 1e-3
+  learning_rate: 0.00023
   ent_coef: auto
   buffer_size: 1_000_000
   learning_starts: 100
-  batch_size: 2048
-  gamma: 0.95
-  tau: 0.05
-  n_critics: 2
+  batch_size: 256
+  gamma: 0.915
+  tau: 0.078
+  n_critics: 1
 
 hydra:
   sweeper:
