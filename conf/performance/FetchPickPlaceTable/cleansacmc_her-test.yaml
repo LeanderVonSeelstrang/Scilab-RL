@@ -29,6 +29,7 @@ algorithm:
   use_her: True
   n_critics: 1
   mc_alpha: 0.2
+  action_scale_factor: 1.0
 performance_testing_conditions:
   # In 2 out of 3 tests, the eval/success rate should be at least 0.7 after 20k steps.
 

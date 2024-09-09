@@ -29,6 +29,7 @@ algorithm:
   gamma: 0.915
   tau: 0.078
   n_critics: 1
+  action_scale_factor: 1.0
 
 hydra:
   sweeper:
