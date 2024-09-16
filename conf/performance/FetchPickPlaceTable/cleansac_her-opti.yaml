@@ -3,9 +3,9 @@
 defaults:
   - override /algorithm: cleansac
 
-n_epochs: 100
+n_epochs: 50
 eval_after_n_steps: 4000
-early_stop_threshold: 0.6
+early_stop_threshold: 0.8
 early_stop_data_column: 'eval/success_rate'
 hyperopt_criterion: 'train/rollout_rewards_mean'
 
