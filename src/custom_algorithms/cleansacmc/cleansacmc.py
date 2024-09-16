@@ -232,6 +232,8 @@ class ActionOnlyModel(nn.Module):
 class CLEANSACMC:
     """
     A one-file version of SAC derived from both the CleanRL and stable-baselines3 versions of SAC.
+    This version is extended with morphological computation as intrinsic reward
+    in the scope of the MS-thesis by Omar Baiazid and, therefore, called SACMC.
     :param env: The Gym environment to learn from
     :param learning_rate: learning rate for adam optimizer,
         the same learning rate will be used for all networks (Q-Values, Actor and Value function)

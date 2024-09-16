@@ -19,15 +19,15 @@ render_frames_per_clip: 200
 
 algorithm:
   name: 'cleansac'
-  learning_rate: 0.00023
+  learning_rate: !!float 1e-3
   ent_coef: auto
   buffer_size: 1_000_000
   learning_starts: 100
-  batch_size: 256
-  gamma: 0.915
-  tau: 0.078
+  batch_size: 2048
+  gamma: 0.95
+  tau: 0.05
   use_her: True
-  n_critics: 1
+  n_critics: 2
   action_scale_factor: 1.0
 
 performance_testing_conditions:
