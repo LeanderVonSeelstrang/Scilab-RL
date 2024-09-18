@@ -196,6 +196,7 @@ class MetaEnvPretrained(gym.Env):
         # get position and object positions of observation
         active_agent_and_object_positions_tensor = get_position_and_object_positions_of_observation(
             torch.tensor(active_last_state, device=device), observation_width=self.observation_width,
+            maximum_number_of_objects=active_model.maximum_number_of_objects,
             agent_size=self.agent_size)
         # forward model predictions once with state and action
         active_belief_state_normal_distribution = active_model.fm_network(active_agent_and_object_positions_tensor,
@@ -213,6 +214,7 @@ class MetaEnvPretrained(gym.Env):
         # get position and object positions of observation
         inactive_agent_and_object_positions_tensor = get_position_and_object_positions_of_observation(
             torch.tensor(inactive_last_state, device=device), observation_width=self.observation_width,
+            maximum_number_of_objects=inactive_model.maximum_number_of_objects,
             agent_size=self.agent_size)
         # forward model predictions once with state and action to get next belief state
         inactive_belief_state_normal_distribution = inactive_model.fm_network(
@@ -276,10 +278,12 @@ class MetaEnvPretrained(gym.Env):
                 next_dodge_position = int(
                     get_position_and_object_positions_of_observation(torch.tensor(new_state, device=device),
                                                                      observation_width=self.observation_width,
+                                                                     maximum_number_of_objects=active_model.maximum_number_of_objects,
                                                                      agent_size=self.agent_size)[0][0])
                 next_collect_position = int(
                     get_position_and_object_positions_of_observation(torch.tensor(belief_state, device=device),
                                                                      observation_width=self.observation_width,
+                                                                     maximum_number_of_objects=inactive_model.maximum_number_of_objects,
                                                                      agent_size=self.agent_size)[0][0])
                 predicted_next_dodge_position = round(
                     min(max(self.agent_size, active_belief_state_normal_distribution.mean.cpu().detach().numpy()[0][0]),
@@ -306,10 +310,12 @@ class MetaEnvPretrained(gym.Env):
                 next_dodge_position = int(
                     get_position_and_object_positions_of_observation(torch.tensor(belief_state, device=device),
                                                                      observation_width=self.observation_width,
+                                                                     maximum_number_of_objects=inactive_model.maximum_number_of_objects,
                                                                      agent_size=self.agent_size)[0][0])
                 next_collect_position = int(
                     get_position_and_object_positions_of_observation(torch.tensor(new_state, device=device),
                                                                      observation_width=self.observation_width,
+                                                                     maximum_number_of_objects=active_model.maximum_number_of_objects,
                                                                      agent_size=self.agent_size)[0][0])
                 predicted_next_dodge_position = round(
                     min(max(1, inactive_belief_state_normal_distribution.mean.cpu().detach().numpy()[0][0]), 10))
