@@ -1,3 +1,4 @@
+
 # @package _global_
 # Changes specified in this config should be interpreted as relative to the _global_ package.
 defaults:
@@ -11,10 +12,12 @@ hyperopt_criterion: 'train/rollout_rewards_mean'
 
 env: 'FetchPlaceOnTable-v2'
 
-render: 'record' # 'display', 'record', or anything else for neither one
+render: 'none' # 'display', 'record', or anything else for neither one
 render_freq: 5
-render_metrics_train: ['train/rollout_rewards_step',  'mc/i_reward', 'mc/kld', 'actor_entropy']
-render_metrics_test: ['eval/rollout_rewards_step', 'mc/i_reward', 'mc/kld', 'actor_entropy']
+#render_metrics_train: ['train/rollout_rewards_step',  'mc/i_reward', 'mc/kld', 'actor_entropy']
+#render_metrics_test: ['eval/rollout_rewards_step', 'mc/i_reward', 'mc/kld', 'actor_entropy']
+render_metrics_train: []
+render_metrics_test: []
 render_frames_per_clip: 200
 
 algorithm:
