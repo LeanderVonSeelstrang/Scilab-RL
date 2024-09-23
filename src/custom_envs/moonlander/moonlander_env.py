@@ -957,24 +957,45 @@ class MoonlanderWorldEnv(Env):
             self.rendering_first_time = False
         # FIXME: this is hardcoded for our custom moonlander env
         if self.forward_model_prediction is not None:
-            # tensor of (1,12)
-            copy_of_forward_model_prediction = copy.deepcopy(self.forward_model_prediction)
+            # tensor of (1,12) or (1, 1260)
+            copy_of_forward_model_prediction = copy.deepcopy(self.forward_model_prediction)[0]
             # build empty obs
-            matrix = np.zeros(shape=(10, 10 + 2), dtype=np.int16)
-
-            # add agent
-            # first element is the y position of the agent, second element is the x position of the agent
-            matrix[max(0, min(int(copy_of_forward_model_prediction[0][1]), 9)), max(1, min(int(
-                copy_of_forward_model_prediction[0][0]), 10))] = 1
+            matrix = np.zeros(shape=(self.observation_height, self.observation_width + 2), dtype=np.int16)
 
             # add objects
             counter = 2
-            while counter < len(copy_of_forward_model_prediction[0]):
-                # objects can be predicted in wall but will be overwritten by wall
-                # -> also catches empty objects at position 0,0
-                matrix[max(0, min(int(copy_of_forward_model_prediction[0][counter + 1]), 9)), max(0, min(int(
-                    copy_of_forward_model_prediction[0][counter]), 11))] = 2
+            while counter < len(copy_of_forward_model_prediction):
+                x_position_of_object = int(torch.round(copy_of_forward_model_prediction[counter]))
+                if self.size <= x_position_of_object <= self.observation_width + 1 - self.size:
+                    matrix[
+                    max(0, min(self.observation_height - (2 * self.size - 1),
+                               int(torch.round(
+                                   copy_of_forward_model_prediction[
+                                       counter + 1]) - self.size + 1))):  # y start of object
+                    max(2 * self.size - 2, min(self.observation_height - 1, int(torch.round(
+                        copy_of_forward_model_prediction[counter + 1]) + self.size - 1))) + 1,  # y end of object
+                    x_position_of_object - self.size + 1:  # x start of object
+                    x_position_of_object + self.size] = 2  # x end of object
                 counter += 2
+
+            # add agent
+            x_position_of_agent = int(torch.round(copy_of_forward_model_prediction[0]))
+            # make sure that the agent is within the matrix
+            if x_position_of_agent < self.size:
+                x_position_of_agent = self.size
+            elif x_position_of_agent > self.observation_width + 1 - self.size:
+                x_position_of_agent = self.observation_width + 1 - self.size
+
+            # first element is the y position of the agent, second element is the x position of the agent
+            matrix[
+            max(0, min(self.observation_height - (2 * self.size - 1),
+                       int(torch.round(copy_of_forward_model_prediction[1]) - self.size + 1))):  # y start of agent
+            max(2 * self.size - 2,
+                min(self.observation_height - 1,
+                    int(torch.round(copy_of_forward_model_prediction[1]) + self.size - 1))) + 1,
+            # y end of agent
+            x_position_of_agent - self.size + 1:  # x start of agent
+            x_position_of_agent + self.size] = 1  # x end of agent
 
             # add wall
             matrix[:, 0] = -1
