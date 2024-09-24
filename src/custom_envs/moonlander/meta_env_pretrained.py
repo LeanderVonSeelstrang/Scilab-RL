@@ -195,7 +195,9 @@ class MetaEnvPretrained(gym.Env):
         action_of_task_agent, _, _ = active_model.predict(active_last_state, deterministic=True)
         # get position and object positions of observation
         active_agent_and_object_positions_tensor = get_position_and_object_positions_of_observation(
-            torch.tensor(active_last_state, device=device), observation_width=self.observation_width,
+            torch.tensor(active_last_state, device=device),
+            observation_width=self.observation_width,
+            observation_height=self.observation_height,
             maximum_number_of_objects=active_model.maximum_number_of_objects,
             agent_size=self.agent_size)
         # forward model predictions once with state and action
@@ -213,7 +215,9 @@ class MetaEnvPretrained(gym.Env):
         _, _, inactive_is_done, inactive_info = inactive_model.env.step(torch.tensor([1], device=device))
         # get position and object positions of observation
         inactive_agent_and_object_positions_tensor = get_position_and_object_positions_of_observation(
-            torch.tensor(inactive_last_state, device=device), observation_width=self.observation_width,
+            torch.tensor(inactive_last_state, device=device),
+            observation_width=self.observation_width,
+            observation_height=self.observation_height,
             maximum_number_of_objects=inactive_model.maximum_number_of_objects,
             agent_size=self.agent_size)
         # forward model predictions once with state and action to get next belief state
@@ -278,11 +282,13 @@ class MetaEnvPretrained(gym.Env):
                 next_dodge_position = int(
                     get_position_and_object_positions_of_observation(torch.tensor(new_state, device=device),
                                                                      observation_width=self.observation_width,
+                                                                     observation_height=self.observation_height,
                                                                      maximum_number_of_objects=active_model.maximum_number_of_objects,
                                                                      agent_size=self.agent_size)[0][0])
                 next_collect_position = int(
                     get_position_and_object_positions_of_observation(torch.tensor(belief_state, device=device),
                                                                      observation_width=self.observation_width,
+                                                                     observation_height=self.observation_height,
                                                                      maximum_number_of_objects=inactive_model.maximum_number_of_objects,
                                                                      agent_size=self.agent_size)[0][0])
                 predicted_next_dodge_position = round(
@@ -310,11 +316,13 @@ class MetaEnvPretrained(gym.Env):
                 next_dodge_position = int(
                     get_position_and_object_positions_of_observation(torch.tensor(belief_state, device=device),
                                                                      observation_width=self.observation_width,
+                                                                     observation_height=self.observation_height,
                                                                      maximum_number_of_objects=inactive_model.maximum_number_of_objects,
                                                                      agent_size=self.agent_size)[0][0])
                 next_collect_position = int(
                     get_position_and_object_positions_of_observation(torch.tensor(new_state, device=device),
                                                                      observation_width=self.observation_width,
+                                                                     observation_height=self.observation_height,
                                                                      maximum_number_of_objects=active_model.maximum_number_of_objects,
                                                                      agent_size=self.agent_size)[0][0])
                 predicted_next_dodge_position = round(

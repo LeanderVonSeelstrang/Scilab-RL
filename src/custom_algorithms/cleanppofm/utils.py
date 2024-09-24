@@ -219,6 +219,7 @@ def get_summed_up_reward_of_env_or_fm_with_predicted_states_of_fm(env, fm_networ
                     last_observation = get_position_and_object_positions_of_observation(last_observation,
                                                                                         maximum_number_of_objects=maximum_number_of_objects,
                                                                                         observation_width=observation_width,
+                                                                                        observation_height=observation_height,
                                                                                         agent_size=agent_size)
 
             # normalize reward
@@ -327,7 +328,8 @@ def get_position_and_object_positions_of_observation(obs: torch.Tensor,
                                                      # FIXME: sometimes the default value is used and we cannot use the value defined in the yaml file
                                                      # quickfix: change here the number to 5 (for small environments) and to 10 (for human environments)
                                                      maximum_number_of_objects: int = 10,
-                                                     observation_width: int = 12,
+                                                     observation_width: int = 10,
+                                                     observation_height: int = 10,
                                                      agent_size: int = 1) -> torch.Tensor:
     """
     Get the position of the agent and up to maximum_number_of_objects objects in the observation.
@@ -365,11 +367,18 @@ def get_position_and_object_positions_of_observation(obs: torch.Tensor,
                     (obs_element.cpu()[:-2] == search_value) & (obs_element.cpu()[1:-1] == search_value) & (
                             obs_element.cpu()[2:] == search_value))[0]
                 # check if it has an object above
-                indices_with_two_or_three = indices_with_two_or_three[
-                    np.isin(indices_with_two_or_three - 42, indices_with_two_or_three)]
-                # check if it has an object below
-                indices_with_two_or_three = indices_with_two_or_three[
-                    np.isin(indices_with_two_or_three + 42, indices_with_two_or_three)]
+                mask = (
+                        (np.isin(indices_with_two_or_three - (observation_width + 2), indices_with_two_or_three)
+                         & np.isin(indices_with_two_or_three + (observation_width + 2), indices_with_two_or_three))
+                        | (indices_with_two_or_three < observation_width + 2
+                           & np.isin(indices_with_two_or_three + (observation_width + 2), indices_with_two_or_three,
+                                     invert=True))
+                        | ((observation_width + 2 >= indices_with_two_or_three)
+                           & (indices_with_two_or_three < (observation_width + 2) * 2)
+                           & np.isin(indices_with_two_or_three - (observation_width + 2), indices_with_two_or_three))
+                        | (indices_with_two_or_three >= (observation_width + 2) * (observation_height - 1))
+                )
+                indices_with_two_or_three = indices_with_two_or_three[mask]
             else:
                 raise ValueError("Agent size not supported.")
 
@@ -379,8 +388,9 @@ def get_position_and_object_positions_of_observation(obs: torch.Tensor,
                     break
                 # get x and y coordinate of object
                 # +2 because of the walls
-                x_coordinate = index % (observation_width + 2)
-                y_coordinate = math.floor(index / observation_width)
+                x_coordinate = (index % (observation_width + 2)) + agent_size - 1
+                # get to the middle of the object
+                y_coordinate = math.floor(index / (observation_width + 2))
                 x_y_coordinates.append([x_coordinate, y_coordinate])
                 current_number_of_objects_in_list += 1
 
@@ -390,12 +400,13 @@ def get_position_and_object_positions_of_observation(obs: torch.Tensor,
                 current_number_of_objects_in_list += 1
 
             # add agent to object positions
-            x_y_coordinates = [[first_index_with_one + agent_size - 1, 0]] + x_y_coordinates
+            x_y_coordinates = [[first_index_with_one + agent_size - 1, agent_size - 1]] + x_y_coordinates
             agent_and_object_positions.append(x_y_coordinates)
         else:  # no object in observation
             # add agent to object positions + zeros for objects
-            x_y_coordinates = [[first_index_with_one + agent_size - 1, 0]] + [[0, 0] for i in
-                                                                              range(maximum_number_of_objects)]
+            x_y_coordinates = [[first_index_with_one + agent_size - 1, agent_size - 1]] + [[0, 0] for i in
+                                                                                           range(
+                                                                                               maximum_number_of_objects)]
             agent_and_object_positions.append(x_y_coordinates)
 
     agent_and_object_positions_tensor = torch.flatten(
@@ -553,7 +564,9 @@ def get_next_observation_gridworld(observations: torch.Tensor, actions: torch.Te
     return agent_location_without_input_noise
 
 
-def get_next_position_observation_moonlander(observations: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
+def get_next_position_observation_moonlander(observations: torch.Tensor, actions: torch.Tensor, observation_width: int,
+                                             observation_height: int, agent_size: int,
+                                             maximum_number_of_objects: int) -> torch.Tensor:
     """
     Calculate the next observation in the moonlander environment manually to exclude random observations through input noise.
     Args:
@@ -571,12 +584,12 @@ def get_next_position_observation_moonlander(observations: torch.Tensor, actions
         # index[0] is agent x position
         # apply action to agent x position
         next_observation_without_input_noise[index][0] += (actions[index] - 1)
-        # clip to range of 1 to 10
-        next_observation_without_input_noise[index][0] = torch.clamp(next_observation_without_input_noise[index][0], 1,
-                                                                     10)
+        # clip to range of agent_size to observation_width
+        next_observation_without_input_noise[index][0] = torch.clamp(next_observation_without_input_noise[index][0],
+                                                                     agent_size, observation_width - agent_size + 1)
 
         # check if there is an object that already is on position 0 -> removed
-        while counter < 10:
+        while counter < (maximum_number_of_objects * 2):
             if not next_observation_without_input_noise[index][counter] == 0 and \
                     next_observation_without_input_noise[index][counter + 1] == 0:
                 next_observation_without_input_noise[index][counter] = 0
@@ -585,8 +598,12 @@ def get_next_position_observation_moonlander(observations: torch.Tensor, actions
 
         # apply step to every y position (agent and objects)
         next_observation_without_input_noise[index][1::2] -= 1
-        next_observation_without_input_noise[index][1::2] = torch.clamp(
-            next_observation_without_input_noise[index][1::2], 0, 10)
+        # clip agent (cannot go out of the grid)
+        next_observation_without_input_noise[index][1] = torch.clamp(
+            next_observation_without_input_noise[index][1], agent_size - 1, observation_height - agent_size)
+        # clip objects (can be at y position zero, when they go out of the grid)
+        next_observation_without_input_noise[index][3::2] = torch.clamp(
+            next_observation_without_input_noise[index][3::2], 0, observation_height - agent_size)
 
     return next_observation_without_input_noise
 
@@ -606,6 +623,7 @@ def calculate_prediction_error(env_name: str, env, next_obs, forward_model_predi
         prediction error between the next obs and the forward model prediction
     """
     observation_width = env.env_method("get_wrapper_attr", "observation_width")[0]
+    observation_height = env.env_method("get_wrapper_attr", "observation_height")[0]
     agent_size = env.env_method("get_wrapper_attr", "size")[0]
     ##### CALCULATE PREDICTION ERROR #####
     # prediction error version one -> standard deviation
@@ -628,6 +646,7 @@ def calculate_prediction_error(env_name: str, env, next_obs, forward_model_predi
         positions = get_position_and_object_positions_of_observation(next_obs,
                                                                      maximum_number_of_objects=maximum_number_of_objects,
                                                                      observation_width=observation_width,
+                                                                     observation_height=observation_height,
                                                                      agent_size=agent_size)
 
         # Smallest x position of the agent is the size of the agent
@@ -711,7 +730,7 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
                 last_observation_default = get_position_and_object_positions_of_observation(
                     torch.tensor(last_observation_default, device=device),
                     maximum_number_of_objects=maximum_number_of_objects,
-                    observation_width=observation_width, agent_size=agent_size)
+                    observation_width=observation_width, observation_height=observation_height, agent_size=agent_size)
             else:
                 last_observation_default = torch.tensor(last_observation_default, device=device,
                                                         dtype=torch.float32).detach().clone()
@@ -760,7 +779,7 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
                 last_observation_optimal = get_position_and_object_positions_of_observation(
                     torch.tensor(last_observation_optimal, device=device),
                     maximum_number_of_objects=maximum_number_of_objects,
-                    observation_width=observation_width, agent_size=agent_size)
+                    observation_width=observation_width, observation_height=observation_height, agent_size=agent_size)
             else:
                 last_observation_optimal = torch.tensor(last_observation_optimal, device=device,
                                                         dtype=torch.float32).detach().clone()

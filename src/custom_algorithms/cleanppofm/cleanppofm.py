@@ -555,14 +555,20 @@ class CLEANPPOFM:
             observations = get_position_and_object_positions_of_observation(observations,
                                                                             maximum_number_of_objects=self.maximum_number_of_objects,
                                                                             observation_width=observation_width,
+                                                                            observation_height=observation_height,
                                                                             agent_size=agent_size)
             if not self.fm_trained_with_input_noise:
                 next_observations_formatted = get_next_position_observation_moonlander(observations=observations,
-                                                                                       actions=actions)
+                                                                                       actions=actions,
+                                                                                       observation_width=observation_width,
+                                                                                       observation_height=observation_height,
+                                                                                       agent_size=agent_size,
+                                                                                       maximum_number_of_objects=self.maximum_number_of_objects)
             else:
                 next_observations_formatted = get_position_and_object_positions_of_observation(next_observations,
                                                                                                maximum_number_of_objects=self.maximum_number_of_objects,
                                                                                                observation_width=observation_width,
+                                                                                               observation_height=observation_height,
                                                                                                agent_size=agent_size)
             if self.reward_predicting:
                 next_observations_formatted = torch.cat((next_observations_formatted, rewards), dim=1)

@@ -22,9 +22,13 @@ def train_fm(observations: torch.Tensor, actions: torch.Tensor, rewards: torch.T
 
     """
     observations = get_position_and_object_positions_of_observation(observations,
-                                                                    maximum_number_of_objects=maximum_number_of_objects)
+                                                                    maximum_number_of_objects=maximum_number_of_objects,
+                                                                    observation_width=40, observation_height=30,
+                                                                    agent_size=2)
     next_observations_formatted = get_next_position_observation_moonlander(observations=observations,
-                                                                           actions=actions)
+                                                                           actions=actions, observation_width=40,
+                                                                           observation_height=30, agent_size=2,
+                                                                           maximum_number_of_objects=10)
     if reward_predicting:
         next_observations_formatted = torch.cat((next_observations_formatted, rewards.unsqueeze(1)), dim=1)
 

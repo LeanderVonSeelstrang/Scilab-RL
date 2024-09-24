@@ -8,7 +8,8 @@ import torch
 from stable_baselines3.common import base_class
 from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv, VecMonitor, is_vecenv_wrapped
 
-from custom_algorithms.cleanppofm.utils import get_position_and_object_positions_of_observation
+from custom_algorithms.cleanppofm.utils import get_position_and_object_positions_of_observation, \
+    get_observation_of_position_and_object_positions
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -106,9 +107,11 @@ def evaluate_policy(
         actions, states, forward_normal = model.predict(observations, state=states, deterministic=deterministic)
         # for logging: get last position, predicted position and new position
         observation_width = env.env_method("get_wrapper_attr", "observation_width")[0]
+        observation_height = env.env_method("get_wrapper_attr", "observation_height")[0]
         agent_size = env.env_method("get_wrapper_attr", "size")[0]
         position = get_position_and_object_positions_of_observation(obs=torch.tensor(observations),
                                                                     observation_width=observation_width,
+                                                                    observation_height=observation_height,
                                                                     agent_size=agent_size)[0][0]
         predicted_x_position = min(max(1, forward_normal.mean.cpu().detach().numpy()[0][0]), 10)
         expected_new_positon = min(max(1, position + (actions[0] - 1)), 10)
@@ -119,6 +122,7 @@ def evaluate_policy(
 
         new_position = get_position_and_object_positions_of_observation(torch.tensor(observations),
                                                                         observation_width=observation_width,
+                                                                        observation_height=observation_height,
                                                                         agent_size=agent_size)[0][0]
 
         if model.reward_predicting:
@@ -300,7 +304,77 @@ def evaluate_policy_meta_agent(
             episode_start=episode_starts,
             deterministic=deterministic,
         )
+
+        ### evaluate the forward model
+        observation_width = env.env_method("get_wrapper_attr", "observation_width")[0]
+        observation_height = env.env_method("get_wrapper_attr", "observation_height")[0]
+        agent_size = env.env_method("get_wrapper_attr", "agent_size")[0]
+
+        last_observations = np.array([])
+        if actions[0] == 0:
+            for i in range(0, observation_height * 2, 2):
+                last_observations = np.concatenate(
+                    (last_observations, observations[0][i * (observation_width + 2):(i + 1) * (observation_width + 2)]),
+                    axis=0)
+            trained_agent = env.env_method("get_wrapper_attr", "trained_dodge_asteroids")[0]
+            task = "dodge"
+        else:
+            for i in range(1, observation_height * 2 + 1, 2):
+                last_observations = np.concatenate(
+                    (last_observations, observations[0][i * (observation_width + 2):(i + 1) * (observation_width + 2)]),
+                    axis=0)
+            trained_agent = env.env_method("get_wrapper_attr", "trained_collect_asteroids")[0]
+            task = "collect"
+
+        last_observations = np.expand_dims(last_observations, axis=0)
+        last_observations = get_position_and_object_positions_of_observation(
+            obs=torch.tensor(last_observations, device=device),
+            # fixme: not hardcoded
+            maximum_number_of_objects=10,
+            observation_width=observation_width,
+            observation_height=observation_height,
+            agent_size=agent_size)
+
+        forward_model = trained_agent.fm_network
+        # tensor (1, 22) & tensor (1, 1)
+        forward_model_prediction = forward_model(last_observations, torch.tensor([actions]).float())
+
+        # belief_state = get_observation_of_position_and_object_positions(agent_and_object_positions=
+        #                                                                 forward_model_prediction.mean[
+        #                                                                     0][:-1].cpu().unsqueeze(0),
+        #                                                                 observation_height=30,
+        #                                                                 observation_width=40,
+        #                                                                 agent_size=2,
+        #                                                                 task=task).flatten().cpu().numpy()
+        # belief_state = np.expand_dims(belief_state, 0)
         new_observations, rewards, dones, infos = env.step(actions)
+
+        new_observations_current_task = np.array([])
+        if actions[0] == 0:
+            for i in range(0, observation_height * 2, 2):
+                new_observations_current_task = np.concatenate(
+                    (new_observations_current_task,
+                     new_observations[0][i * (observation_width + 2):(i + 1) * (observation_width + 2)]),
+                    axis=0)
+        else:
+            for i in range(1, observation_height * 2 + 1, 2):
+                new_observations_current_task = np.concatenate(
+                    (new_observations_current_task,
+                     new_observations[0][i * (observation_width + 2):(i + 1) * (observation_width + 2)]),
+                    axis=0)
+
+        new_observations_current_task = np.expand_dims(new_observations_current_task, axis=0)
+        positions_of_new_observation = \
+            get_position_and_object_positions_of_observation(
+                obs=torch.tensor(new_observations_current_task, device=device),
+                # fixme: not hardcoded
+                maximum_number_of_objects=10,
+                observation_width=observation_width,
+                observation_height=observation_height,
+                agent_size=agent_size)
+
+        print("forward_model_prediction", torch.round(forward_model_prediction.mean))
+        print("positions_of_new_observation", positions_of_new_observation)
 
         ### custom code
         # EXAMPLE INFOS:
