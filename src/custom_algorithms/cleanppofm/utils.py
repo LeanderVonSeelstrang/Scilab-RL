@@ -366,17 +366,20 @@ def get_position_and_object_positions_of_observation(obs: torch.Tensor,
                 indices_with_two_or_three = np.where(
                     (obs_element.cpu()[:-2] == search_value) & (obs_element.cpu()[1:-1] == search_value) & (
                             obs_element.cpu()[2:] == search_value))[0]
-                # check if it has an object above
                 mask = (
+                    # check if there is a line above
                         (np.isin(indices_with_two_or_three - (observation_width + 2), indices_with_two_or_three)
+                         # and check if there is a line below
                          & np.isin(indices_with_two_or_three + (observation_width + 2), indices_with_two_or_three))
-                        | (indices_with_two_or_three < observation_width + 2
-                           & np.isin(indices_with_two_or_three + (observation_width + 2), indices_with_two_or_three,
-                                     invert=True))
-                        | ((observation_width + 2 >= indices_with_two_or_three)
-                           & (indices_with_two_or_three < (observation_width + 2) * 2)
-                           & np.isin(indices_with_two_or_three - (observation_width + 2), indices_with_two_or_three))
-                        | (indices_with_two_or_three >= (observation_width + 2) * (observation_height - 1))
+                        # otherwise check if the object is flying out of the grid (index in first line & not an object line two rows below)
+                        | ((indices_with_two_or_three < observation_width + 2)
+                           & (np.isin(indices_with_two_or_three + ((observation_width + 2) * 2),
+                                      indices_with_two_or_three,
+                                      invert=True)))
+                        # otherwise check if the object is flying into the grid (index in last line) & not two lines above (then it is covered above)
+                        | ((indices_with_two_or_three >= (observation_width + 2) * (observation_height - 1))
+                           & (np.isin(indices_with_two_or_three - ((observation_width + 2) * 2),
+                                      indices_with_two_or_three, invert=True)))
                 )
                 indices_with_two_or_three = indices_with_two_or_three[mask]
             else:
