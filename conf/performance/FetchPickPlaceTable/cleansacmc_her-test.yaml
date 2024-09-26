@@ -29,6 +29,8 @@ algorithm:
   use_her: True
   n_critics: 2
   action_scale_factor: 1.0
+  set_min_norm: -1
+  set_max_norm: 0
   mc_alpha: 0.2
 
 performance_testing_conditions:
