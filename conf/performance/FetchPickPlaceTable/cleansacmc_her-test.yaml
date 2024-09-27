@@ -36,7 +36,7 @@ algorithm:
 performance_testing_conditions:
   # In 2 out of 3 tests, the eval/success rate should be at least 0.7 after 20k steps.
 
-  total_runs: 3 # How many runs in total:
+  total_runs: 5 # How many runs in total:
 
   succ_runs: 2 # This number of runs should meet the conditions:
 
@@ -48,6 +48,6 @@ performance_testing_conditions:
 
 hydra:
   sweeper:
-    n_jobs: 3
+    n_jobs: 5
     _target_: hydra_plugins.hydra_custom_optuna_sweeper.performance_testing_sweeper.PerformanceTestingSweeper
     study_name: cleansacmc_her_PickPlaceTable-test
