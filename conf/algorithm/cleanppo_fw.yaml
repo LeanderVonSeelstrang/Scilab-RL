@@ -1,0 +1,24 @@
+name: 'cleanppo_fw'
+learning_rate: 3e-4
+n_steps: 2048
+batch_size: 64 # The batch size for the training
+n_epochs: 10 # These are the training epochs for the neural network training, not the rollout epochs (these are in main.yaml)
+gamma: 0.99
+gae_lambda: 0.95
+clip_range: 0.2
+clip_range_vf: null
+normalize_advantage: true
+ent_coef: 0.0
+vf_coef: 0.5
+max_grad_norm: 0.5
+
+fwd:
+  #  Parameters for the forward model
+  hidden_size: 128
+  n_hidden_layers : 2
+  activation_func : 'relu'  # can be 'relu', 'tanh' or 'logistic'
+  loss_func : 'l2'  # for deterministic models, use l2; for probabilisticMLE model use nll. You can implement your desired loss in src.utils.forward_models.py
+  fw_batch_size : 256
+  fw_learning_rate : 0.0001
+  retrain_every_n_steps : 1  # can be set to 1 for algos that already train only in every k'th step (like for example cleanppo)
+  model_save_path : 'your/path/here'
