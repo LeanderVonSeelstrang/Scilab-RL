@@ -108,7 +108,7 @@ fwd:
 
 ```
 
-### Forward model parameters
+### Forward model configuration
 
 1. hidden_size: Number of neurons in each hidden layer.
 2. n_hidden_layers: Numer of hidden layers.
@@ -320,4 +320,56 @@ If you want to save your forward model for later usage, you can do so by filling
         return self
 ```
 
-# Functionalities of pre-implemented forward models
+# Functionalities of implemented forward models
+
+Scilabrl currently implements two fully connected multi-layer perceptron (MLP) classes:
+
+1. `DeterministicForwardModel` is a point estimator for the next observation.
+2. `ProbabilisticForwardMLENetwork` learns the paramenters `mu` and `theta` of a normal distribution over the predicted next observation.
+
+## Training
+
+The models have a `train` method, that expects an optimizer and a dataloader as input:
+
+```
+def train(self, optimizer: torch.optim.Optimizer, dataloader: torch.utils.data.DataLoader):
+    """
+    Trains the model using the provided optimizer and dataloader.
+
+    Parameters:
+    -----------
+    optimizer : torch.optim.Optimizer
+        The optimizer to be used for training (e.g., Adam, SGD).
+    dataloader : torch.utils.data.DataLoader
+        A PyTorch dataloader providing batches of input data and target labels.
+    epochs : int
+        The number of training epochs to run.
+
+    Returns:
+    --------
+    None
+    """
+```
+
+## Inference
+
+The models can be used for inference after training. Since they are trained to predict the difference `next_observation - observation`, instead of predicting the `next_observation` directly, you should use the models `predict` method for inference. Do not use the result of a forward pass through the network for inference!
+
+```
+def predict(self, observation: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+    """
+    Predicts the next observation based on the given observation and action.
+
+    Parameters:
+    -----------
+    observation : torch.Tensor
+        A tensor representing the current observation (state) of the environment.
+    action : torch.Tensor
+        A tensor representing the action taken in the current state.
+
+    Returns:
+    --------
+    torch.Tensor
+        A tensor representing the predicted next observation (next state).
+    """
+```
