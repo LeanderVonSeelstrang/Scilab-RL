@@ -85,7 +85,8 @@ class CLEANPPOFM:
             number_of_future_steps: int = 10,
             fm_trained_with_input_noise: bool = True,
             input_noise_on: bool = False,
-            maximum_number_of_objects: int = 5
+            maximum_number_of_objects: int = 5,
+            model_based: bool = False
     ):
         if fm_parameters is None:
             fm_parameters = {}
@@ -162,6 +163,8 @@ class CLEANPPOFM:
         self.input_noise_on = input_noise_on
         # maximal number of objects considered in the forward model
         self.maximum_number_of_objects = maximum_number_of_objects
+        # boolean if the forward model is used for selecting the next action of the RL agent
+        self.model_based = model_based
         # prediction error of the prediction of the forward model and the actual next observation
         self.soc = 1
 
@@ -207,7 +210,8 @@ class CLEANPPOFM:
             gae_lambda=self.gae_lambda,
             n_envs=self.n_envs,
         )
-        self.policy = Agent(self.env).to(device)
+        self.policy = Agent(env=self.env, reward_predicting=self.reward_predicting, model_based=self.model_based).to(
+            device)
         self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=self.learning_rate, eps=1e-5)
 
     def train(self) -> None:

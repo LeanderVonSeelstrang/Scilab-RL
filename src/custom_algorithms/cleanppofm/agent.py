@@ -4,7 +4,8 @@ import torch.nn as nn
 from gymnasium import spaces
 from torch.distributions.categorical import Categorical
 from stable_baselines3.common.logger import Logger
-from custom_algorithms.cleanppofm.utils import flatten_obs, layer_init, get_position_and_object_positions_of_observation
+from custom_algorithms.cleanppofm.utils import flatten_obs, layer_init, \
+    get_position_and_object_positions_of_observation, get_observation_of_position_and_object_positions
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -14,13 +15,17 @@ class Agent(nn.Module):
     Agent class for the PPO algorithm. The agent has a critic and an actor network. It only works with discrete actions.
     """
 
-    def __init__(self, env) -> None:
+    def __init__(self, env, reward_predicting: bool, model_based: bool = False) -> None:
         """
         Initialize the agent
         Args:
             env: using env for the observation space and action space size
         """
         super().__init__()
+        self.model_based = model_based
+        self.number_of_actions = env.action_space.n
+        self.reward_predicting = reward_predicting
+
         # this is implemented for the gridworld envs
         if isinstance(env.observation_space, spaces.Dict):
             obs_shape = np.sum([obs_space.shape for obs_space in env.observation_space.spaces.values()])
@@ -29,6 +34,8 @@ class Agent(nn.Module):
         else:
             obs_shape = np.array(env.observation_space.shape).prod()
             self.flatten = False
+        if model_based:
+            obs_shape = obs_shape * 4
 
         self.critic = nn.Sequential(
             layer_init(nn.Linear(obs_shape, 64)),
@@ -96,6 +103,37 @@ class Agent(nn.Module):
             else:
                 obs = torch.tensor(obs, device=device, dtype=torch.float32).clone().detach()
 
+        observation_width = self.env.env_method("get_wrapper_attr", "observation_width")[0]
+        observation_height = self.env.env_method("get_wrapper_attr", "observation_height")[0]
+        agent_size = self.env.env_method("get_wrapper_attr", "size")[0]
+        task = self.env.env_method("get_wrapper_attr", "task")[0]
+
+        if self.model_based:
+            # Use fm
+            comb_obs = obs.clone().detach()
+            comb_obj_positions = get_position_and_object_positions_of_observation(comb_obs,
+                                                                                  maximum_number_of_objects=maximum_number_of_objects)
+
+            # Convert comb_obj_positions to a tensor
+            cop_tensor = torch.tensor(comb_obj_positions).float()
+
+            obs_after_every_action = comb_obs.clone().detach()
+
+            for i in range(0, self.number_of_actions):
+                current_action = torch.full((cop_tensor.shape[0], 1), i)
+                network_result_action = fm_network(cop_tensor, current_action)
+                nra_mean = network_result_action.mean
+                if self.reward_predicting:
+                    nra_mean = nra_mean[:, :-1]
+                obs_after_action = get_observation_of_position_and_object_positions(
+                    # :-1 to remove reward prediction of obs
+                    agent_and_object_positions=nra_mean,
+                    observation_height=observation_height,
+                    observation_width=observation_width,
+                    agent_size=agent_size, task=task)
+                obs_after_every_action = torch.cat((obs_after_every_action, obs_after_action), dim=1)
+            obs = obs_after_every_action
+
         ##### PREDICT NEXT ACTION #####
         # obs is a tensor
         # get the mean of each action (discrete) from the actor network
@@ -132,9 +170,6 @@ class Agent(nn.Module):
         # formal_normal_action in form of tensor([[action]])
         # get position of last state out of the observation --> moonlander specific implementation
         if position_predicting:
-            observation_width = self.env.env_method("get_wrapper_attr", "observation_width")[0]
-            observation_height = self.env.env_method("get_wrapper_attr", "observation_height")[0]
-            agent_size = self.env.env_method("get_wrapper_attr", "size")[0]
             positions = get_position_and_object_positions_of_observation(obs,
                                                                          maximum_number_of_objects=maximum_number_of_objects,
                                                                          observation_width=observation_width,
