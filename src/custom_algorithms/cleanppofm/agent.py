@@ -107,12 +107,20 @@ class Agent(nn.Module):
         observation_height = self.env.env_method("get_wrapper_attr", "observation_height")[0]
         agent_size = self.env.env_method("get_wrapper_attr", "size")[0]
         task = self.env.env_method("get_wrapper_attr", "task")[0]
+        obs_for_agent = obs.clone().detach()
 
         if self.model_based:
+            if not position_predicting:
+                raise ValueError("Model based agent needs position predicting")
+
+            action_to_prediction_dict = {}
             # Use fm
             comb_obs = obs.clone().detach()
             comb_obj_positions = get_position_and_object_positions_of_observation(comb_obs,
-                                                                                  maximum_number_of_objects=maximum_number_of_objects)
+                                                                                  maximum_number_of_objects=maximum_number_of_objects,
+                                                                                  observation_width=observation_width,
+                                                                                  observation_height=observation_height,
+                                                                                  agent_size=agent_size)
 
             # Convert comb_obj_positions to a tensor
             cop_tensor = torch.tensor(comb_obj_positions).float()
@@ -122,23 +130,23 @@ class Agent(nn.Module):
             for i in range(0, self.number_of_actions):
                 current_action = torch.full((cop_tensor.shape[0], 1), i)
                 network_result_action = fm_network(cop_tensor, current_action)
+                action_to_prediction_dict[str(i)] = network_result_action
                 nra_mean = network_result_action.mean
                 if self.reward_predicting:
                     nra_mean = nra_mean[:, :-1]
                 obs_after_action = get_observation_of_position_and_object_positions(
-                    # :-1 to remove reward prediction of obs
                     agent_and_object_positions=nra_mean,
                     observation_height=observation_height,
                     observation_width=observation_width,
                     agent_size=agent_size, task=task)
                 obs_after_every_action = torch.cat((obs_after_every_action, obs_after_action), dim=1)
-            obs = obs_after_every_action
+            obs_for_agent = obs_after_every_action
 
         ##### PREDICT NEXT ACTION #####
         # obs is a tensor
         # get the mean of each action (discrete) from the actor network
         # e.g. a tensor of size (1, 8) for each of the 8 discrete actions in the gridworld envs
-        action_mean = self.actor_mean(obs)
+        action_mean = self.actor_mean(obs_for_agent)
 
         # create a categorical distribution from the mean of the actions
         # e.g. a tensor of size (1, 8) for the probability of each of 8 discrete actions in the gridworld envs
@@ -170,12 +178,16 @@ class Agent(nn.Module):
         # formal_normal_action in form of tensor([[action]])
         # get position of last state out of the observation --> moonlander specific implementation
         if position_predicting:
-            positions = get_position_and_object_positions_of_observation(obs,
-                                                                         maximum_number_of_objects=maximum_number_of_objects,
-                                                                         observation_width=observation_width,
-                                                                         observation_height=observation_height,
-                                                                         agent_size=agent_size)
-            forward_model_prediction_normal_distribution = fm_network(positions, forward_normal_action.float())
+            # don't predict again and use the prediction above
+            if self.model_based:
+                forward_model_prediction_normal_distribution = action_to_prediction_dict[str(action.item())]
+            else:
+                positions = get_position_and_object_positions_of_observation(obs,
+                                                                             maximum_number_of_objects=maximum_number_of_objects,
+                                                                             observation_width=observation_width,
+                                                                             observation_height=observation_height,
+                                                                             agent_size=agent_size)
+                forward_model_prediction_normal_distribution = fm_network(positions, forward_normal_action.float())
         else:
             forward_model_prediction_normal_distribution = fm_network(obs, forward_normal_action.float())
 
@@ -206,4 +218,4 @@ class Agent(nn.Module):
         # value of critic network, forward model prediction in normal distribution
 
         return action.unsqueeze(0), distribution.log_prob(action), distribution.entropy(), self.critic(
-            obs), forward_model_prediction_normal_distribution
+            obs_for_agent), forward_model_prediction_normal_distribution
