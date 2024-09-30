@@ -373,8 +373,8 @@ def evaluate_policy_meta_agent(
                 observation_height=observation_height,
                 agent_size=agent_size)
 
-        print("forward_model_prediction", torch.round(forward_model_prediction.mean))
-        print("positions_of_new_observation", positions_of_new_observation)
+        # print("forward_model_prediction", torch.round(forward_model_prediction.mean))
+        # print("positions_of_new_observation", positions_of_new_observation)
 
         ### custom code
         # EXAMPLE INFOS:

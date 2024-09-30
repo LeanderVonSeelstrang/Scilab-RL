@@ -257,8 +257,8 @@ def register_custom_envs():
              max_episode_steps=500)
     register(id="MetaEnv-pretrained-human-v0",
              entry_point="custom_envs.moonlander.meta_env_pretrained:MetaEnvPretrained",
-             kwargs={'dodge_best_model_name': "dodge_human_size_hard_rl_model_best",
-                     'collect_best_model_name': "collect_human_size_hard_rl_model_best"},
+             kwargs={'dodge_best_model_name': "dodge_human_27_09_rl_model_best",
+                     'collect_best_model_name': "collect_human_27_09_rl_model_best"},
              max_episode_steps=500)
     register(id="MetaEnv-pretrained-benchmark-small-v0",
              entry_point="custom_envs.moonlander.meta_env_pretrained:MetaEnvPretrained",
