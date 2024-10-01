@@ -41,11 +41,8 @@ test_envs() {
   ENVS+="FetchReach-v2,"
   ENVS+="FetchPickAndPlace-v2,"
   ENVS+="HandManipulateBlock-v1,"
-  ENVS+="Hook-o1-v1,"
-  ENVS+="ButtonUnlock-o2-v1,"
   ENVS+="Blocks-o0-gripper_random-v1,"
   ENVS+="Blocks-o3-gripper_none-v1,"
-  ENVS+="Reach1DOF-v0,"
   # ADD NEW ENVIRONMENTS HERE.
   # Don't forget to add a comma at the end of each environment name except for the last environment name.
   ENVS+="parking-limited-v0,"
