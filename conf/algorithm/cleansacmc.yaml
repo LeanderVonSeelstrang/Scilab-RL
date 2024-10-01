@@ -1,18 +1,36 @@
 name: 'cleansacmc'
 
-learning_rate: 0.001
-gamma: 0.95
-tau: 0.05
-use_her: False
-ent_coef: auto
-n_critics: 1
-hidden_size: 256
-
+learning_rate: 0.0004
+buffer_size: 1_000_000
 learning_starts: 1000
-batch_size: 2048
+batch_size: 1024
+tau: 0.05
+gamma: 0.95
+ent_coef: auto
+use_her: True
+n_critics: 2
+mc_alpha: 0.2 # Scalar of MC Reward # Setting mc_alpha -> a will result in the rest of the reward
+             # to have the scale (1-a)
+max_percentile: 98 # For Kld normalizing to avoid impact of outliers
+min_percentile: 1
+mc_lr: 0.0004
 
-# morphological computation hyperparameters
-mc:
-  learning_rate: 0.001
-  reward_eta: 0.2 # small bonus by default
-  hidden_size: 256
+# Whether to set future expected discounted cumulative reward to what the critic
+# computes or to just set it to 0 if the episode is done. The SB3 implementation sets it to 0 if done,
+# which is equivalent to false, so we set this as default here.
+ignore_dones_for_qvalue: False
+
+# Usually, the action scale is determined by the action space of the environment. Sometimes, however, it is
+# desireable to not max out the full scale and reduce the action intensity. For this purpose,
+# action_scale_factor is multiplied with the action space of the environment.
+action_scale_factor: 0.4 # Adapt to environment. E.g.: 0.4 for Ant/Maze and 1.0 for Fetch environments.
+
+# Whether to log each observation and action dimension in each step. This might slow down everything, but it can help
+# debugging because it logs each action and observation dimension per step. It only holds for training, not for eval.
+log_obs_step: False
+log_act_step: False
+
+# The normalization bounds for the intrinsic mc-based rewards. 
+# They should be the same as the rewards coming from the environment.
+set_min_norm: -1
+set_max_norm: 0
