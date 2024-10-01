@@ -820,18 +820,13 @@ def calculate_difficulty(env, policy, fm_network, logger, env_name: str,
     rounded_summed_up_reward_default = np.round(summed_up_reward_default, 2)
     rounded_summed_up_reward_optimal = np.round(summed_up_reward_optimal, 2)
     # distance between the two trajectories
-    if rounded_summed_up_reward_default == 0 and rounded_summed_up_reward_optimal == 0:
-        # cannot divide by zero
-        # both trajectories are the same
-        difficulty = 1
-    else:
-        difficulty = (min(summed_up_reward_default, summed_up_reward_optimal)) / (
-            max(summed_up_reward_default, summed_up_reward_optimal))
+    difficulty = (max(summed_up_reward_default, summed_up_reward_optimal)) - (
+        min(summed_up_reward_default, summed_up_reward_optimal))
 
     # get a mean reward between 0 and 1
     summed_up_reward_default_normalized = summed_up_reward_default / (max(round(trajectory_length), 1))
-    # difficulty is high if the rewards are quite similar, but difficulty should be the other way around -> 1 - difficulty
-    return 1 - difficulty, summed_up_reward_default_normalized
+    # difficulty is high if the rewards are quite different
+    return difficulty, summed_up_reward_default_normalized
 
 
 def normalize_rewards(task: str, absolute_reward) -> float:
