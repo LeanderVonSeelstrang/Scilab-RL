@@ -309,6 +309,7 @@ def evaluate_policy_meta_agent(
         observation_width = env.env_method("get_wrapper_attr", "observation_width")[0]
         observation_height = env.env_method("get_wrapper_attr", "observation_height")[0]
         agent_size = env.env_method("get_wrapper_attr", "agent_size")[0]
+        maximum_number_of_objects = env.env_method("get_wrapper_attr", "maximum_number_of_objects")[0]
 
         last_observations = np.array([])
         if actions[0] == 0:
@@ -329,8 +330,7 @@ def evaluate_policy_meta_agent(
         last_observations = np.expand_dims(last_observations, axis=0)
         last_observations = get_position_and_object_positions_of_observation(
             obs=torch.tensor(last_observations, device=device),
-            # fixme: not hardcoded
-            maximum_number_of_objects=10,
+            maximum_number_of_objects=maximum_number_of_objects,
             observation_width=observation_width,
             observation_height=observation_height,
             agent_size=agent_size)
