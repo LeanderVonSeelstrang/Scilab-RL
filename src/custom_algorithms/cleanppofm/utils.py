@@ -585,8 +585,11 @@ def get_next_position_observation_moonlander(observations: torch.Tensor, actions
         # first two elements are agent x and y position
         counter = 2
         # index[0] is agent x position
-        # apply action to agent x position
-        next_observation_without_input_noise[index][0] += (actions[index] - 1)
+        # apply action to agent x position (actions: 0, 1, 2)
+        # action_movement is -1 to go left, 0 to stay and 1 to go right for agent size 1
+        # for agent size 2 it is -2, 0, 2
+        # for agent size 3 it is -3, 0, 3 ...
+        next_observation_without_input_noise[index][0] += (agent_size * actions[index] - agent_size)
         # clip to range of agent_size to observation_width
         next_observation_without_input_noise[index][0] = torch.clamp(next_observation_without_input_noise[index][0],
                                                                      agent_size, observation_width - agent_size + 1)
