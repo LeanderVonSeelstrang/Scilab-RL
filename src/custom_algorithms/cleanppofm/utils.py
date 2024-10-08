@@ -399,7 +399,7 @@ def get_position_and_object_positions_of_observation(obs: torch.Tensor,
                 # remove agent from indices with two or three --> agent is added later at the beginning of the list
                 if not (x_coordinate == (first_index_with_one + agent_size - 1) and y_coordinate == (agent_size - 1)):
                     x_y_coordinates.append([x_coordinate, y_coordinate])
-                current_number_of_objects_in_list += 1
+                    current_number_of_objects_in_list += 1
 
             # add zeros to the list if we have not enough objects
             while current_number_of_objects_in_list < maximum_number_of_objects:
