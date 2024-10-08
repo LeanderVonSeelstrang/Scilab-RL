@@ -15,8 +15,8 @@ np.set_printoptions(threshold=sys.maxsize)
 
 from custom_algorithms.cleanppofm.cleanppofm import CLEANPPOFM
 from custom_algorithms.cleanppofm.utils import get_summed_up_reward_of_env_or_fm_with_predicted_states_of_fm, \
-    get_position_and_object_positions_of_observation, \
-    get_observation_of_position_and_object_positions
+    get_position_and_object_positions_of_observation, get_observation_of_position_and_object_positions, \
+    get_next_position_observation_moonlander
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -202,14 +202,30 @@ class MetaEnvPretrained(gym.Env):
             maximum_number_of_objects=active_model.maximum_number_of_objects,
             agent_size=self.agent_size)
         # forward model predictions once with state and action
-        active_belief_state_normal_distribution = active_model.fm_network(active_agent_and_object_positions_tensor,
-                                                                          torch.tensor([action_of_task_agent]).float())
+        # active_belief_state_normal_distribution = active_model.fm_network(active_agent_and_object_positions_tensor,
+        #                                                                   torch.tensor([action_of_task_agent]).float())
+        # FIXME: hardcoded forward model prediction
+        active_gold_label = get_next_position_observation_moonlander(
+            observations=active_agent_and_object_positions_tensor,
+            actions=action_of_task_agent,
+            observation_width=self.observation_width,
+            observation_height=self.observation_height,
+            agent_size=self.agent_size,
+            maximum_number_of_objects=self.maximum_number_of_objects)
+        # form to normal distribution
+        active_gold_label = torch.distributions.Normal(active_gold_label,
+                                                       scale=torch.tensor(
+                                                           [[1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.,
+                                                             1., 1., 1., 1., 1., 1., 1., 1.]]))
         # perform action & SoC calculation & reward estimation corrected by SoC
         new_state, active_reward, active_is_done, active_info, active_prediction_error, active_difficulty, active_SoC, active_reward_estimation_corrected_by_SoC, input_noise = active_model.step_in_env(
             actions=torch.tensor(action_of_task_agent).float(),
-            forward_normal=active_belief_state_normal_distribution)
+            # forward_normal=active_belief_state_normal_distribution)
+            forward_normal=active_gold_label)
 
         ### INACTIVE TASK ###
+        # set input noise to zero
+        inactive_model.env.env_method("set_input_noise", 0)
         # perform default action 1 in inactive task
         # only four return value because DummyVecEnv only returns observation, reward, done, info
         # but meta agent does not see actual state and reward
@@ -222,13 +238,27 @@ class MetaEnvPretrained(gym.Env):
             maximum_number_of_objects=inactive_model.maximum_number_of_objects,
             agent_size=self.agent_size)
         # forward model predictions once with state and action to get next belief state
-        inactive_belief_state_normal_distribution = inactive_model.fm_network(
-            inactive_agent_and_object_positions_tensor,
-            torch.tensor([[1]]).float())
+        # inactive_belief_state_normal_distribution = inactive_model.fm_network(
+        #     inactive_agent_and_object_positions_tensor,
+        #     torch.tensor([[1]]).float())
+        # FIXME: hardcoded forward model prediction
+        inactive_gold_label = get_next_position_observation_moonlander(
+            observations=inactive_agent_and_object_positions_tensor,
+            actions=torch.tensor([1]),
+            observation_width=self.observation_width,
+            observation_height=self.observation_height,
+            agent_size=self.agent_size,
+            maximum_number_of_objects=self.maximum_number_of_objects)
+        # form to normal distribution
+        inactive_gold_label = torch.distributions.Normal(inactive_gold_label,
+                                                         scale=torch.tensor(
+                                                             [[1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.,
+                                                               1., 1., 1., 1., 1., 1., 1., 1.]]))
         # get new inactive state from forward model
         belief_state = get_observation_of_position_and_object_positions(agent_and_object_positions=
-                                                                        inactive_belief_state_normal_distribution.mean[
-                                                                            0][:-1].cpu().unsqueeze(0),
+                                                                        # inactive_belief_state_normal_distribution.mean[
+                                                                        #     0][:-1].cpu().unsqueeze(0),
+                                                                        inactive_gold_label.mean,
                                                                         observation_height=self.observation_height,
                                                                         observation_width=self.observation_width,
                                                                         agent_size=self.agent_size,
@@ -245,8 +275,9 @@ class MetaEnvPretrained(gym.Env):
             env=inactive_model.env,
             fm_network=inactive_model.fm_network,
             last_observation=
-            inactive_belief_state_normal_distribution.mean[
-                0][:-1].unsqueeze(0),
+            # inactive_belief_state_normal_distribution.mean[
+            #     0][:-1].unsqueeze(0),
+            inactive_gold_label.mean,
             reward_from_env=True,
             env_name="MoonlanderWorldEnv",
             position_predicting=True,
@@ -293,11 +324,13 @@ class MetaEnvPretrained(gym.Env):
                                                                      maximum_number_of_objects=inactive_model.maximum_number_of_objects,
                                                                      agent_size=self.agent_size)[0][0])
                 predicted_next_dodge_position = round(
-                    min(max(self.agent_size, active_belief_state_normal_distribution.mean.cpu().detach().numpy()[0][0]),
+                    # min(max(self.agent_size, active_belief_state_normal_distribution.mean.cpu().detach().numpy()[0][0]),
+                    min(max(self.agent_size, active_gold_label.mean.cpu().detach().numpy()[0][0]),
                         self.observation_width - self.agent_size + 1))
                 predicted_next_collect_position = round(
                     min(max(self.agent_size,
-                            inactive_belief_state_normal_distribution.mean.cpu().detach().numpy()[0][0]),
+                            # inactive_belief_state_normal_distribution.mean.cpu().detach().numpy()[0][0]),
+                            inactive_gold_label.mean.cpu().detach().numpy()[0][0]),
                         self.observation_width - self.agent_size + 1))
             case 1:
                 # collect task
@@ -327,9 +360,11 @@ class MetaEnvPretrained(gym.Env):
                                                                      maximum_number_of_objects=active_model.maximum_number_of_objects,
                                                                      agent_size=self.agent_size)[0][0])
                 predicted_next_dodge_position = round(
-                    min(max(1, inactive_belief_state_normal_distribution.mean.cpu().detach().numpy()[0][0]), 10))
+                    # min(max(1, inactive_belief_state_normal_distribution.mean.cpu().detach().numpy()[0][0]), 10))
+                    min(max(1, inactive_gold_label.mean.cpu().detach().numpy()[0][0]), 10))
                 predicted_next_collect_position = round(
-                    min(max(1, active_belief_state_normal_distribution.mean.cpu().detach().numpy()[0][0]), 10))
+                    # min(max(1, active_belief_state_normal_distribution.mean.cpu().detach().numpy()[0][0]), 10))
+                    min(max(1, active_gold_label.mean.cpu().detach().numpy()[0][0]), 10))
             case _:
                 raise ValueError("action must be 0, 1")
 
