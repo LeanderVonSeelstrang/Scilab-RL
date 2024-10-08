@@ -364,8 +364,10 @@ def get_position_and_object_positions_of_observation(obs: torch.Tensor,
             elif agent_size == 2:
                 # Find indices where three consecutive ones occur
                 indices_with_two_or_three = np.where(
-                    (obs_element.cpu()[:-2] == search_value) & (obs_element.cpu()[1:-1] == search_value) & (
-                            obs_element.cpu()[2:] == search_value))[0]
+                    ((obs_element.cpu()[:-2] == search_value) | (obs_element.cpu()[:-2] == 1))
+                    & ((obs_element.cpu()[1:-1] == search_value) | (obs_element.cpu()[1:-1] == 1))
+                    & ((obs_element.cpu()[2:] == search_value) | (obs_element.cpu()[2:] == 1))
+                )[0]
                 mask = (
                     # check if there is a line above
                         (np.isin(indices_with_two_or_three - (observation_width + 2), indices_with_two_or_three)
@@ -394,7 +396,9 @@ def get_position_and_object_positions_of_observation(obs: torch.Tensor,
                 x_coordinate = (index % (observation_width + 2)) + agent_size - 1
                 # get to the middle of the object
                 y_coordinate = math.floor(index / (observation_width + 2))
-                x_y_coordinates.append([x_coordinate, y_coordinate])
+                # remove agent from indices with two or three --> agent is added later at the beginning of the list
+                if not (x_coordinate == (first_index_with_one + agent_size - 1) and y_coordinate == (agent_size - 1)):
+                    x_y_coordinates.append([x_coordinate, y_coordinate])
                 current_number_of_objects_in_list += 1
 
             # add zeros to the list if we have not enough objects
