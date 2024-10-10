@@ -67,10 +67,12 @@ class MetaEnvPretrained(gym.Env):
             int(world_config["y_height"] - self.y_position_of_agent + 1),
         )
         self.observation_space = gym.spaces.Box(
-            low=-10,
-            high=5,
+            low=0,
+            high=2,
             shape=(
-                self.following_observations_size * (world_config["x_width"] + 2) * 2,
+                # self.following_observations_size * (world_config["x_width"] + 2) * 2,
+                # (self.following_observations_size * (world_config["x_width"] + 2) * 2) + 6,
+                6,
             ),
             dtype=np.int64,
         )
@@ -125,14 +127,18 @@ class MetaEnvPretrained(gym.Env):
 
         # concatenate states (possibly belief states)
         self.current_task = 0
-        self.state = np.concatenate(
-            (self.state_of_dodge_asteroids.reshape(self.observation_height, self.observation_width + 2),
-             self.state_of_collect_asteroids.reshape(self.observation_height, self.observation_width + 2)),
-            axis=1,
-        ).flatten()
+        # self.state = np.concatenate(
+        #     (self.state_of_dodge_asteroids.reshape(self.observation_height, self.observation_width + 2),
+        #      self.state_of_collect_asteroids.reshape(self.observation_height, self.observation_width + 2)),
+        #     axis=1,
+        # ).flatten()
 
         self.SoC_dodge = 1
         self.SoC_collect = 1
+
+        # add SoC_dodge, SoC_collect, reward_dodge, reward_collect, task_action, meta_action
+        # self.state = np.append(self.state, [self.SoC_dodge, self.SoC_collect, 0, 0, 0, 0])
+        self.state = np.array([self.SoC_dodge, self.SoC_collect, 0, 0, 0, 0])
 
         # for rendering
         plt.ion()
@@ -368,13 +374,20 @@ class MetaEnvPretrained(gym.Env):
             case _:
                 raise ValueError("action must be 0, 1")
 
-        self.state = np.concatenate(
-            (
-                self.state_of_dodge_asteroids.reshape(self.observation_height, self.observation_width + 2),
-                self.state_of_collect_asteroids.reshape(self.observation_height, self.observation_width + 2),
-            ),
-            axis=1,
-        ).flatten()
+        # self.state = np.concatenate(
+        #     (
+        #         self.state_of_dodge_asteroids.reshape(self.observation_height, self.observation_width + 2),
+        #         self.state_of_collect_asteroids.reshape(self.observation_height, self.observation_width + 2),
+        #     ),
+        #     axis=1,
+        # ).flatten()
+
+        # numpy array (2520,) + SoC_dodge + SoC_collect + reward_dodge + reward_collect + task_action + meta_action
+        # self.state = np.append(self.state,
+        #                        [self.SoC_dodge, self.SoC_collect, reward_dodge, reward_collect, action_of_task_agent,
+        #                         action])
+        self.state = np.array(
+            [self.SoC_dodge, self.SoC_collect, reward_dodge, reward_collect, action_of_task_agent, action])
 
         self.step_counter += 1
         info = {"info_dodge": info_dodge, "info_collect": info_collect, "reward_dodge": reward_dodge,
@@ -395,6 +408,7 @@ class MetaEnvPretrained(gym.Env):
         )
 
     def render(self):
+        # FIXME: not implemented for obs with SoC, reward, task_action, meta_action
         observation = copy.deepcopy(self.state).reshape(self.observation_height, self.observation_width * 2 + 4)
         # place frame around current task
         if self.current_task == 0:
@@ -437,14 +451,18 @@ class MetaEnvPretrained(gym.Env):
 
         # concatenate states (possibly belief states)
         self.current_task = 0
-        self.state = np.concatenate(
-            (self.state_of_dodge_asteroids.reshape(self.observation_height, self.observation_width + 2),
-             self.state_of_collect_asteroids.reshape(self.observation_height, self.observation_width + 2)),
-            axis=1,
-        ).flatten()
+        # self.state = np.concatenate(
+        #     (self.state_of_dodge_asteroids.reshape(self.observation_height, self.observation_width + 2),
+        #      self.state_of_collect_asteroids.reshape(self.observation_height, self.observation_width + 2)),
+        #     axis=1,
+        # ).flatten()
 
         self.SoC_dodge = 1
         self.SoC_collect = 1
+
+        # add SoC_dodge, SoC_collect, reward_dodge, reward_collect, task_action, meta_action
+        # self.state = np.append(self.state, [self.SoC_dodge, self.SoC_collect, 0, 0, 0, 0])
+        self.state = np.array([self.SoC_dodge, self.SoC_collect, 0, 0, 0, 0])
 
         # counter
         self.episode_counter += 1
