@@ -297,6 +297,14 @@ def evaluate_policy_meta_agent(
     observations = env.reset()
     states = None
     episode_starts = np.ones((env.num_envs,), dtype=bool)
+
+    ### from me
+    current_number_of_crashed_objects = np.zeros(n_envs, dtype="int")
+    current_number_of_collected_objects = np.zeros(n_envs, dtype="int")
+    episode_number_of_crashed_objects = []
+    episode_number_of_collected_objects = []
+    ###
+
     while (episode_counts < episode_count_targets).any():
         actions, states = model.predict(
             observations,  # type: ignore[arg-type]
@@ -405,9 +413,9 @@ def evaluate_policy_meta_agent(
         logger.record("eval/SoC_collect", info_dict["SoC_collect"])
         logger.record("eval/reward_dodge", info_dict["reward_dodge"])
         logger.record("eval/reward_collect", info_dict["reward_collect"])
-        logger.record("eval/dodge_object_crashed_or_collected",
+        logger.record("eval/dodge_object_crashed",
                       info_dict["info_dodge"][0]["number_of_crashed_or_collected_objects"])
-        logger.record("eval/collect_object_crashed_or_collected",
+        logger.record("eval/collect_object_collected",
                       info_dict["info_collect"][0]["number_of_crashed_or_collected_objects"])
         # print("eval/action_meta", info_dict["action_meta"])
         # print("eval/dodge_position_before", info_dict["dodge_position_before"])
@@ -439,6 +447,9 @@ def evaluate_policy_meta_agent(
         # trigger metric visualization
         if callback_metric_viz:
             callback_metric_viz._on_step()
+
+        current_number_of_crashed_objects += info_dict["info_dodge"][0]["number_of_crashed_or_collected_objects"]
+        current_number_of_collected_objects += info_dict["info_collect"][0]["number_of_crashed_or_collected_objects"]
         ### until here
 
         current_rewards += rewards
@@ -471,8 +482,17 @@ def evaluate_policy_meta_agent(
                         episode_rewards.append(current_rewards[i])
                         episode_lengths.append(current_lengths[i])
                         episode_counts[i] += 1
+
+                        ### from me
+                        episode_number_of_crashed_objects.append(current_number_of_crashed_objects[i])
+                        episode_number_of_collected_objects.append(current_number_of_collected_objects[i])
+                        ###
                     current_rewards[i] = 0
                     current_lengths[i] = 0
+
+                    ### from me
+                    current_number_of_crashed_objects[i] = 0
+                    current_number_of_collected_objects[i] = 0
 
         observations = new_observations
 
@@ -484,5 +504,5 @@ def evaluate_policy_meta_agent(
     if reward_threshold is not None:
         assert mean_reward > reward_threshold, "Mean reward below threshold: " f"{mean_reward:.2f} < {reward_threshold:.2f}"
     if return_episode_rewards:
-        return episode_rewards, episode_lengths
+        return episode_rewards, episode_lengths, episode_number_of_crashed_objects, episode_number_of_collected_objects
     return mean_reward, std_reward
