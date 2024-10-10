@@ -85,7 +85,9 @@ class MetaEnvPretrained(gym.Env):
              "reward_dodge": gym.spaces.Box(low=0, high=1, shape=(1,), dtype=np.float32),
              "reward_collect": gym.spaces.Box(low=0, high=1, shape=(1,), dtype=np.float32),
              "task_action": gym.spaces.Box(low=0, high=2, shape=(1,), dtype=np.int64),
-             "meta_action": gym.spaces.Box(low=0, high=1, shape=(1,), dtype=np.int64)
+             "meta_action": gym.spaces.Box(low=0, high=1, shape=(1,), dtype=np.int64),
+             "crashed_objects": gym.spaces.Box(low=0, high=74, shape=(1,), dtype=np.int64),
+             "collected_objects": gym.spaces.Box(low=0, high=30, shape=(1,), dtype=np.int64)
              }
         )
 
@@ -152,7 +154,8 @@ class MetaEnvPretrained(gym.Env):
         # self.state = np.append(self.state, [self.SoC_dodge, self.SoC_collect, 0, 0, 0, 0])
         # self.state = np.array([self.SoC_dodge, self.SoC_collect, 0, 0, 0, 0])
         self.state = {"image": state_image, "SoC_dodge": self.SoC_dodge, "SoC_collect": self.SoC_collect,
-                      "reward_dodge": 0, "reward_collect": 0, "task_action": 0, "meta_action": 0}
+                      "reward_dodge": 0, "reward_collect": 0, "task_action": 0, "meta_action": 0, "crashed_objects": 0,
+                      "collected_objects": 0}
 
         # for rendering
         plt.ion()
@@ -404,7 +407,9 @@ class MetaEnvPretrained(gym.Env):
         #     [self.SoC_dodge, self.SoC_collect, reward_dodge, reward_collect, action_of_task_agent, action])
         self.state = {"image": state_image, "SoC_dodge": self.SoC_dodge, "SoC_collect": self.SoC_collect,
                       "reward_dodge": reward_dodge, "reward_collect": reward_collect,
-                      "task_action": action_of_task_agent, "meta_action": action}
+                      "task_action": action_of_task_agent, "meta_action": action,
+                      "crashed_objects": info_dodge[0]["number_of_crashed_or_collected_objects"],
+                      "collected_objects": info_collect[0]["number_of_crashed_or_collected_objects"]}
 
         self.step_counter += 1
         info = {"info_dodge": info_dodge, "info_collect": info_collect, "reward_dodge": reward_dodge,
@@ -416,17 +421,24 @@ class MetaEnvPretrained(gym.Env):
                 "predicted_collect_next_position": predicted_next_collect_position,
                 "prediction_error": active_prediction_error, "difficulty": active_difficulty,
                 "SoC_dodge": self.SoC_dodge, "SoC_collect": self.SoC_collect}
+
+        if info_dodge[0]["number_of_crashed_or_collected_objects"] > 0:
+            reward_dodge -= 1
+        if info_collect[0]["number_of_crashed_or_collected_objects"] > 0:
+            reward_collect += 1
         return (
             self.state,
-            active_reward_estimation_corrected_by_SoC + inactive_reward_estimation_corrected_by_SoC,
+            # active_reward_estimation_corrected_by_SoC + inactive_reward_estimation_corrected_by_SoC,
+            reward_dodge + reward_collect,
             active_is_done or inactive_is_done,
             False,
             info,
         )
 
     def render(self):
-        # FIXME: not implemented for obs with SoC, reward, task_action, meta_action
-        observation = copy.deepcopy(self.state).reshape(self.observation_height, self.observation_width * 2 + 4)
+        # observation = copy.deepcopy(self.state).reshape(self.observation_height, self.observation_width * 2 + 4)
+        observation = copy.deepcopy(self.state["image"]).reshape(self.observation_height,
+                                                                 self.observation_width * 2 + 4)
         # place frame around current task
         if self.current_task == 0:
             first_fill_value = -10
@@ -481,7 +493,8 @@ class MetaEnvPretrained(gym.Env):
         # self.state = np.append(self.state, [self.SoC_dodge, self.SoC_collect, 0, 0, 0, 0])
         # self.state = np.array([self.SoC_dodge, self.SoC_collect, 0, 0, 0, 0])
         self.state = {"image": state_image, "SoC_dodge": self.SoC_dodge, "SoC_collect": self.SoC_collect,
-                      "reward_dodge": 0, "reward_collect": 0, "task_action": 0, "meta_action": 0}
+                      "reward_dodge": 0, "reward_collect": 0, "task_action": 0, "meta_action": 0, "crashed_objects": 0,
+                      "collected_objects": 0}
 
         # counter
         self.episode_counter += 1
