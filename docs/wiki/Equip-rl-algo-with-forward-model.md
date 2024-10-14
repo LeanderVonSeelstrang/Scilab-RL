@@ -8,6 +8,10 @@ nav_order: 2
 
 You can extend any algorithm with a forward model that learns the environments transition dynamics, i.e., that predicts the `next_observation`, given `observation` and `action`.
 
+# Prerequisite
+
+Please ensure that you have completed the tutorial for [adding a new algorithm](Adding-a-new-Algorithm.md) before proceeding with this guide.
+
 # Necessary steps
 
 The following basic steps are necessary to equip an algorithm of your choice with a forward model:
@@ -24,15 +28,15 @@ Here, we exemplary show you how to equip the algorithm `cleansac` with a forward
 
 ## Adding a new algorithm
 
-Start with copying the folder `src.custom_algorithms.cleansac`. Name your copy `cleansac_fw`. 
+Start with copying the folder `src.custom_algorithms.cleansac`. Name your copy `cleansac_mod_fw`. 
 
-Copy the file `conf.algorithm.cleansac.yaml`. Name your copy `cleansac_fw.yaml`. 
+Copy the file `conf.algorithm.cleansac.yaml`. Name your copy `cleansac_mod_fw.yaml`. 
 
-IMPORTANT: Remember to change the name of your algorithm class, the import in the `__init__.py` and the name in the `cleansac_fw.yaml`. If you do not know what this means, please read the section about adding a new algorithm first!
+IMPORTANT: Remember to change the name of your algorithm class, the import in the `__init__.py` and the name in the `cleansac_mod_fw.yaml`. If you do not know what this means, please read the section about adding a new algorithm first!
 
 ## Extending the configuration
 
-In your newly created configuration file `cleansac_fw.yaml`, add a field `fwd`, that contains all parameters for your forward model. This looks as follows:
+In your newly created configuration file `cleansac_mod_fw.yaml`, add a field `fwd`, that contains all parameters for your forward model. This looks as follows:
 
 ```
 # Original file
@@ -68,7 +72,7 @@ log_act_step: False
 ```
 # Changed file
 
-name: 'cleansac_fw'
+name: 'cleansac_mod_fw'
 
 learning_rate: 0.0003
 buffer_size: 1_000_000
@@ -127,14 +131,14 @@ The class `DeterministicForwardModel` is a point estimator for the next observat
 
 The class `ProbabilisticForwardMLENetwork` learns a normal distribution over the predicted next observation.
 
-Import the class you need and the training data buffer as follows:
+Import the class you need and the training data buffer to your `cleansac_mod_fw.py` as follows:
 
 ```
 """
 Imports for the fw models
 """
-from src.utils.forward_models import DeterministicForwardNetwork, ProbabilisticForwardMLENetwork
-from src.utils.fw_utils import Training_Data
+from utils.forward_models import DeterministicForwardNetwork, ProbabilisticForwardMLENetwork
+from utils.fw_utils import Training_Data
 ```
 
 ## Equip your agent ("policy", "actor") with getters for action and observation shape
@@ -172,7 +176,7 @@ class Actor(nn.Module):
 First, it is crucial that you add `fwd = {}` as an argument in your algorithms initializer:
 
 ```
-class CLEANSAC_FW:
+class CLEANSAC_MOD_FW:
 
     (...)
 
@@ -202,7 +206,7 @@ Now you can instanciate your forward model and the training data buffer.
 Typically, you want the forward model and training data to be attributes of your algorithm instance. In this case, you can simply add the following attributes at the end of your algorithms initialization:
 
 ```
-class CLEANSAC_FW:
+class CLEANSAC_MOD_FW:
 
     (...)
 
@@ -298,9 +302,14 @@ Instead, we recommend to only (re-)train your forward model every n'th step:
 
 ```
 
+## Check your implementation
+To verify that your implementation is working correctly, you can start a training session with your newly implemented Forward model by running the following command:
+`python src/main.py algorithm=cleansac_mod_fw env=FetchReach-v2`.
+During training, you should observe that the `fwd/train_loss metric` decreases over time, indicating that the model is learning effectively. 
+
 ## Save your forward model
 
-If you want to save your forward model for later usage, you can do so by filling in `model_save_path` in the `cleansac_fw.yaml` and calling the forward models `save_model` or `save_state_dict` method before end of your RL algorithms training, like this:
+If you want to save your forward model for later usage, you can do so by filling in `model_save_path` in the `cleansac_mod_fw.yaml` and calling the forward models `save_model` or `save_state_dict` method before end of your RL algorithms training, like this (for further information see the [documentation](https://pytorch.org/tutorials/beginner/saving_loading_models.html) of pycharm):
 
 ```
     def learn(
@@ -322,7 +331,7 @@ If you want to save your forward model for later usage, you can do so by filling
 
 # Functionalities of implemented forward models
 
-Scilabrl currently implements two fully connected multi-layer perceptron (MLP) classes:
+This concludes the tutorial, providing you with additional explanations. Scilabrl currently implements two fully connected multi-layer perceptron (MLP) classes:
 
 1. `DeterministicForwardModel` is a point estimator for the next observation.
 2. `ProbabilisticForwardMLENetwork` learns the paramenters `mu` and `theta` of a normal distribution over the predicted next observation.
