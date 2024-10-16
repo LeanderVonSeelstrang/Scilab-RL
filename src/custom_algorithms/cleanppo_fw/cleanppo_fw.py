@@ -20,8 +20,8 @@ from stable_baselines3.common.vec_env import VecEnv
 """
 Imports for the fw models
 """
-from src.utils.forward_models import DeterministicForwardNetwork, ProbabilisticForwardMLENetwork
-from src.utils.fw_utils import Training_Data
+from utils.forward_models import DeterministicForwardNetwork, ProbabilisticForwardMLENetwork
+from utils.fw_utils import Training_Data
 
 
 #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

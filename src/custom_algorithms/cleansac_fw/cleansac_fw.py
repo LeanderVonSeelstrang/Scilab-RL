@@ -22,8 +22,8 @@ LOG_STD_MIN = -20
 """
 Imports for the fw models
 """
-from src.utils.forward_models import DeterministicForwardNetwork, ProbabilisticForwardMLENetwork
-from src.utils.fw_utils import Training_Data
+from utils.forward_models import DeterministicForwardNetwork, ProbabilisticForwardMLENetwork
+from utils.fw_utils import Training_Data
 
 class Actor(nn.Module):
     def __init__(self, env, action_scale_factor=1.0):
