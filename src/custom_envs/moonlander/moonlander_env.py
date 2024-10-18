@@ -1078,10 +1078,9 @@ class MoonlanderWorldEnv(Env):
 
         if (
                 objects_config["type"] == "coin"
-                and self.reward_function == "pos_neg"
                 and world_config["difficulty"] == "hard"
         ):
-            number_of_objects = 15
+            number_of_objects = 30
         else:
             number_of_objects = None
 
