@@ -38,6 +38,8 @@ How to [set up and perform a smoke test](Smoke-tests).
 
 How to [add a new robotic environment](Adding-a-new-Environment).
 
+How to [equip an algorithm with a forward model](Equip_rl-algo_with_forward_model).
+
 # Further information
 
 [How are the files structured?](File-structure)
