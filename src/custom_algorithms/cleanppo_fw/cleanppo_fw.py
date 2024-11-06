@@ -21,7 +21,7 @@ from stable_baselines3.common.vec_env import VecEnv
 Imports for the fw models
 """
 from utils.forward_models import DeterministicForwardNetwork, ProbabilisticForwardMLENetwork
-from utils.fw_utils import Training_Data
+from utils.fw_utils import Fwd_Training_Data
 
 
 #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -252,7 +252,7 @@ class CLEANPPO_FW:
         self.forward_model = ProbabilisticForwardMLENetwork(self.fwd, self.obs_shape, self.action_shape)
         self.fw_optimizer = torch.optim.Adam(self.forward_model.parameters(), lr=self.learning_rate)
 
-        self.training_data = Training_Data()
+        self.fwd_training_data = Fwd_Training_Data()
 
     def _setup_model(self) -> None:
         buffer_cls = DictRolloutBuffer if isinstance(self.observation_space, spaces.Dict) else RolloutBuffer
@@ -385,7 +385,7 @@ class CLEANPPO_FW:
             """
             Forward model training
             """
-            fw_data_loader = self.training_data.get_dataloader()
+            fw_data_loader = self.fwd_training_data.get_dataloader()
             self.forward_model.train(self.fw_optimizer, fw_data_loader)
 
             self.logger.record('fwd/train_loss', self.forward_model.get_average_loss(fw_data_loader))
@@ -440,7 +440,7 @@ class CLEANPPO_FW:
             self.num_timesteps += env.num_envs
 
             # Collect training data for the forward model
-            self.training_data.collect_training_data(self._last_obs, clipped_actions, new_obs)
+            self.fwd_training_data.collect_training_data(self._last_obs, clipped_actions, new_obs)
 
             # Give access to local variables
             callback.update_locals(locals())

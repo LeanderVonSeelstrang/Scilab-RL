@@ -23,7 +23,7 @@ LOG_STD_MIN = -20
 Imports for the fw models
 """
 from utils.forward_models import DeterministicForwardNetwork, ProbabilisticForwardMLENetwork
-from utils.fw_utils import Training_Data
+from utils.fw_utils import Fwd_Training_Data
 
 class Actor(nn.Module):
     def __init__(self, env, action_scale_factor=1.0):
@@ -234,7 +234,7 @@ class CLEANSAC_FW:
         self.forward_model = DeterministicForwardNetwork(self.fwd, self.obs_shape, self.action_shape)
         self.fw_optimizer = torch.optim.Adam(self.forward_model.parameters(), lr=self.learning_rate)
 
-        self.training_data = Training_Data()
+        self.fwd_training_data = Fwd_Training_Data()
 
     def _create_actor_critic(self) -> None:
         self.actor = Actor(self.env, self.action_scale_factor).to(self.device)
@@ -268,7 +268,7 @@ class CLEANSAC_FW:
                 Forward model training
                 """
                 if self.num_timesteps % self.fwd['retrain_every_n_steps'] == 0:
-                    fw_data_loader = self.training_data.get_dataloader()
+                    fw_data_loader = self.fwd_training_data.get_dataloader()
                     self.forward_model.train(self.fw_optimizer, fw_data_loader)
 
                     self.logger.record('fwd/train_loss', self.forward_model.get_average_loss(fw_data_loader))
@@ -342,7 +342,7 @@ class CLEANSAC_FW:
         self.replay_buffer.add(self._last_obs, next_obs, action, rewards, dones, infos)
 
         # Collect training data for the forward model
-        self.training_data.collect_training_data(self._last_obs, action, new_obs)
+        self.fwd_training_data.collect_training_data(self._last_obs, action, new_obs)
 
         self._last_obs = new_obs
 
