@@ -360,9 +360,9 @@ def train(self, optimizer: torch.optim.Optimizer, dataloader: torch.utils.data.D
     """
 ```
 
-## Inference
+## Inference (use model to make predictions)
 
-The models can be used for inference after training. Since they are trained to predict the difference `next_observation - observation`, instead of predicting the `next_observation` directly, you should use the models `predict` method for inference. Do not use the result of a forward pass through the network for inference!
+Inference in forward models involves using the trained models to make predictions based on new data. When these models are designed to predict the change in state, such as `next_observation - observation`, they are particularly well-suited for understanding the transitions or dynamics within a system. To perform inference correctly, you should utilize the models' `predict` method. This method is specifically crafted to compute the accurate predictions by incorporating the learned relationships from training. Avoid relying on the output of a simple forward pass through the network for inference, as it may not fully capture the nuances of the trained prediction differences, and thus might lead to inaccurate results.
 
 ```
 def predict(self, observation: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
