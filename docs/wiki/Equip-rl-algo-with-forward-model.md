@@ -309,7 +309,7 @@ During training, you should observe that the `fwd/train_loss metric` decreases o
 
 ## Save your forward model
 
-If you want to save your forward model for later usage, you can do so by filling in `model_save_path` in the `cleansac_mod_fw.yaml` and calling the forward models `save_model` or `save_state_dict` method before end of your RL algorithms training, like this (for further information see the [documentation](https://pytorch.org/tutorials/beginner/saving_loading_models.html) of pycharm):
+If you want to save your forward model for later usage, you can do so by filling in `model_save_path` in the `cleansac_mod_fw.yaml` and calling the forward models `save_model` or `save_state_dict` method before end of your RL algorithms training, like this (for further information see the [documentation](https://pytorch.org/tutorials/beginner/saving_loading_models.html) of PyTorch):
 
 ```
     def learn(
