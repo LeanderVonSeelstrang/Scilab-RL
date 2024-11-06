@@ -309,8 +309,27 @@ During training, you should observe that the `fwd/train_loss metric` decreases o
 
 ## Save your forward model
 
-If you want to save your forward model for later usage, you can do so by filling in `model_save_path` in the `cleansac_mod_fw.yaml` and calling the forward models `save_model` or `save_state_dict` method before end of your RL algorithms training, like this (for further information see the [documentation](https://pytorch.org/tutorials/beginner/saving_loading_models.html) of PyTorch):
+To save your forward model for future use, specify your desired file storage location by filling in the `model_save_path` field within the `cleansac_mod_fw_yaml`. Additionally, ensure you invoke either the `savemodel()` or `savestatedict()` method before completing the training of your reinforcement learning algorithm.
 
+
+### The difference of `save_model()` and `save_state_dict()`
+Within `utils/forward_models.py`, these methods function as follows:
+```
+    def save_model(self, model_name):
+        torch.save(self, os.path.join(self.cfg['model_save_path'], f'{model_name}.pt'))
+
+    def save_state_dict(self, state_dict_name):
+        torch.save(self.state_dict(), os.path.join(self.cfg['model_save_path'], f'{state_dict_name}.pt'))
+```
+The `save_state_dict()` method saves only the `state_dict`, which is a Python dictionary mapping each layer to its parameter tensor. This method is advantageous as it significantly reduces file size and is the **officially recommended approach by PyTorch**.
+
+
+
+Conversely, `save_model()` saves the entire model, resulting in a larger file size. A drawback of this method is that the serialized model is tied to the specific classes and directory structure present at the time of saving.
+
+We strongly encourage you to use `save_state_dict()` to save your models. For more information on saving and loading models or state dictionaries, see the [documentation](https://pytorch.org/tutorials/beginner/saving_loading_models.html) of PyTorch.  
+
+### Example implementation
 ```
     def learn(
         self,
@@ -321,7 +340,9 @@ If you want to save your forward model for later usage, you can do so by filling
         
         (...)
             
+        # use eiter this    
         self.forward_model.save_model('your_models_name')
+        # or this
         self.forward_model.save_state_dict('your_state_dicts_name')
 
         callback.on_training_end()
