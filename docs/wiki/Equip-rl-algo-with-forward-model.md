@@ -138,7 +138,7 @@ Import the class you need and the training data buffer to your `cleansac_mod_fw.
 Imports for the fw models
 """
 from utils.forward_models import DeterministicForwardNetwork, ProbabilisticForwardMLENetwork
-from utils.fw_utils import Training_Data
+from utils.fw_utils import Fwd_Training_Data
 ```
 
 ## Equip your agent ("policy", "actor") with getters for action and observation shape
@@ -241,7 +241,7 @@ class CLEANSAC_MOD_FW:
         self.forward_model = DeterministicForwardNetwork(self.fwd, self.obs_shape, self.action_shape)
         self.fw_optimizer = torch.optim.Adam(self.forward_model.parameters(), lr=self.learning_rate)
 
-        self.training_data = Training_Data()
+        self.fwd_training_data = Fwd_Training_Data()
 ```
 
 ## Find the appropriate place to collect training data
@@ -261,7 +261,7 @@ In `cleansac`, an appropriate place is directly in the `step_env()` method, righ
         (...)
 
         # Collect training data for the forward model
-        self.training_data.collect_training_data(self._last_obs, action, new_obs)
+        self.fwd_training_data.collect_training_data(self._last_obs, action, new_obs)
 
         self._last_obs = new_obs
 
@@ -293,7 +293,7 @@ Instead, we recommend to only (re-)train your forward model every n'th step:
                 Forward model training
                 """
                 if self.num_timesteps % self.fwd['retrain_every_n_steps'] == 0:  # only train every n steps
-                    fw_data_loader = self.training_data.get_dataloader()
+                    fw_data_loader = self.fwd_training_data.get_dataloader()
                     self.forward_model.train(self.fw_optimizer, fw_data_loader)
 
                     self.logger.record('fwd/train_loss', self.forward_model.get_average_loss(fw_data_loader))
