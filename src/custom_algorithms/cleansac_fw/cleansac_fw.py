@@ -73,23 +73,6 @@ class Actor(nn.Module):
 
         return action, log_prob
 
-    def get_observation_shape(self, env):
-        if isinstance(env.observation_space, spaces.Dict):
-            obs_shape = env.observation_space.spaces['observation'].shape[0]
-        else:
-            obs_shape = np.array(env.observation_space.shape).prod()
-
-        return obs_shape
-
-    def get_action_shape(self, env):
-
-        if isinstance(env.action_space, spaces.Discrete):
-            action_shape = env.action_space.n.size
-        else:
-            action_shape = np.prod(env.action_space.shape)
-
-        return action_shape
-
 
 class Critic(nn.Module):
     def __init__(self, env):
@@ -229,9 +212,7 @@ class CLEANSAC_FW:
         """
         Forward model initialization
         """
-        self.obs_shape = self.actor.get_observation_shape(self.env)
-        self.action_shape = self.actor.get_action_shape(self.env)
-        self.forward_model = DeterministicForwardNetwork(self.fwd, self.obs_shape, self.action_shape)
+        self.forward_model = DeterministicForwardNetwork(self.fwd, self.env)
         self.fw_optimizer = torch.optim.Adam(self.forward_model.parameters(), lr=self.learning_rate)
 
         self.fwd_training_data = Fwd_Training_Data()
