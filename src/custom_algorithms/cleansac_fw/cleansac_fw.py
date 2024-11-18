@@ -248,7 +248,7 @@ class CLEANSAC_FW:
                 """
                 Forward model training
                 """
-                if self.num_timesteps % self.fwd['retrain_every_n_steps'] == 0:
+                if self.num_timesteps % self.fwd['train_every_n_data'] == 0:
                     fw_data_loader = self.fwd_training_data.get_dataloader()
                     self.forward_model.train(self.fw_optimizer, fw_data_loader)
 

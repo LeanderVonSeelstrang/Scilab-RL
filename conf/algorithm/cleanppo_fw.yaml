@@ -20,5 +20,5 @@ fwd:
   loss_func : 'l2'  # for deterministic models, use l2; for probabilisticMLE model use nll. You can implement your desired loss in src.utils.forward_models.py
   fw_batch_size : 256
   fw_learning_rate : 0.0001
-  retrain_every_n_steps : 1  # can be set to 1 for algos that already train only in every k'th step (like for example cleanppo)
+  train_every_n_data : 1  # can be set to 1 for algos that already train only in every k'th step (like for example cleanppo)
   model_save_path : 'your/path/here'
