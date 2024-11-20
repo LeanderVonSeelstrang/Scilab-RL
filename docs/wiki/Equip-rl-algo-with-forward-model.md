@@ -19,7 +19,6 @@ The following basic steps are necessary to equip an algorithm of your choice wit
 1. Add a new algorithm as described in the corresponding section in this wiki.
 2. Extend the new algorithms configuration by a field `fwd`, that contains important parameters for the forward model.
 3. Import the desired forward model classes from `src.utils.forward_models.py` and a buffer for the training data from `src.utils.fw_utils.py` (you could also use a replay buffer class provided by stable baselines, but we recommend to use our custom class for convenience).
-4. Equip your agent (in some cases named 'policy' or 'actor') with getters to retrieve the shape of an `observation` and an `action`, respectively.
 5. Instanciate the forward model and the data buffer.
 6. Find the appropriate places to collect training data and to call your forward models `train` method.
 7. (Optional) Save your model for later use
@@ -141,35 +140,6 @@ from utils.forward_models import DeterministicForwardNetwork, ProbabilisticForwa
 from utils.fw_utils import Fwd_Training_Data
 ```
 
-## Equip your agent ("policy", "actor") with getters for action and observation shape
-
-For proper initialization of your forward model, you need to provide the correct shapes of `action` and `observation`. Since the agent needs to handle observations and actions anyways, it makes sense, to receive their dimensionality from it.
-
-You can do this by extend your agent (in many algorithms named "policy" or "actor") in the following way:
-
-```
-class Actor(nn.Module):
-    def __init__(self, env, action_scale_factor=1.0):
-        
-        (...)
-
-    def get_observation_shape(self, env):
-        if isinstance(env.observation_space, spaces.Dict):
-            obs_shape = env.observation_space.spaces['observation'].shape[0]
-        else:
-            obs_shape = np.array(env.observation_space.shape).prod()
-
-        return obs_shape
-
-    def get_action_shape(self, env):
-
-        if isinstance(env.action_space, spaces.Discrete):
-            action_shape = env.action_space.n.size
-        else:
-            action_shape = np.prod(env.action_space.shape)
-
-        return action_shape
-```
 
 ## Instanciate forward model and data buffer
 
@@ -232,13 +202,12 @@ class CLEANSAC_MOD_FW:
 
         (...)
 
+        
         """
-        Forward model and data buffer initialization
+        Forward model initialization
         """
         self.fwd = fwd
-        self.obs_shape = self.actor.get_observation_shape(self.env)
-        self.action_shape = self.actor.get_action_shape(self.env)
-        self.forward_model = DeterministicForwardNetwork(self.fwd, self.obs_shape, self.action_shape)
+        self.forward_model = DeterministicForwardNetwork(self.fwd, self.env)
         self.fw_optimizer = torch.optim.Adam(self.forward_model.parameters(), lr=self.learning_rate)
 
         self.fwd_training_data = Fwd_Training_Data()
@@ -250,7 +219,7 @@ Training data consists of triples `(observation, action, next_observation)`, whi
 
 Those triples are typically available right after an `env.step(action)` was performed, and BEFORE the `last_observation` is overwritten by a new observation.
 
-In `cleansac`, an appropriate place is directly in the `step_env()` method, right before the `last_observation` is overwritten. You collect training data by your training data buffers corresponding method `collect_training_data`:
+In `cleansac`, an appropriate place is directly in the `step_env()` method, right before the `last_observation` is overwritten. You collect training data by your forward models corresponding method `collect_training_data`:
 
 ```
     def step_env(
@@ -261,7 +230,7 @@ In `cleansac`, an appropriate place is directly in the `step_env()` method, righ
         (...)
 
         # Collect training data for the forward model
-        self.fwd_training_data.collect_training_data(self._last_obs, action, new_obs)
+        self.forward_model.collect_training_data(self.fwd_training_data, self._last_obs, action, new_obs)
 
         self._last_obs = new_obs
 
