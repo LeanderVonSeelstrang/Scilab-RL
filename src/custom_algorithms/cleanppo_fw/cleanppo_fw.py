@@ -421,7 +421,7 @@ class CLEANPPO_FW:
             self.num_timesteps += env.num_envs
 
             # Collect training data for the forward model
-            self.fwd_training_data.collect_training_data(self._last_obs, clipped_actions, new_obs)
+            self.forward_model.collect_training_data(self.fwd_training_data, self._last_obs, clipped_actions, new_obs)
 
             # Give access to local variables
             callback.update_locals(locals())
