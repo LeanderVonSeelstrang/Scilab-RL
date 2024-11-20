@@ -6,6 +6,7 @@ from torch.distributions import Normal
 from gymnasium import spaces
 import os
 from collections import OrderedDict
+from utils.fw_utils import Fwd_Training_Data
 
 LOG_STD_MAX = 2
 LOG_STD_MIN = -5
@@ -98,6 +99,9 @@ class ProbabilisticForwardNet(nn.Module):
         for obs, action, next_obs in dataloader:
            losses.append(self.loss_func(obs, action, next_obs).mean().detach().item())
         return np.mean(losses)
+
+    def collect_training_data(self, training_data:Fwd_Training_Data, last_obs, action, new_obs):
+        training_data.collect_training_data(last_obs, action, new_obs)
 
     def save_model(self, model_name):
         torch.save(self, os.path.join(self.cfg['model_save_path'], f'{model_name}.pt'))
