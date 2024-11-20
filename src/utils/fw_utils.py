@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader, Dataset
 from collections import OrderedDict
 import torch
 
-class Training_Dataset(Dataset):
+class Fwd_Training_Dataset(Dataset):
     """
     This class is not used for collecting training data. It is just a necessary intermediary for preparing the dataloader.
     """
@@ -18,7 +18,7 @@ class Training_Dataset(Dataset):
     def __getitem__(self, idx):
         return self.obs[idx], self.action[idx], self.next_obs[idx]
 
-class Training_Data():
+class Fwd_Training_Data():
     """
     Used to collect training data and to prepare it for model training.
     """
@@ -49,8 +49,8 @@ class Training_Data():
         self.raw_data['next_observation'].append(next_obs)
 
     def prepare_dataloader(self, batch_size = 256, shuffle = True):
-        training_dataset = Training_Dataset(self.raw_data)
-        self.dataloader = DataLoader(training_dataset, batch_size = batch_size, shuffle = shuffle)
+        fwd_training_dataset = Fwd_Training_Dataset(self.raw_data)
+        self.dataloader = DataLoader(fwd_training_dataset, batch_size = batch_size, shuffle = shuffle)
 
     def get_dataloader(self):
         self.prepare_dataloader()

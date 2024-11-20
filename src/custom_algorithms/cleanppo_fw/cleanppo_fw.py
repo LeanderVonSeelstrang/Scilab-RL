@@ -21,7 +21,7 @@ from stable_baselines3.common.vec_env import VecEnv
 Imports for the fw models
 """
 from utils.forward_models import DeterministicForwardNetwork, ProbabilisticForwardMLENetwork
-from utils.fw_utils import Training_Data
+from utils.fw_utils import Fwd_Training_Data
 
 
 #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -118,23 +118,6 @@ class Agent(nn.Module):
                 else:
                     action = distribution.sample()
             return action, distribution.log_prob(action).sum(1), distribution.entropy().sum(1), self.critic(x)
-
-    def get_observation_shape(self, env):
-        if isinstance(env.observation_space, spaces.Dict):
-            obs_shape = env.observation_space.spaces['observation'].shape[0]
-        else:
-            obs_shape = np.array(env.observation_space.shape).prod()
-
-        return obs_shape
-
-    def get_action_shape(self, env):
-
-        if isinstance(env.action_space, spaces.Discrete):
-            action_shape = env.action_space.n.size
-        else:
-            action_shape = np.prod(env.action_space.shape)
-
-        return action_shape
 
 class CLEANPPO_FW:
     """
@@ -247,12 +230,10 @@ class CLEANPPO_FW:
         """
         Forward model initialization
         """
-        self.obs_shape = self.policy.get_observation_shape(self.env)
-        self.action_shape = self.policy.get_action_shape(self.env)
-        self.forward_model = ProbabilisticForwardMLENetwork(self.fwd, self.obs_shape, self.action_shape)
+        self.forward_model = ProbabilisticForwardMLENetwork(self.fwd, self.env)
         self.fw_optimizer = torch.optim.Adam(self.forward_model.parameters(), lr=self.learning_rate)
 
-        self.training_data = Training_Data()
+        self.fwd_training_data = Fwd_Training_Data()
 
     def _setup_model(self) -> None:
         buffer_cls = DictRolloutBuffer if isinstance(self.observation_space, spaces.Dict) else RolloutBuffer
@@ -385,7 +366,7 @@ class CLEANPPO_FW:
             """
             Forward model training
             """
-            fw_data_loader = self.training_data.get_dataloader()
+            fw_data_loader = self.fwd_training_data.get_dataloader()
             self.forward_model.train(self.fw_optimizer, fw_data_loader)
 
             self.logger.record('fwd/train_loss', self.forward_model.get_average_loss(fw_data_loader))
@@ -440,7 +421,7 @@ class CLEANPPO_FW:
             self.num_timesteps += env.num_envs
 
             # Collect training data for the forward model
-            self.training_data.collect_training_data(self._last_obs, clipped_actions, new_obs)
+            self.forward_model.collect_training_data(self.fwd_training_data, self._last_obs, clipped_actions, new_obs)
 
             # Give access to local variables
             callback.update_locals(locals())

@@ -6,6 +6,7 @@ from torch.distributions import Normal
 from gymnasium import spaces
 import os
 from collections import OrderedDict
+from utils.fw_utils import Fwd_Training_Data
 
 LOG_STD_MAX = 2
 LOG_STD_MIN = -5
@@ -14,7 +15,7 @@ LOG_STD_MIN = -5
 device = torch.device('cpu')
 
 class ProbabilisticForwardNet(nn.Module):
-    def __init__(self, config, obs_shape, action_shape):
+    def __init__(self, config, env):
         super().__init__()
         self.hidden_size = config['hidden_size']
         self.n_hidden_layers = config['n_hidden_layers']  # Number of hidden layers
@@ -29,10 +30,16 @@ class ProbabilisticForwardNet(nn.Module):
         else:
             assert False, "Error, activation function not valid"
 
-        #self.obs_shape = config['observation_shape']
-        #self.action_shape = config['action_shape']
-        self.obs_shape = obs_shape
-        self.action_shape = action_shape
+        if isinstance(env.observation_space, spaces.Dict):
+            self.obs_shape = env.observation_space.spaces['observation'].shape[0]
+        else:
+            self.obs_shape = np.array(env.observation_space.shape).prod()
+
+        if isinstance(env.action_space, spaces.Discrete):
+            self.action_shape = env.action_space.n.size
+        else:
+            self.action_shape = np.prod(env.action_space.shape)
+
         self.input_shape = self.obs_shape + self.action_shape
 
         # Loss function setup
@@ -93,6 +100,9 @@ class ProbabilisticForwardNet(nn.Module):
            losses.append(self.loss_func(obs, action, next_obs).mean().detach().item())
         return np.mean(losses)
 
+    def collect_training_data(self, training_data:Fwd_Training_Data, last_obs, action, new_obs):
+        training_data.collect_training_data(last_obs, action, new_obs)
+
     def save_model(self, model_name):
         torch.save(self, os.path.join(self.cfg['model_save_path'], f'{model_name}.pt'))
 
@@ -100,8 +110,8 @@ class ProbabilisticForwardNet(nn.Module):
         torch.save(self.state_dict(), os.path.join(self.cfg['model_save_path'], f'{state_dict_name}.pt'))
 
 class ProbabilisticForwardMLENetwork(ProbabilisticForwardNet):
-    def __init__(self, config, obs_shape, action_shape):
-        super().__init__(config, obs_shape, action_shape)
+    def __init__(self, config, env):
+        super().__init__(config, env)
         # Building the state-action encoder and output layers dynamically based on n_hidden_layers
         self.state_action_encoder = self.build_hidden_layers(self.input_shape, self.hidden_size)
         self.fw_mu = self.build_hidden_layers(self.hidden_size, self.obs_shape)
@@ -118,8 +128,8 @@ class ProbabilisticForwardMLENetwork(ProbabilisticForwardNet):
 
 
 class DeterministicForwardNetwork(ProbabilisticForwardNet):
-    def __init__(self, config, obs_shape, action_shape):
-        super().__init__(config, obs_shape, action_shape)
+    def __init__(self, config, env):
+        super().__init__(config, env)
         # Building the state-action model dynamically based on n_hidden_layers
         self.state_action_model = self.build_hidden_layers(self.input_shape, self.obs_shape)
 

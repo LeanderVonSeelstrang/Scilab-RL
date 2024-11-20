@@ -19,7 +19,6 @@ The following basic steps are necessary to equip an algorithm of your choice wit
 1. Add a new algorithm as described in the corresponding section in this wiki.
 2. Extend the new algorithms configuration by a field `fwd`, that contains important parameters for the forward model.
 3. Import the desired forward model classes from `src.utils.forward_models.py` and a buffer for the training data from `src.utils.fw_utils.py` (you could also use a replay buffer class provided by stable baselines, but we recommend to use our custom class for convenience).
-4. Equip your agent (in some cases named 'policy' or 'actor') with getters to retrieve the shape of an `observation` and an `action`, respectively.
 5. Instanciate the forward model and the data buffer.
 6. Find the appropriate places to collect training data and to call your forward models `train` method.
 7. (Optional) Save your model for later use
@@ -138,38 +137,9 @@ Import the class you need and the training data buffer to your `cleansac_mod_fw.
 Imports for the fw models
 """
 from utils.forward_models import DeterministicForwardNetwork, ProbabilisticForwardMLENetwork
-from utils.fw_utils import Training_Data
+from utils.fw_utils import Fwd_Training_Data
 ```
 
-## Equip your agent ("policy", "actor") with getters for action and observation shape
-
-For proper initialization of your forward model, you need to provide the correct shapes of `action` and `observation`. Since the agent needs to handle observations and actions anyways, it makes sense, to receive their dimensionality from it.
-
-You can do this by extend your agent (in many algorithms named "policy" or "actor") in the following way:
-
-```
-class Actor(nn.Module):
-    def __init__(self, env, action_scale_factor=1.0):
-        
-        (...)
-
-    def get_observation_shape(self, env):
-        if isinstance(env.observation_space, spaces.Dict):
-            obs_shape = env.observation_space.spaces['observation'].shape[0]
-        else:
-            obs_shape = np.array(env.observation_space.shape).prod()
-
-        return obs_shape
-
-    def get_action_shape(self, env):
-
-        if isinstance(env.action_space, spaces.Discrete):
-            action_shape = env.action_space.n.size
-        else:
-            action_shape = np.prod(env.action_space.shape)
-
-        return action_shape
-```
 
 ## Instanciate forward model and data buffer
 
@@ -232,16 +202,15 @@ class CLEANSAC_MOD_FW:
 
         (...)
 
+        
         """
-        Forward model and data buffer initialization
+        Forward model initialization
         """
         self.fwd = fwd
-        self.obs_shape = self.actor.get_observation_shape(self.env)
-        self.action_shape = self.actor.get_action_shape(self.env)
-        self.forward_model = DeterministicForwardNetwork(self.fwd, self.obs_shape, self.action_shape)
+        self.forward_model = DeterministicForwardNetwork(self.fwd, self.env)
         self.fw_optimizer = torch.optim.Adam(self.forward_model.parameters(), lr=self.learning_rate)
 
-        self.training_data = Training_Data()
+        self.fwd_training_data = Fwd_Training_Data()
 ```
 
 ## Find the appropriate place to collect training data
@@ -250,7 +219,7 @@ Training data consists of triples `(observation, action, next_observation)`, whi
 
 Those triples are typically available right after an `env.step(action)` was performed, and BEFORE the `last_observation` is overwritten by a new observation.
 
-In `cleansac`, an appropriate place is directly in the `step_env()` method, right before the `last_observation` is overwritten. You collect training data by your training data buffers corresponding method `collect_training_data`:
+In `cleansac`, an appropriate place is directly in the `step_env()` method, right before the `last_observation` is overwritten. You collect training data by your forward models corresponding method `collect_training_data`:
 
 ```
     def step_env(
@@ -261,7 +230,7 @@ In `cleansac`, an appropriate place is directly in the `step_env()` method, righ
         (...)
 
         # Collect training data for the forward model
-        self.training_data.collect_training_data(self._last_obs, action, new_obs)
+        self.forward_model.collect_training_data(self.fwd_training_data, self._last_obs, action, new_obs)
 
         self._last_obs = new_obs
 
@@ -293,7 +262,7 @@ Instead, we recommend to only (re-)train your forward model every n'th step:
                 Forward model training
                 """
                 if self.num_timesteps % self.fwd['retrain_every_n_steps'] == 0:  # only train every n steps
-                    fw_data_loader = self.training_data.get_dataloader()
+                    fw_data_loader = self.fwd_training_data.get_dataloader()
                     self.forward_model.train(self.fw_optimizer, fw_data_loader)
 
                     self.logger.record('fwd/train_loss', self.forward_model.get_average_loss(fw_data_loader))
@@ -309,8 +278,27 @@ During training, you should observe that the `fwd/train_loss metric` decreases o
 
 ## Save your forward model
 
-If you want to save your forward model for later usage, you can do so by filling in `model_save_path` in the `cleansac_mod_fw.yaml` and calling the forward models `save_model` or `save_state_dict` method before end of your RL algorithms training, like this (for further information see the [documentation](https://pytorch.org/tutorials/beginner/saving_loading_models.html) of pycharm):
+To save your forward model for future use, specify your desired file storage location by filling in the `model_save_path` field within the `cleansac_mod_fw_yaml`. Additionally, ensure you invoke either the `savemodel()` or `savestatedict()` method before completing the training of your reinforcement learning algorithm.
 
+
+### The difference of `save_model()` and `save_state_dict()`
+Within `utils/forward_models.py`, these methods function as follows:
+```
+    def save_model(self, model_name):
+        torch.save(self, os.path.join(self.cfg['model_save_path'], f'{model_name}.pt'))
+
+    def save_state_dict(self, state_dict_name):
+        torch.save(self.state_dict(), os.path.join(self.cfg['model_save_path'], f'{state_dict_name}.pt'))
+```
+The `save_state_dict()` method saves only the `state_dict`, which is a Python dictionary mapping each layer to its parameter tensor. This method is advantageous as it significantly reduces file size and is the **officially recommended approach by PyTorch**.
+
+
+
+Conversely, `save_model()` saves the entire model, resulting in a larger file size. A drawback of this method is that the serialized model is tied to the specific classes and directory structure present at the time of saving.
+
+We strongly encourage you to use `save_state_dict()` to save your models. For more information on saving and loading models or state dictionaries, see the [documentation](https://pytorch.org/tutorials/beginner/saving_loading_models.html) of PyTorch.  
+
+### Example implementation
 ```
     def learn(
         self,
@@ -321,7 +309,9 @@ If you want to save your forward model for later usage, you can do so by filling
         
         (...)
             
+        # use eiter this    
         self.forward_model.save_model('your_models_name')
+        # or this
         self.forward_model.save_state_dict('your_state_dicts_name')
 
         callback.on_training_end()
@@ -360,9 +350,9 @@ def train(self, optimizer: torch.optim.Optimizer, dataloader: torch.utils.data.D
     """
 ```
 
-## Inference
+## Inference (use model to make predictions)
 
-The models can be used for inference after training. Since they are trained to predict the difference `next_observation - observation`, instead of predicting the `next_observation` directly, you should use the models `predict` method for inference. Do not use the result of a forward pass through the network for inference!
+Inference in forward models involves using the trained models to make predictions based on new data. When these models are designed to predict the change in state, such as `next_observation - observation`, they are particularly well-suited for understanding the transitions or dynamics within a system. To perform inference correctly, you should utilize the models' `predict` method. This method is specifically crafted to compute the accurate predictions by incorporating the learned relationships from training. Avoid relying on the output of a simple forward pass through the network for inference, as it may not fully capture the nuances of the trained prediction differences, and thus might lead to inaccurate results.
 
 ```
 def predict(self, observation: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
