@@ -149,7 +149,7 @@ def create_callbacks(cfg, logger, eval_env):
 
 # config_path is relative to the location of the Python script
 @hydra.main(config_name="main", config_path="../conf", version_base="1.1.2")
-def main(cfg: DictConfig) -> (float, int):
+def main(cfg: DictConfig): # -> (float, int):
     run_dir = os.getcwd()
     if cfg.restore_policy is not None:
         run_dir = os.path.split(cfg.restore_policy)[:-1][0]

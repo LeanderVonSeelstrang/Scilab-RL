@@ -15,7 +15,8 @@ from gymnasium.wrappers.monitoring import video_recorder
 from moviepy.editor import VideoFileClip, clips_array
 from gymnasium import spaces
 from metaworld.envs import ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE as METAWORLD_ENVS
-from metaworld.envs.reward_utils import tolerance
+# from metaworld.envs.reward_utils import tolerance
+from metaworld.envs.mujoco.utils.reward_utils import tolerance
 
 
 # for newer versions of metaworld
